@@ -1,0 +1,9 @@
+{
+  "name": "aventura-de-almas",
+  "version": "1.0.0",
+  "description": "Aventura de almas: estrategia por turnos para celular, hasta 10 jugadores",
+  "main": "server.js",
+  "scripts": { "start": "node server.js", "sim": "node test/sim.js 10 150" },
+  "engines": { "node": ">=18" },
+  "dependencies": {}
+}
