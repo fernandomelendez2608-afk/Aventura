@@ -1,0 +1,44 @@
+// Prueba en Chrome móvil: chat dentro de la partida (con un segundo jugador por WebSocket)
+const { spawn } = require('child_process');
+const fs = require('fs');
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const srv = spawn('node', ['server.js'], { env: { ...process.env, PORT: '3118', DATA_DIR: '/tmp/ada-cdp6-data' } });
+const chrome = spawn('google-chrome', ['--headless=new', '--no-sandbox', '--disable-gpu', '--no-proxy-server', '--remote-debugging-port=9339', '--user-data-dir=/tmp/ada-cdp6-chrome', 'about:blank'], { stdio: 'ignore' });
+let bad = 0; const check = (n, c, x) => { if (!c) bad++; console.log((c ? '✓ ' : '✗ ') + n + (x ? ' — ' + x : '')); };
+(async () => {
+  await wait(3000);
+  const page = (await (await fetch('http://127.0.0.1:9339/json')).json()).find(t => t.type === 'page');
+  const ws = new WebSocket(page.webSocketDebuggerUrl); await new Promise(r => ws.onopen = r);
+  let id = 0; const pend = new Map(); const errs = [];
+  ws.onmessage = e => { const m = JSON.parse(e.data); if (m.id && pend.has(m.id)) { pend.get(m.id)(m); pend.delete(m.id); } else if (m.method === 'Runtime.exceptionThrown') errs.push(m.params.exceptionDetails.text + ' ' + (m.params.exceptionDetails.exception?.description || '')); };
+  const cdp = (method, params = {}) => new Promise(r => { const i = ++id; pend.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
+  const ev = async expr => { const r = await cdp('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true }); return r.result.result.value; };
+  fs.mkdirSync('/tmp/shots', { recursive: true });
+  const shot = async name => { const r = await cdp('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync('/tmp/shots/' + name + '.png', Buffer.from(r.result.data, 'base64')); };
+  await cdp('Runtime.enable'); await cdp('Page.enable');
+  await cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 780, deviceScaleFactor: 2, mobile: true });
+  await cdp('Page.navigate', { url: 'http://127.0.0.1:3118/' }); await wait(1300);
+  await ev(`document.getElementById('hName').value='Fercho'; document.getElementById('hCreate').click()`); await wait(700);
+  const code = await ev(`S.code`);
+  // segundo jugador humano por WebSocket
+  const w2 = new WebSocket('ws://127.0.0.1:3118/ws'); await new Promise(r => w2.onopen = r);
+  const got = []; w2.onmessage = e => got.push(JSON.parse(e.data));
+  w2.send(JSON.stringify({ t: 'join', code, name: 'Amigo' })); await wait(500);
+  await ev(`document.getElementById('lBot').click()`); await wait(300);
+  await ev(`document.getElementById('lStart').click()`); await wait(1500);
+  check('la partida empezó', await ev(`S.status`) === 'playing');
+  await ev(`document.getElementById('nChat').click()`); await wait(400);
+  await shot('c1-chat-vacio');
+  await ev(`(()=>{const i=document.getElementById('chIn'); i.value='Hola desde el celular 👋'; document.querySelector('[data-ui=chsend]').click()})()`); await wait(600);
+  check('mi mensaje aparece en la lista', (await ev(`document.getElementById('chList').innerText`)).includes('Hola desde el celular'));
+  w2.send(JSON.stringify({ t: 'chat', text: '¡Hola Fercho! Vamos por el jefe', al: false })); await wait(700);
+  check('el mensaje del amigo llega en vivo', (await ev(`document.getElementById('chList').innerText`)).includes('Vamos por el jefe'));
+  await shot('c2-chat-conversacion');
+  await ev(`document.querySelector('[data-ui=close]') && document.querySelector('[data-ui=close]').click()`); await wait(300);
+  w2.send(JSON.stringify({ t: 'chat', text: 'Mensaje con el chat cerrado', al: false })); await wait(700);
+  const badge = await ev(`(()=>{const b=document.getElementById('chCnt'); return b.classList.contains('hidden') ? '' : b.textContent})()`);
+  check('con el chat cerrado aparece el contador de no leídos', badge === '1', 'contador: ' + badge);
+  await shot('c3-chat-contador');
+  console.log('errores JS:', JSON.stringify(errs)); check('sin errores en la página', errs.length === 0);
+  chrome.kill(); srv.kill(); process.exit(bad ? 1 : 0);
+})();

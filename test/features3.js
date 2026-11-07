@@ -40,6 +40,13 @@ console.log('Órdenes en cola');
   const far = g.units.find(x => x.o === 0);
   let tx = null, ty = null;
   for (let r = 6; r < 12 && tx === null; r++) for (const [dx, dy] of S.DIRS) { const x = cap.x + dx * r, y = cap.y + dy * r; if (x > 0 && y > 0 && x < g.map.w - 1 && y < g.map.h - 1 && 'gfh'.includes(g.map.t.charAt(y * g.map.w + x))) { tx = x; ty = y; break; } }
+  { // despeja un camino recto para que el resultado no dependa del mapa al azar
+    const arr = g.map.t.split ? g.map.t.split('') : null;
+    let x = u.x, y = u.y; const set = (X, Y) => { const k = Y * g.map.w + X; if (arr) arr[k] = 'g'; else g.map.t[k] = 'g'; };
+    while (x !== tx || y !== ty) { x += Math.sign(tx - x); y += Math.sign(ty - y); set(x, y); }
+    if (arr) g.map.t = arr.join('');
+    g.creatures = []; E.touch(g);
+  }
   const r1 = E.cmd(g, 0, { a: 'ord', u: u.id, o: 'goto', x: tx, y: ty });
   ok(!r1.err && u.ord && u.ord.t === 'goto', 'orden "ir a" aceptada: ' + (r1.err || r1.msg));
   const d0 = Math.max(Math.abs(u.x - tx), Math.abs(u.y - ty));
@@ -148,7 +155,7 @@ console.log('Edificios');
   if (c.owner === 1) ok(c.b.muralla === before - 1 && c.b.herreria === 1, 'al conquistarla los edificios bajan un nivel');
   // bots construyen solos
   const g2 = mk(2); const bc = city(g2, 1); bc.st.m = { hierro: 60, acero: 30, cuero: 60, hueso: 60 };
-  for (let i = 0; i < 8; i++) { g2.status = 'playing'; E.advanceTurn(g2); }
+  for (let i = 0; i < 8; i++) { g2.status = 'playing'; g2.creatures = []; E.touch(g2); E.advanceTurn(g2); }
   ok(bc.b && Object.keys(bc.b).length > 0, 'los bots también construyen: ' + JSON.stringify(bc.b));
 }
 

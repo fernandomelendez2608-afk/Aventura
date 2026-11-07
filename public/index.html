@@ -83,9 +83,11 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:0}
 .hint{color:var(--dim);font-size:13px;margin:6px 0}
 #pushBar{position:absolute;left:8px;right:8px;bottom:8px;z-index:6;background:#181c27f2;border:1px solid var(--gold);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;font-size:14px}
 #pushBar .row{gap:8px}
+.menub{min-height:34px;width:40px;border-radius:9px;border:1px solid var(--line);background:#181c27;color:inherit;font-size:18px;margin-right:8px;padding:0}
 #mm{position:absolute;right:8px;top:8px;width:104px;height:104px;border:2px solid var(--line);border-radius:8px;background:#0b0d12;z-index:4;touch-action:none;opacity:.92}
 #nav{position:absolute;right:8px;top:120px;z-index:4;display:flex;flex-direction:column;gap:6px}
 #nav button{width:46px;height:46px;border-radius:50%;border:1px solid var(--line);background:#181c27ee;font-size:20px;position:relative}
+#sheet .chm{padding:5px 8px;margin:4px 0;border-radius:10px;background:#ffffff0d}#sheet .chm.me{background:#e6b45a22}#sheet .chm div{word-break:break-word}
 #nav button small{position:absolute;bottom:-1px;right:-1px;background:var(--gold);color:#1b1608;border-radius:99px;font-size:10px;padding:0 5px;font-weight:700}
 .r1{color:#6cb4ff}.r2{color:#c58bff}
 .fxl{display:block;color:var(--dim);font-size:12px;margin-top:1px}
@@ -105,6 +107,7 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:0}
       <h3>Tu nombre</h3>
       <input id="hName" maxlength="14" placeholder="Ej: Fercho" autocomplete="off">
     </div>
+    <div class="card hidden" id="hSaved"><h3>Tus partidas</h3><p class="hint" style="margin-top:0">Puedes tener varias a la vez. Salir al menú no te saca de la partida.</p><div id="hList"></div></div>
     <div class="card">
       <h3>Nueva partida</h3>
       <button class="btn gold block" id="hCreate">Crear partida</button>
@@ -116,7 +119,6 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:0}
       <p class="hint" style="margin-top:0">Esta partida ya empezó. Puedes ocupar el lugar de uno de sus bots y seguir con su ejército y sus ciudades:</p>
       <div id="hSlotList"></div>
       <button class="btn block" id="hSlotCancel" style="margin-top:10px">Cancelar</button></div>
-    <div class="card hidden" id="hSaved"><h3>Tus partidas</h3><div id="hList"></div></div>
     <p class="sub" style="margin:18px 0"><span class="conn" id="hConn"></span><span id="hConnT">Conectando…</span></p>
   </div>
 </section>
@@ -158,6 +160,8 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:0}
         <option value="5">Un bot dirige su ejército tras 5 turnos sin entrar</option>
         <option value="0">Nunca (su ejército se queda quieto)</option>
       </select>
+      <h3 style="margin-top:18px">🌍 Ajustes del mundo</h3>
+      <div id="lWorld"></div>
       <p class="hint">El turno termina cuando todos los humanos pulsan «Listo» o se acaba el tiempo. Todos juegan a la vez.</p>
       <button class="btn gold block" id="lStart">Empezar partida</button>
     </div>
@@ -168,8 +172,8 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:0}
 </section>
 
 <section id="game" class="screen hidden">
-  <div id="top"><span><span class="conn" id="gConn"></span><b id="gTurn">Turno 1</b></span><span class="mid" id="gTimer">--:--:--</span><span id="gReady" class="dim">0/0</span></div>
-  <div id="cvwrap"><canvas id="cv"></canvas><canvas id="mm" width="104" height="104"></canvas><div id="nav"><button id="nHome" title="Ir a mi ciudad">🏠</button><button id="nNext" title="Siguiente unidad con acciones">🛡️<small id="nCnt">0</small></button></div><div id="toast"></div><div id="pushBar" class="hidden"></div></div>
+  <div id="top"><span><button class="menub" id="gMenu" title="Menú principal">☰</button><span class="conn" id="gConn"></span><b id="gTurn">Turno 1</b></span><span class="mid" id="gTimer">--:--:--</span><span id="gReady" class="dim">0/0</span></div>
+  <div id="cvwrap"><canvas id="cv"></canvas><canvas id="mm" width="104" height="104"></canvas><div id="nav"><button id="nHome" title="Ir a mi ciudad">🏠</button><button id="nChat" title="Chat">💬<small id="chCnt" class="hidden">0</small></button><button id="nNext" title="Siguiente unidad con acciones">🛡️<small id="nCnt">0</small></button></div><div id="toast"></div><div id="pushBar" class="hidden"></div></div>
   <div id="sheet" class="hidden"></div>
   <div id="bar">
     <button data-ui="units"><span>🛡️</span>Unidades<i class="badge hidden" id="bUnits"></i></button>
@@ -193,14 +197,23 @@ let selId = null, sheet = null, forge = { k: 'espada', tr: 1 };
 let reachMap = null, atkSet = new Set(), lastLog = 0, firstState = true;
 let maps = { mine: new Map(), cre: new Map(), oth: new Map(), city: new Map() };
 const cam = { x: 10, y: 10, z: 44 };
-let saved = [];
+let saved = [], resumed = false, gInfo = {}, gSkew = 0;
 try { saved = JSON.parse(localStorage.getItem('ada_games') || '[]'); } catch (e) { saved = []; }
 const persist = () => { try { localStorage.setItem('ada_games', JSON.stringify(saved)); } catch (e) {} };
 
 /* ---------- red ---------- */
 function connect() {
   ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
-  ws.onopen = () => { wsOpen = true; retry = 0; setConn(true); if (cur) send({ t: 'auth', code: cur.code, token: cur.token }); };
+  ws.onopen = () => {
+    wsOpen = true; retry = 0; setConn(true);
+    if (cur) send({ t: 'auth', code: cur.code, token: cur.token });
+    else if (!resumed) { // al recargar la página vuelve a la última partida abierta
+      resumed = true; let last = null; try { last = localStorage.getItem('ada_last'); } catch (e) {}
+      const s = saved.find(x => x.code === last);
+      if (s) { cur = { code: s.code, token: s.token, pid: 0, name: s.name }; send({ t: 'auth', code: s.code, token: s.token }); }
+    }
+    askGames();
+  };
   ws.onclose = () => { wsOpen = false; setConn(false); setTimeout(connect, Math.min(8000, 800 + retry++ * 800)); };
   ws.onerror = () => { try { ws.close(); } catch (e) {} };
   ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch (x) { return; } onMsg(m); };
@@ -222,37 +235,62 @@ setInterval(() => { if (!document.hidden && S && S.status === 'playing') { lastS
 function onMsg(m) {
   if (m.t === 'joined') {
     cur = { code: m.code, token: m.token, pid: m.pid, name: m.name };
-    saved = saved.filter(s => s.code !== m.code); saved.unshift({ code: m.code, token: m.token, name: m.name }); saved = saved.slice(0, 8); persist();
+    saved = saved.filter(s => s.code !== m.code); saved.unshift({ code: m.code, token: m.token, name: m.name }); saved = saved.slice(0, 20); persist(); try { localStorage.setItem('ada_last', m.code); } catch (e) {}
     try { localStorage.setItem('ada_name', m.name); } catch (e) {}
     vapidKey = m.vapid || null; $('hSlots').classList.add('hidden'); pendingJoin = null; lastSeenTurn = -1; syncPush(); renderPushBar();
   } else if (m.t === 's') {
+    if (!cur) return;
     S = m.s; skew = S.now - Date.now(); onState();
   } else if (m.t === 'err') {
     toast(m.m, true); $('hErr').textContent = m.m; $('lErr').textContent = m.m;
   } else if (m.t === 'msg') toast(m.m);
   else if (m.t === 'slots') showSlots(m.slots, m.code);
+  else if (m.t === 'mygames') { gSkew = m.now - Date.now(); gInfo = {}; for (const g of m.games) gInfo[g.code] = g; if (!$('home').classList.contains('hidden')) renderSaved(); }
   else if (m.t === 'push') { renderPushBar(); if (!$('sheet').classList.contains('hidden')) renderSheet(); }
-  else if (m.t === 'authfail') { saved = saved.filter(s => !cur || s.code !== cur.code); persist(); leave(); toast('Esa partida ya no existe en el servidor', true); }
+  else if (m.t === 'authfail') { leave(); toast('No se encontró esa partida en el servidor. Si acaba de despertar, espera un momento y reintenta; si no, quítala de la lista con ✕.', true); }
   else if (m.t === 'kicked') { leave(); toast('El anfitrión te sacó de la sala', true); }
 }
-function leave() { cur = null; S = null; selId = null; sheet = null; firstState = true; show('home'); renderSaved(); }
+function leave() {
+  if (ws && wsOpen) { try { ws.send(JSON.stringify({ t: 'leave' })); } catch (e) {} }
+  try { localStorage.removeItem('ada_last'); } catch (e) {}
+  cur = null; S = null; selId = null; sheet = null; firstState = true; show('home'); renderSaved(); askGames();
+}
+function askGames() { if (saved.length && wsOpen) ws.send(JSON.stringify({ t: 'mygames', games: saved.map(s => ({ code: s.code, token: s.token })) })); }
+setInterval(() => { if (!document.hidden && !$('home').classList.contains('hidden')) askGames(); }, 20000);
+$('gMenu').onclick = () => { leave(); toast('Tu partida sigue en marcha. Vuelve a entrar desde «Tus partidas».'); };
 function act(o) { return send(Object.assign({ t: 'cmd' }, o)); }
 
 /* ---------- pantallas ---------- */
-function show(id) { for (const s of ['home', 'lobby', 'game']) $(s).classList.toggle('hidden', s !== id); if (id === 'game') resize(); }
+function show(id) { for (const s of ['home', 'lobby', 'game']) $(s).classList.toggle('hidden', s !== id); if (id === 'game') resize(); if (id === 'home') { renderSaved(); askGames(); } }
 function toast(msg, err) {
   const t = document.createElement('div'); if (err) t.className = 'e'; t.textContent = msg;
   const box = $('toast'); box.appendChild(t); while (box.children.length > 3) box.removeChild(box.firstChild);
   setTimeout(() => t.remove(), err ? 3200 : 2400);
 }
 
+function fmtLeft(ms) { if (ms <= 0) return 'turno por cerrar'; const m = Math.floor(ms / 60000), h = Math.floor(m / 60); return h >= 24 ? 'quedan ' + Math.floor(h / 24) + ' d ' + (h % 24) + ' h' : h ? 'quedan ' + h + ' h ' + (m % 60) + ' min' : 'quedan ' + m + ' min'; }
 function renderSaved() {
   $('hSaved').classList.toggle('hidden', !saved.length);
-  $('hList').innerHTML = saved.map(s => `<div class="line"><div class="g"><b>${esc(s.code)}</b> <span class="dim">· ${esc(s.name)}</span></div><button class="btn sm gold" data-ui="resume:${esc(s.code)}">Entrar</button></div>`).join('');
+  $('hList').innerHTML = saved.map(s => {
+    const i = gInfo[s.code]; let st = '<span class="dim">Consultando…</span>';
+    if (i) {
+      if (!i.ok) st = '<span class="lack">No se encontró en el servidor (quizá se borró)</span>';
+      else if (i.status === 'lobby') st = `🕓 En sala de espera · ${i.n} ${i.n === 1 ? 'jugador' : 'jugadores'}${i.host ? ' · eres el anfitrión' : ''}`;
+      else if (i.status === 'over') st = '🏁 Terminada' + (i.winner === i.you ? ' · ¡ganaste!' : '');
+      else st = `Turno ${i.turn} · ` + (!i.alive ? '☠️ eliminado' : i.auto ? '🤖 un bot juega por ti' : i.ready ? '✔ ya terminaste tu turno' : '<b style="color:var(--gold)">⏳ te toca jugar</b>') + ' · ' + fmtLeft(i.endsAt - (Date.now() + gSkew));
+    }
+    return `<div class="line"><div class="g"><b>${esc(s.code)}</b> <span class="dim">· ${esc(s.name)}</span><div class="hint" style="margin:2px 0 0">${st}</div></div><button class="btn sm gold fix" data-ui="resume:${esc(s.code)}">Entrar</button><button class="btn sm fix" data-ui="forget:${esc(s.code)}" title="Quitar de la lista" aria-label="Quitar de la lista">✕</button></div>`;
+  }).join('') + (saved.some(x => gInfo[x.code] && !gInfo[x.code].ok) ? '<button class="btn sm block" style="margin-top:10px" data-ui="clean:x">🧹 Quitar las que ya no existen</button>' : '');
 }
 $('hList').addEventListener('click', e => {
   const b = e.target.closest('[data-ui]'); if (!b) return;
-  const code = b.dataset.ui.split(':')[1]; const s = saved.find(x => x.code === code); if (!s) return;
+  if (b.dataset.ui === 'clean:x') { saved = saved.filter(x => !gInfo[x.code] || gInfo[x.code].ok); persist(); renderSaved(); return; }
+  const [k, code] = b.dataset.ui.split(':'); const s = saved.find(x => x.code === code); if (!s) return;
+  if (k === 'forget') {
+    const i = gInfo[code];
+    if ((i && !i.ok) || confirm('¿Quitar la partida ' + code + ' de tu lista?\nLa partida sigue en el servidor; si te ausentas un bot jugará por ti. Para volver necesitarás el código y ocupar el lugar de un bot.')) { saved = saved.filter(x => x.code !== code); persist(); renderSaved(); }
+    return;
+  }
   cur = { code: s.code, token: s.token, pid: 0, name: s.name }; send({ t: 'auth', code: s.code, token: s.token });
 });
 $('hName').value = localStorage.getItem('ada_name') || '';
@@ -274,15 +312,17 @@ function renderLobby() {
   $('lCode').textContent = S.code; $('lCount').textContent = S.players.length;
   $('lPlayers').innerHTML = S.players.map(p => `<div class="it"><span class="sw" style="background:${p.color}"></span><b>${esc(p.name)}</b>${p.id === S.hostId ? '<span class="tag">anfitrión</span>' : ''}${botTag(p)}${p.id === S.you ? '<span class="tag">tú</span>' : ''}<span style="flex:1"></span>${host && p.id !== S.hostId ? `<button class="btn sm red fix" data-ui="rm:${p.id}">Quitar</button>` : ''}</div>`).join('');
   $('lAdd').classList.toggle('hidden', !host); $('lCfg').classList.toggle('hidden', !host); $('lWait').classList.toggle('hidden', host);
-  if (host) { $('lTurn').value = String(S.cfg.turnHours); if ($('lTurn').value !== String(S.cfg.turnHours)) $('lTurn').value = '4'; $('lMax').value = String(S.cfg.maxTurns); $('lIdle').value = String(S.cfg.idleTurns === undefined ? 2 : S.cfg.idleTurns); $('lLevel').value = S.cfg.botLevel || 'normal'; }
+  if (host) { $('lTurn').value = String(S.cfg.turnHours); if ($('lTurn').value !== String(S.cfg.turnHours)) $('lTurn').value = '4'; $('lMax').value = String(S.cfg.maxTurns); $('lIdle').value = String(S.cfg.idleTurns === undefined ? 2 : S.cfg.idleTurns); $('lLevel').value = S.cfg.botLevel || 'normal'; for (const k in SH.WORLD_OPTS) $('w_' + k).value = String(S.cfg[k] !== undefined ? S.cfg[k] : SH.WORLD_OPTS[k].def); }
 }
 $('lPlayers').addEventListener('click', e => { const b = e.target.closest('[data-ui]'); if (b) send({ t: 'lobby', a: 'remove', id: +b.dataset.ui.split(':')[1] }); });
 $('lBot').onclick = () => send({ t: 'lobby', a: 'addbot', pers: $('lPers').value });
 $('lPers').onchange = () => { const d = SH.PERS[$('lPers').value]; $('lPersHint').textContent = d ? d.d : 'Cada bot recibe una personalidad distinta al azar.'; $('lPersHint').classList.remove('hidden'); };
-$('lTurn').onchange = () => send({ t: 'lobby', a: 'cfg', turnHours: +$('lTurn').value, maxTurns: +$('lMax').value, idleTurns: +$('lIdle').value, botLevel: $('lLevel').value });
-$('lMax').onchange = $('lTurn').onchange; $('lIdle').onchange = $('lTurn').onchange; $('lLevel').onchange = $('lTurn').onchange;
+$('lWorld').innerHTML = Object.keys(SH.WORLD_OPTS).map(k => { const o = SH.WORLD_OPTS[k]; return `<label class="dim" style="display:block;margin-top:10px">${o.n}</label><select id="w_${k}" data-w="${k}" style="margin-top:6px">${Object.keys(o.o).map(v => `<option value="${v}">${o.o[v]}</option>`).join('')}</select>`; }).join('');
+const sendCfg = () => { const m = { t: 'lobby', a: 'cfg', turnHours: +$('lTurn').value, maxTurns: +$('lMax').value, idleTurns: +$('lIdle').value, botLevel: $('lLevel').value }; for (const k in SH.WORLD_OPTS) m[k] = $('w_' + k).value; send(m); };
+for (const id of ['lTurn', 'lMax', 'lIdle', 'lLevel']) $(id).onchange = sendCfg;
+for (const k in SH.WORLD_OPTS) $('w_' + k).onchange = sendCfg;
 $('lStart').onclick = () => { $('lErr').textContent = ''; send({ t: 'lobby', a: 'start' }); };
-$('lLeave').onclick = () => leave();
+$('lLeave').onclick = () => { leave(); toast('Tu partida sigue en «Tus partidas».'); };
 $('lCopy').onclick = async () => { try { await navigator.clipboard.writeText(S.code); toast('Código copiado'); } catch (e) { toast('Código: ' + S.code); } };
 $('lShare').onclick = async () => {
   const text = `Únete a mi partida de Aventura de almas. Código: ${S.code}\n${location.origin}`;
@@ -290,11 +330,13 @@ $('lShare').onclick = async () => {
 };
 
 /* ---------- estado del juego ---------- */
+let chatPrev = 0;
 function onState() {
   if (!S) return;
   if (S.status === 'lobby') { show('lobby'); renderLobby(); return; }
   const wasHidden = $('game').classList.contains('hidden');
   show('game');
+  const prevChat = chatPrev; chatPrev = S.chat && S.chat.length ? S.chat[S.chat.length - 1].id : 0;
   maps = { mine: new Map(), cre: new Map(), oth: new Map(), city: new Map() };
   for (const u of S.mine) maps.mine.set(u.y * S.w + u.x, u);
   for (const c of S.cre) maps.cre.set(c.y * S.w + c.x, c);
@@ -319,9 +361,10 @@ function onState() {
     else if (S.recap && recapKey !== S.recap.to && !sheet) { recapKey = S.recap.to; sheet = { mode: 'recap', tab: 'state' }; resize(); }
     lastTurnClient = S.turn;
   }
+  chatOnState(prevChat);
   computeReach(); renderTop(); renderSheet(); dirty = true; sendSeen(); renderPushBar();
 }
-const classAvail = u => (!u.cls && u.lv >= SH.CLASS_LV) || (u.cls && !u.sub && u.lv >= SH.SUB_LV);
+const classAvail = u => !u.sm && ((!u.cls && u.lv >= SH.CLASS_LV) || (u.cls && !u.sub && u.lv >= SH.SUB_LV));
 const clsTag = u => u.cls ? SH.CLASSES[u.cls].e + (u.sub ? SH.CLASSES[u.cls].sub[u.sub].e : '') : '';
 const bldHtml = b => SH.BUILD_ORDER.filter(k => b && b[k]).map(k => `<span class="chip">${SH.BUILDINGS[k].e}${b[k] > 1 ? ' ' + 'II' : ''}</span>`).join('');
 let gotoMode = null, recapKey = null, lastTurnClient = null;
@@ -389,6 +432,7 @@ const bar = (cls, a, b) => `<div class="bar ${cls}"><i style="width:${pct(a, b)}
 
 function renderSheet() {
   const el = $('sheet');
+  if (sheet && sheet.mode === 'chat' && S && S.status !== 'lobby' && $('chList')) { chatRefresh(); return; } // no pisa lo que se está escribiendo
   if (!sheet || !S || S.status === 'lobby') { el.classList.add('hidden'); el.innerHTML = ''; return; }
   let html = '';
   const u = selUnit();
@@ -402,12 +446,14 @@ function renderSheet() {
     case 'cities': html += hd('Tus ciudades') + (S.cities.filter(c => c.o === S.you).map(c => `<div class="line" data-ui="city:${c.id}"><div class="g"><b>${esc(c.name)}</b> ${bldHtml(c.b)}<div>${matsHtml(c.st.m)}</div></div><span class="dim">${c.st.it.length} 🎒</span></div>`).join('') || '<p class="dim">No controlas ciudades.</p>'); break;
     case 'city': html += citySheet(); break;
     case 'log': html += hd('Registro') + (S.log.map(l => `<div class="line"><span class="dim fix" style="min-width:38px">T${l.turn}</span><div class="g">${esc(l.text)}</div></div>`).join('') || '<p class="dim">Sin novedades.</p>'); break;
+    case 'chat': html += chatSheet(); break;
     case 'players': html += playersSheet(); break;
     case 'info': html += infoSheet(); break;
   }
   const key = sheet.mode + ':' + sheet.tab + ':' + (sheet.cityId || '') + (selId || '');
   const keep = el._key === key ? el.scrollTop : 0;
   el.innerHTML = html; el.classList.remove('hidden'); el._key = key; el.scrollTop = keep;
+  if (sheet.mode === 'chat') { const l = $('chList'); if (l) l.scrollTop = l.scrollHeight; }
 }
 const hd = t => `<div class="hd"><b>${t}</b><button class="x" data-ui="close">✕</button></div>`;
 
@@ -425,8 +471,9 @@ function recapSheet() {
     `<button class="btn gold block" style="margin-top:12px" data-ui="close">Entendido</button>`;
 }
 function unitSheet(u) {
-  const e = u.e, tabs = [['state', 'Estado'], ['skills', 'Habilidades' + (u.pts ? ' ⭐' + u.pts : '')], ['class', 'Clase' + (classAvail(u) ? ' ⭐' : '')], ['gear', 'Equipo'], ['bag', 'Mochila']];
-  let h = `<div class="hd"><span class="sw" style="background:${S.players[S.you].color}"></span><b>${esc(u.name)} <span class="dim">niv. ${u.lv}</span> ${clsTag(u)}</b><button class="x" data-ui="close">✕</button></div>`;
+  if (u.sm) sheet.tab = 'state';
+  const e = u.e, tabs = u.sm ? [['state', 'Estado']] : u.cart ? [['state', 'Estado'], ['bag', 'Carga']] : [['state', 'Estado'], ['skills', 'Habilidades' + (u.pts ? ' ⭐' + u.pts : '')], ['class', 'Clase' + (classAvail(u) ? ' ⭐' : '')], ['gear', 'Equipo'], ['bag', 'Mochila']];
+  let h = `<div class="hd"><span class="sw" style="background:${S.players[S.you].color}"></span><b>${esc(u.name)} <span class="dim">niv. ${u.lv}</span> ${clsTag(u)}</b><button class="btn sm fix" data-ui="rename" title="Cambiar nombre" style="margin-left:auto">✏️</button><button class="x" data-ui="close">✕</button></div>`;
   h += `<div class="tabs">${tabs.map(t => `<button class="tab ${sheet.tab === t[0] ? 'on' : ''}" data-ui="tab:${t[0]}">${t[1]}</button>`).join('')}</div>`;
   if (sheet.tab === 'state') {
     const w = u.eq.arma;
@@ -436,6 +483,16 @@ function unitSheet(u) {
       <div class="stat"><small>Daño</small>${e.dmg}${e.attacks > 1 ? ' ×2' : ''}</div><div class="stat"><small>Defensa</small>${e.def}</div>
       <div class="stat"><small>Alcance</small>${e.min === e.range ? e.range : e.min + '–' + e.range}</div><div class="stat"><small>Movimiento</small>${u.mp}/${e.mov}</div>
       <div class="stat"><small>Ataques</small>${u.at}/${e.attacks}</div><div class="stat"><small>Arma</small>${w ? SH.KINDS[w.k].e + ' ' + SH.itemName(w) : '✊ Puños'}</div></div>`;
+    if (S.cfg && S.cfg.hero !== 'no' && !u.sm) {
+      if (u.hr) h += `<p class="hint ok">${u.hr} <b>Protagonista</b>: +50% de experiencia y +${Math.round(SH.HERO.aura * 100)}% de daño y defensa a tus unidades a ${SH.HERO.range} casillas. Si cae, vuelve a tu ciudad en ${SH.HERO.wait} turnos con ${SH.HERO.loss} niveles menos.</p>`;
+      if (S.turn <= SH.HERO.pickTurn) h += `<div class="row" style="flex-wrap:wrap;gap:6px;margin:6px 0">${u.hr ? SH.HERO.emb.map(em => `<button class="btn sm ${em === u.hr ? 'gold' : ''}" data-c='${jattr({ a: 'hero', u: u.id, emb: em })}'>${em}</button>`).join('') : `<button class="btn sm gold" data-c='${jattr({ a: 'hero', u: u.id })}'>👑 Elegir como protagonista</button>`}</div><p class="hint">Solo se puede elegir y cambiar en el turno 1; después queda fijo.</p>`;
+    }
+    if (u.e && u.e.ha) h += `<p class="hint ok">👑 Cerca de tu protagonista: +${Math.round(u.e.ha * 100)}% de daño y defensa.</p>`;
+    if (u.cart) h += `<p class="hint ok">🛒 Carreta: almacén móvil (${u.cap} de capacidad, movilidad ${u.e.mov}). No ataca ni sube de nivel. Llévala a una ciudad para cargar o descargar; si la matan, el enemigo se queda con parte de la carga.</p>`;
+    if (u.sm) h += `<p class="hint ok">🔮 Invocación (${SH.CREATURES[u.sm].n}): su fuerza sube con el nivel de su invocador y desaparece si él cae.</p><button class="btn sm red" data-c='${jattr({ a: 'dismiss', u: u.id })}'>Despedir</button>`;
+    if (u.sc) h += `<h3 class="hint" style="margin-top:12px">🔮 Invocar (${u.sc.n}/${u.sc.max} por jugador)</h3>` + (u.sc.near ? '' : '<p class="hint lack">Acércate a 2 casillas o menos de una ciudad tuya.</p>') + `<div class="row" style="flex-wrap:wrap;gap:6px">${u.sc.opts.map(o => `<button class="btn sm gold" ${u.sc.near && u.sc.n < u.sc.max && u.sc.bones >= o.cost.hueso ? '' : 'disabled'} data-c='${jattr({ a: 'summon', u: u.id, k: o.k })}'>${SH.CREATURES[o.k].e} ${SH.CREATURES[o.k].n} · ${SH.MATS.hueso.e}${o.cost.hueso}</button>`).join('')}</div><p class="hint">Huesos en el almacén cercano: ${u.sc.bones}.</p>`;
+    if (u.bn) h += `<p class="hint ok">👶 Cría: +${u.bn.hp} salud y +${u.bn.dmg} daño de nacimiento.</p>`;
+    if (u.pr) h += u.pr.w ? `<p class="hint ok">💞 Junto a <b>${esc(u.pr.w)}</b> cerca de la ciudad: ${u.pr.n}/${u.pr.need} turnos.</p>` : `<p class="hint">💞 ${u.pr.cd > 0 ? 'Podrá tener otra cría en ' + u.pr.cd + ' turnos.' : 'Para tener una cría: quédate 1 casilla de otra unidad tuya, a 2 casillas de una ciudad tuya, durante ' + u.pr.need + ' turnos.'}</p>`;
     if (e.aura) h += `<p class="hint">Aura de aliado cercano: +${Math.round(e.aura * 100)}% salud y defensa.</p>`;
     h += `<h3 class="hint" style="margin-top:12px">Órdenes (siguen solas los próximos turnos)</h3>`;
     if (u.ord) h += `<p class="hint ok">${ORD_E[u.ord.t]} Orden actual: <b>${SH.ORDERS[u.ord.t].n}</b>${u.ord.t === 'goto' ? ` (${u.ord.x},${u.ord.y})` : ''}</p>`;
@@ -454,11 +511,11 @@ function unitSheet(u) {
     if (!u.nearCity) h += '<p class="hint">Acércate a una ciudad tuya para cambiar el equipo.</p>';
   } else {
     let w = 0; for (const k in u.inv.m) w += u.inv.m[k]; w += u.inv.it.length * 2;
-    h += `<p class="hint">Mochila: ${w}/${S.invCap}</p><div>${matsHtml(u.inv.m)}</div>`;
+    h += `<p class="hint">${u.cart ? '🛒 Carga' : 'Mochila'}: ${w}/${u.cap || S.invCap}</p><div>${matsHtml(u.inv.m)}</div>`;
     if (u.nearCity) {
       const c = S.cities.find(c => c.o === S.you && Math.max(Math.abs(c.x - u.x), Math.abs(c.y - u.y)) <= 1);
       h += `<button class="btn gold block" style="margin:10px 0" data-c='${jattr({ a: 'dep', u: u.id, all: true })}' ${w ? '' : 'disabled'}>Depositar todo en ${esc(c.name)}</button>`;
-      h += `<h3 class="hint">Almacén de la ciudad</h3>` + (SH.MAT_ORDER.filter(k => c.st.m[k] > 0).map(k => `<div class="line"><div class="g">${SH.MATS[k].e} ${SH.MATS[k].n} <b>${c.st.m[k]}</b></div><button class="btn sm fix" data-c='${jattr({ a: 'wd', u: u.id, m: k, n: 1 })}'>+1</button><button class="btn sm fix" data-c='${jattr({ a: 'wd', u: u.id, m: k, n: 5 })}'>+5</button></div>`).join('') || '<p class="dim">Vacío</p>');
+      h += `<h3 class="hint">Almacén de la ciudad</h3>` + (SH.MAT_ORDER.filter(k => c.st.m[k] > 0).map(k => `<div class="line"><div class="g">${SH.MATS[k].e} ${SH.MATS[k].n} <b>${c.st.m[k]}</b></div><button class="btn sm fix" data-c='${jattr({ a: 'wd', u: u.id, m: k, n: 1 })}'>+1</button>${u.cart ? `<button class="btn sm fix" data-c='${jattr({ a: 'wd', u: u.id, m: k, n: 999 })}'>Todo</button>` : ''}<button class="btn sm fix" data-c='${jattr({ a: 'wd', u: u.id, m: k, n: 5 })}'>+5</button></div>`).join('') || '<p class="dim">Vacío</p>');
       h += c.st.it.map(it => `<div class="line"><div class="g">${itemHtml(it)}</div><button class="btn sm fix" data-c='${jattr({ a: 'wdi', u: u.id, i: it.id })}'>Tomar</button></div>`).join('');
     } else h += '<p class="hint">Acércate a una ciudad tuya para depositar el botín o tomar materiales.</p>';
   }
@@ -502,6 +559,9 @@ function citySheet() {
       return `<div class="line" style="flex-wrap:wrap"><div class="g" style="flex-basis:100%"><b>${B.e} ${B.n}</b> <span class="pips">${'●'.repeat(lv)}${'○'.repeat(SH.BUILD_MAX - lv)}</span><div class="hint" style="margin:2px 0 0">${B.d}</div></div>` +
         (cost ? `<div>${SH.MAT_ORDER.filter(m => cost[m]).map(m => `<span class="chip ${(c.st.m[m] || 0) >= cost[m] ? 'ok' : 'lack'}">${SH.MATS[m].e} ${c.st.m[m] || 0}/${cost[m]}</span>`).join('')}</div><button class="btn sm ${ok ? 'gold' : ''}" ${ok ? '' : 'disabled'} data-c='${jattr({ a: 'build', c: c.id, k })}'>${lv ? 'Mejorar' : 'Construir'}</button>` : '<span class="ok">Nivel máximo</span>') + `</div>`;
     }).join('');
+    { const ct = SH.CART, cc = c.cart, okc = !cc && S.cfg.mode !== 'uno' && SH.MAT_ORDER.every(m => !ct.cost[m] || (c.st.m[m] || 0) >= ct.cost[m]);
+      h += `<div class="line" style="flex-wrap:wrap"><div class="g" style="flex-basis:100%"><b>${ct.e} Carreta</b> <span class="pips">${cc ? '●' : '○'}</span><div class="hint" style="margin:2px 0 0">Almacén móvil: carga hasta ${ct.cap} (una mochila normal lleva ${S.invCap}), movilidad ${ct.mov}, no ataca y no cuenta como unidad. Máximo una por ciudad.</div></div>` +
+        (S.cfg.mode === 'uno' ? '<div class="hint lack">No disponible en el reto de una unidad.</div>' : cc ? `<div class="hint ok">Activa en (${cc.x}, ${cc.y})</div><button class="btn sm" data-ui="gotocart" data-x="${cc.x}" data-y="${cc.y}">Ver</button>` : `<div>${SH.MAT_ORDER.filter(m => ct.cost[m]).map(m => `<span class="chip ${(c.st.m[m] || 0) >= ct.cost[m] ? 'ok' : 'lack'}">${SH.MATS[m].e} ${c.st.m[m] || 0}/${ct.cost[m]}</span>`).join('')}</div><button class="btn sm ${okc ? 'gold' : ''}" ${okc ? '' : 'disabled'} data-c='${jattr({ a: 'cart', c: c.id })}'>Construir</button>`) + '</div>'; }
   } else if (sheet.tab === 'up') {
     const left = (c.cm || S.craftsMax) - c.crafts, soul = SH.MATS.alma;
     h += `<p class="hint">Trabajos restantes este turno: <b>${left}</b>. Mejorar sube la calidad del material (cuesta menos que forjar de nuevo) y conserva los efectos. Encantar añade un efecto especial (máx. 2) por ${SH.ENCHANT_COST.alma} ${soul.e} ${soul.n.toLowerCase()}.</p>`;
@@ -517,16 +577,16 @@ function citySheet() {
       return `<div class="line" style="flex-wrap:wrap"><div class="g" style="flex-basis:100%">${itemHtml(it)}</div><div>${b || '<span class="dim">Ya está al máximo</span>'}</div>${ch}</div>`;
     }).join('') : '<p class="dim">No hay objetos en el almacén. Forja uno o lleva botín raro de criaturas élite, jefes, cofres y ruinas.</p>';
   } else {
-    const cost = c.rc, n = S.mine.length, ok = SH.MAT_ORDER.every(m => !cost[m] || (c.st.m[m] || 0) >= cost[m]) && n < S.maxUnits;
+    const cost = c.rc, n = S.mine.filter(x => !x.sm && !x.cart).length, ok = SH.MAT_ORDER.every(m => !cost[m] || (c.st.m[m] || 0) >= cost[m]) && n < S.maxUnits;
     h += `<p>Unidades: <b>${n}/${S.maxUnits}</b></p><div>Coste: ${SH.MAT_ORDER.filter(m => cost[m]).map(m => `<span class="chip ${(c.st.m[m] || 0) >= cost[m] ? 'ok' : 'lack'}">${SH.MATS[m].e} ${c.st.m[m] || 0}/${cost[m]}</span>`).join('')}</div>`;
-    h += `<button class="btn gold block" style="margin-top:10px" ${ok ? '' : 'disabled'} data-c='${jattr({ a: 'recruit', c: c.id })}'>Reclutar unidad</button><p class="hint">La nueva unidad empieza en nivel 1 y descansa el turno en que llega. Cada reclutamiento cuesta más.</p>`;
+    if (S.cfg.mode === 'uno') h += '<p class="hint lack">🎯 Reto de una unidad: aquí no se puede reclutar.</p>'; else h += `<button class="btn gold block" style="margin-top:10px" ${ok ? '' : 'disabled'} data-c='${jattr({ a: 'recruit', c: c.id })}'>Reclutar unidad</button><p class="hint">La nueva unidad empieza en nivel 1 y descansa el turno en que llega. Cada reclutamiento cuesta más.</p>`;
   }
   return h;
 }
 
 function playersSheet() {
   const list = S.players.slice().sort((a, b) => b.score - a.score);
-  let h = hd('Jugadores') + list.map(p => `<div class="line"><span class="sw" style="background:${p.color}"></span><div class="g"><b>${esc(p.name)}</b>${botTag(p)}${p.auto ? '<span class="tag">🤖 ausente</span>' : ''}${p.id === S.you ? '<span class="tag">tú</span>' : ''}<div class="hint" style="margin:0">${p.alive ? `${p.units} ${p.units === 1 ? 'unidad' : 'unidades'} · ${p.cities} ${p.cities === 1 ? 'ciudad' : 'ciudades'} · ${p.kills} criaturas · ${p.pk} jugadores` : '☠️ eliminado'}</div></div><div style="text-align:right"><b>${p.score}</b><div class="hint" style="margin:0">${p.alive && !p.bot && !p.auto ? (p.ready ? '✅ listo' : '⏳') : ''}${S.you === S.hostId && p.auto && S.status === 'playing' ? `<button class="btn sm red" style="margin-top:4px" data-ui="release:${p.id}">Liberar plaza</button>` : ''}</div></div></div>`).join('');
+  let h = hd('Jugadores') + list.map(p => `<div class="line"><span class="sw" style="background:${p.color}"></span><div class="g"><b>${esc(p.name)}</b>${botTag(p)}${p.auto ? '<span class="tag">🤖 ausente</span>' : ''}${p.id === S.you ? '<span class="tag">tú</span>' : ''}${p.hero ? `<div class="hint" style="margin:0">${p.hero.emb} ${esc(p.hero.n)} · nivel ${p.hero.lv}${p.hero.w ? ' · ☠️ vuelve en ' + p.hero.w + ' turnos' : ''}</div>` : ''}<div class="hint" style="margin:0">${p.alive ? `${p.units} ${p.units === 1 ? 'unidad' : 'unidades'} · ${p.cities} ${p.cities === 1 ? 'ciudad' : 'ciudades'} · ${p.kills} criaturas · ${p.pk} jugadores` : '☠️ eliminado'}</div></div><div style="text-align:right"><b>${p.score}</b><div class="hint" style="margin:0">${p.alive && !p.bot && !p.auto ? (p.ready ? '✅ listo' : '⏳') : ''}${S.you === S.hostId && p.auto && S.status === 'playing' ? `<button class="btn sm red" style="margin-top:4px" data-ui="release:${p.id}">Liberar plaza</button>` : ''}</div></div></div>`).join('');
   h += diplomacyHtml();
   h += `<p class="hint">Puntos: nivel de unidades ×5, ciudades ×30, criaturas ×2, jefes ×50, jugadores abatidos ×20.</p>`;
   h += `<p class="hint">🤖 ausente: un bot dirige su ejército (de forma cauta) hasta que vuelva a entrar. El anfitrión puede liberar su plaza para que entre otra persona.</p>`;
@@ -580,6 +640,9 @@ $('sheet').addEventListener('click', e => {
   const b = e.target.closest('[data-ui]'); if (!b) return;
   const [k, v] = b.dataset.ui.split(':');
   if (k === 'close') closeSheet();
+  else if (k === 'gotocart') { closeSheet(); centerOn(+b.dataset.x, +b.dataset.y); }
+  else if (k === 'rename') { const u = S.mine.find(x => x.id === selId); if (!u) return; const nm = prompt('Nuevo nombre para esta unidad (máx. 16 letras):', u.name); if (nm !== null && nm.trim()) send({ t: 'cmd', a: 'rename', u: u.id, name: nm }); }
+  else if (k === 'chsend') chatSend();
   else if (k === 'goto') { gotoMode = gotoMode === selId ? null : selId; if (gotoMode) toast('Toca la casilla de destino en el mapa'); renderSheet(); }
   else if (k === 'tab') { sheet.tab = v; renderSheet(); }
   else if (k === 'pick') { selectUnit(+v, true); }
@@ -663,9 +726,9 @@ function tapTile(x, y) {
 }
 
 /* ---------- mapa: dibujo ---------- */
-const TCOL = { g: '#4d7a3b', f: '#2f5a33', h: '#8a7b4c', m: '#69707c', w: '#2a5b8c', '?': '#0a0c11' };
+const TCOL = { g: '#4d7a3b', f: '#2f5a33', h: '#8a7b4c', m: '#69707c', d: '#c2a45a', w: '#2a5b8c', '?': '#0a0c11' };
 const EMO = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
-const WEAPON_E = { daga: '🗡️', espada: '⚔️', arco: '🏹', arcolargo: '🎯', ballesta: '🔱' };
+const WEAPON_E = new Proxy({}, { get: (_, k) => SH.KINDS[k] ? SH.KINDS[k].e : '⚔️' });
 function emoji(ch, cx, cy, size) { ctx.font = Math.floor(size) + 'px ' + EMO; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(ch, cx, cy + size * 0.06); }
 function draw() {
   if (!S || S.status === 'lobby') return;
@@ -723,10 +786,11 @@ function draw() {
     ctx.fillStyle = col; ctx.beginPath(); ctx.arc(cx, cy, z * .36, 0, 7); ctx.fill();
     ctx.strokeStyle = own && u && u.id === m.id ? '#fff' : '#000a'; ctx.lineWidth = own && u && u.id === m.id ? 3 : 2; ctx.stroke();
     const w = own ? (m.eq.arma && m.eq.arma.k) : m.w;
-    emoji(w ? WEAPON_E[w] : '✊', cx, cy, z * .42);
+    emoji((m.cart || m.ct) ? SH.CART.e : m.sm ? SH.CREATURES[m.sm].e : (w ? WEAPON_E[w] : '✊'), cx, cy, z * .42);
     hpBar(cx, cy + z * .43, z * .7, own ? m.hp / m.e.maxHp : m.hp / m.mhp);
     ctx.font = 'bold ' + Math.floor(z * .24) + 'px sans-serif'; ctx.textAlign = 'right'; ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.strokeText(m.lv, cx + z * .44, cy - z * .3); ctx.fillText(m.lv, cx + z * .44, cy - z * .3);
     if (own && (m.mp > 0 || m.at > 0) && S.status === 'playing') { ctx.fillStyle = '#3fbf7f'; ctx.beginPath(); ctx.arc(cx - z * .34, cy - z * .34, z * .08, 0, 7); ctx.fill(); }
+    if (m.hr) emoji(m.hr, cx - z * .3, cy - z * .36, z * .3);
     if (own && (m.pts > 0 || classAvail(m))) emoji('⭐', cx - z * .3, cy + z * .1, z * .3);
     if (own && m.ord && z > 24) emoji(ORD_E[m.ord.t], cx + z * .32, cy - z * .02, z * .26);
     if (m.pz && z > 26) emoji('☠️', cx + z * .3, cy + z * .12, z * .24);
@@ -773,6 +837,44 @@ mm.addEventListener('pointerdown', e => { mmDown = true; try { mm.setPointerCapt
 mm.addEventListener('pointermove', e => { if (mmDown) mmGo(e); });
 mm.addEventListener('pointerup', () => { mmDown = false; }); mm.addEventListener('pointercancel', () => { mmDown = false; });
 let navCity = 0, navUnit = -1;
+/* ---- chat ---- */
+let chatSeen = 0, chatCode = null, chatFirst = true;
+function chatKey() { return 'ada_chat_' + (S ? S.code : ''); }
+function chatLoad() { if (!S) return; if (chatCode !== S.code) { chatCode = S.code; try { chatSeen = +localStorage.getItem(chatKey()) || 0; } catch (e) { chatSeen = 0; } chatFirst = true; } }
+function chatUnread() { return (S && S.chat ? S.chat : []).filter(m => m.id > chatSeen && m.p !== S.you).length; }
+function chatMark() { const l = S && S.chat && S.chat.length ? S.chat[S.chat.length - 1].id : 0; if (l > chatSeen) { chatSeen = l; try { localStorage.setItem(chatKey(), String(l)); } catch (e) { /* sin almacenamiento */ } } }
+function chatHtml() {
+  const ms = S.chat || [];
+  if (!ms.length) return '<p class="hint">Aún no hay mensajes. ¡Saluda a los demás jugadores!</p>';
+  return ms.map(m => { const p = S.players[m.p]; return `<div class="chm ${m.p === S.you ? 'me' : ''}"><b style="color:${p ? p.color : '#fff'}">${esc(p ? p.name : '?')}</b> <small class="dim">T${m.tu}${m.al ? ' · 🤝 aliados' : ''}</small><div>${esc(m.x)}</div></div>`; }).join('');
+}
+function chatSheet() {
+  return hd('💬 Chat de la partida') + `<div id="chList" style="max-height:40vh;overflow:auto;margin-bottom:8px">${chatHtml()}</div>
+    <div class="row"><input id="chIn" maxlength="200" placeholder="Escribe un mensaje…" autocomplete="off" style="flex:1;font-size:16px"><button class="btn gold fix" data-ui="chsend">Enviar</button></div>
+    <label class="hint" style="display:block;margin-top:6px"><input type="checkbox" id="chAl" style="width:20px;height:20px;min-width:20px;padding:0;margin:0 8px 0 0;vertical-align:middle;display:inline-block"> Solo para mis aliados 🤝</label>`;
+}
+function chatRefresh() {
+  const l = $('chList'); if (!l) return;
+  const near = l.scrollHeight - l.scrollTop - l.clientHeight < 60;
+  l.innerHTML = chatHtml(); if (near) l.scrollTop = l.scrollHeight;
+  chatMark(); chatBadge();
+}
+function chatBadge() { const n = sheet && sheet.mode === 'chat' ? 0 : chatUnread(); const b = $('chCnt'); b.textContent = n > 9 ? '9+' : n; b.classList.toggle('hidden', !n); }
+function chatSend() {
+  const i = $('chIn'); if (!i) return; const t = i.value.trim(); if (!t) return;
+  send({ t: 'chat', text: t, al: $('chAl').checked }); i.value = '';
+}
+function chatOnState(prev) {
+  chatLoad();
+  if (sheet && sheet.mode === 'chat') chatMark();
+  else if (!chatFirst && S.chat) {
+    const fresh = S.chat.filter(m => m.id > prev && m.p !== S.you);
+    if (fresh.length) { const m = fresh[fresh.length - 1]; toast(`💬 ${S.players[m.p] ? S.players[m.p].name : '?'}: ${m.x.length > 40 ? m.x.slice(0, 40) + '…' : m.x}`); }
+  }
+  chatFirst = false; chatBadge();
+}
+$('nChat').onclick = () => { openSheet('chat'); chatMark(); chatBadge(); };
+$('sheet').addEventListener('keydown', e => { if (e.target && e.target.id === 'chIn' && e.key === 'Enter') { e.preventDefault(); chatSend(); } });
 $('nHome').onclick = () => {
   if (!S) return; const mine = S.cities.filter(c => c.o === S.you).sort((a, b) => (b.cap ? 1 : 0) - (a.cap ? 1 : 0) || a.id - b.id);
   if (!mine.length) { const u = S.mine[0]; if (u) centerOn(u.x, u.y); return; }
@@ -857,7 +959,6 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').cat
 
 /* ---------- arranque ---------- */
 renderSaved(); show('home'); connect();
-const last = saved[0]; if (last) { cur = { code: last.code, token: last.token, pid: 0, name: last.name }; }
 </script>
 </body>
 </html>

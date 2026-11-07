@@ -1,0 +1,32 @@
+// Prueba en Chrome móvil: protagonista (elegir, emblema, lista de jugadores)
+const { spawn } = require('child_process');
+const fs = require('fs');
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const srv = spawn('node', ['server.js'], { env: { ...process.env, PORT: '3120', DATA_DIR: '/tmp/ada-cdp8-data' } });
+const chrome = spawn('google-chrome', ['--headless=new', '--no-sandbox', '--disable-gpu', '--no-proxy-server', '--remote-debugging-port=9341', '--user-data-dir=/tmp/ada-cdp8-chrome', 'about:blank'], { stdio: 'ignore' });
+let bad = 0; const check = (n, c, x) => { if (!c) bad++; console.log((c ? '✓ ' : '✗ ') + n + (x ? ' — ' + x : '')); };
+(async () => {
+  await wait(3000);
+  const page = (await (await fetch('http://127.0.0.1:9341/json')).json()).find(t => t.type === 'page');
+  const ws = new WebSocket(page.webSocketDebuggerUrl); await new Promise(r => ws.onopen = r);
+  let id = 0; const pend = new Map(); const errs = [];
+  ws.onmessage = e => { const m = JSON.parse(e.data); if (m.id && pend.has(m.id)) { pend.get(m.id)(m); pend.delete(m.id); } else if (m.method === 'Runtime.exceptionThrown') errs.push(m.params.exceptionDetails.text + ' ' + (m.params.exceptionDetails.exception?.description || '')); };
+  const cdp = (method, params = {}) => new Promise(r => { const i = ++id; pend.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
+  const ev = async expr => { const r = await cdp('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true }); return r.result.result.value; };
+  fs.mkdirSync('/tmp/shots', { recursive: true });
+  const shot = async name => { const r = await cdp('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync('/tmp/shots/' + name + '.png', Buffer.from(r.result.data, 'base64')); };
+  await cdp('Runtime.enable'); await cdp('Page.enable');
+  await cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 780, deviceScaleFactor: 2, mobile: true });
+  await cdp('Page.navigate', { url: 'http://127.0.0.1:3120/' }); await wait(1300);
+  await ev(`document.getElementById('hName').value='Fercho'; document.getElementById('hCreate').click()`); await wait(700);
+  check('el lobby muestra el ajuste «Protagonista»', await ev(`!!document.getElementById('w_hero')`));
+  await ev(`document.getElementById('lBot').click()`); await wait(300);
+  await ev(`document.getElementById('lStart').click()`); await wait(1500);
+  await ev(`(()=>{const c=S.cities.find(c=>c.o===S.you); openSheet('city',{cityId:c.id}); sheet.tab='build'; renderSheet(); })()`); await wait(500);
+  const txt = await ev(`document.getElementById('sheet').innerText`);
+  check('la pestaña Construir muestra la carreta', txt.includes('Carreta') && txt.includes('150'));
+  await ev(`document.getElementById('sheet').scrollTop = 99999; document.querySelector('#sheet .sbody, #sheet') && (document.getElementById('sheet').scrollTop = 99999)`); await wait(300);
+  await shot('k1-construir-carreta');
+  console.log('errores JS:', JSON.stringify(errs)); check('sin errores en la página', errs.length === 0);
+  chrome.kill(); srv.kill(); process.exit(bad ? 1 : 0);
+})();

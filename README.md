@@ -29,6 +29,13 @@ Sin dependencias: solo Node.js 18+ (`npm start`). El cliente es una página web 
 - Niebla de guerra: solo ves lo que tus unidades y ciudades alcanzan a ver.
 - Ganas siendo el último en pie, o por puntos si pusiste límite de turnos.
 
+## Varias partidas y menú principal
+
+- Puedes tener **varias partidas a la vez** (cada una con su código). En el menú, *Tus partidas* muestra el estado de cada una: en sala, turno actual, si **te toca jugar**, si ya terminaste, si un bot juega por ti, cuánto falta para que cierre el turno, o si terminó.
+- Dentro de una partida, el botón **☰** (arriba a la izquierda) te lleva al menú sin salirte de ella. Desde ahí puedes crear otra, unirte a otra con código o **Entrar** de nuevo. La **✕** quita una partida de tu lista (la partida sigue en el servidor).
+- Al recargar la página vuelves a la última partida abierta; si saliste al menú, te quedas en el menú.
+- Mientras estás en el menú no cuentas como «presente»: si pasan los turnos que elegiste en la sala, un bot dirige tu ejército hasta que vuelvas.
+
 ## Mundo vivo: estaciones, élites, hordas y tesoros
 
 - **Estaciones** (cada 12 turnos, el icono sale junto al turno): 🌸 *primavera* más animales · ☀️ *verano* tranquilo · 🍂 *otoño* las criaturas sueltan +25 % de botín · ❄️ *invierno* criaturas más agresivas (+15 % daño, ven más lejos) y hordas más seguidas.
@@ -73,6 +80,115 @@ Al agregar un bot eliges su **personalidad**: 🌾 *Granjero* (caza y construye;
 ## Mapa y navegación
 
 Arriba a la derecha hay un **minimapa** (toca o arrastra para ir a ese lugar; muestra ciudades, tus unidades, criaturas, jefes y tesoros). Debajo: 🏠 salta a tu capital (toca otra vez para pasar por tus otras ciudades) y 🛡️ va a la siguiente unidad con acciones disponibles (el número indica cuántas).
+
+## Ajustes del mundo (v1.5)
+
+Al crear la partida, el anfitrión puede elegir en el lobby, bajo «🌍 Ajustes del mundo»:
+
+| Ajuste | Opciones |
+|---|---|
+| Tamaño del mapa | Pequeño · Normal · Grande · Enorme |
+| Ciudades neutrales (aldeas) | Pocas · Normal · Muchas · Abundantes |
+| Bioma | Mixto (al azar) · Solo bosque · Solo pradera · Solo desierto |
+| Criaturas | Más pacíficas · Normal · Más agresivas (también cambia la frecuencia de hordas) |
+| Unidades iniciales | 4 · 8 · 14 (máximo) |
+| Nivel inicial | 1 · 3 · 6 · 10 |
+| Armadura inicial | Ninguna · Hierro completa · Acero completa |
+
+Notas: el desierto es un terreno nuevo (arena, se camina como la pradera). En «solo bosque» los caminos entre ciudades quedan despejados. Los sitios (cofres y ruinas) y las criaturas escalan con el tamaño del mapa. Las partidas guardadas antiguas reciben los valores normales.
+
+## Carreta (v1.12)
+
+Una mejora de ciudad (pestaña **Construir** de la ciudad, abajo del todo) que crea una **carreta**: un almacén móvil.
+
+- **Coste:** 8 cuero, 8 hueso y 3 hierro del almacén de la ciudad.
+- **Carga:** hasta **150** (una mochila normal lleva 30), con materiales y objetos. Cárgala o descárgala junto a una ciudad tuya desde su pestaña «Carga» (botones +1, Todo y «Depositar todo»).
+- **Movilidad 6** (una unidad normal tiene 3).
+- **No cuenta como unidad:** no ocupa puestos del tope de 14/20.
+- **Máximo una por ciudad.** Si la destruyen, la ciudad puede construir otra. Si te la matan, el enemigo se queda con parte de la carga (lo que le quepa en la mochila).
+- Frágil: 80 de salud, 2 de defensa. No ataca, no sube de nivel, no usa equipo ni habilidades. Si un bot toma el control de tu ejército por ausencia, no la mueve.
+- No está disponible en el reto de una unidad.
+
+## Reto de una unidad (v1.11)
+
+En «Ajustes del mundo» → **Modo de juego: Reto de una unidad**:
+
+- Cada jugador y cada bot tiene **una sola unidad** en toda la partida (ignora «unidades iniciales»).
+- No se puede reclutar, invocar ni tener crías, y no hay protagonista (tu única unidad ya lo es).
+- **Si tu unidad cae, quedas eliminado** y tus ciudades quedan libres, aunque tengas materiales.
+- Sigue valiendo el nivel inicial y la armadura inicial, el tamaño del mapa, el bioma, las criaturas, etc. Una combinación divertida: nivel 6 + armadura de hierro. Las ciudades siguen sirviendo para forjar, mejorar y guardar equipo.
+- Los bots no eligen invocador en este modo.
+
+## Protagonista (v1.10)
+
+Cada jugador (y cada bot) empieza con un **protagonista**: una de sus unidades, marcada con una corona 👑 (o el emblema que elijas).
+
+- **Elegirlo:** en el turno 1, abre la ficha de cualquier unidad y toca «👑 Elegir como protagonista». Ahí mismo eliges el emblema (👑 🦅 🐉 🦁 🔥 ⚜️ 🌟 🛡️). Desde el turno 2 queda fijo. Puedes ponerle nombre con ✏️ en cualquier momento.
+- **Bonos:** gana **+50% de experiencia** y da un **aura de +10% de daño y defensa** a tus demás unidades a 2 casillas o menos (se suma al aura de general/guardián).
+- **Si cae:** vuelve a tu capital (o a otra ciudad tuya) **3 turnos después, con 2 niveles menos** y la salud llena. Si lo mató una criatura conserva su equipo; si lo mató otro jugador, ese jugador se queda con su botín como con cualquier unidad. Mientras tanto, la lista de jugadores muestra «☠️ vuelve en N turnos».
+- Cuenta como una unidad más para el tope de unidades.
+- El anfitrión puede desactivarlo en «Ajustes del mundo». Las partidas empezadas antes de la v1.10 no lo tienen.
+
+## Chat de la partida (v1.9)
+
+- Botón 💬 en la columna de botones junto al minimapa (🏠, 💬…). Muestra un número rojo con los mensajes sin leer y un aviso breve cuando llega uno nuevo.
+- Mensajes de hasta 200 letras, para todos los jugadores o «solo para mis aliados 🤝» (los ve quien tenga alianza contigo).
+- Se guardan con la partida (los últimos 80; se muestran 60) y también al reiniciar el servidor.
+- Límite anti-spam: 5 mensajes cada 10 segundos. Los bots no escriben. Se abre cuando empieza la partida (no en la sala de espera).
+- Si tienes los avisos activados y no estás mirando la partida, te llega un aviso al celular (máx. uno cada 3 minutos por partida).
+
+## Ajustes de equilibrio (v1.8.1)
+
+- Cuando las criaturas suben de nivel (cada 10 turnos) **ya no se curan por completo**: conservan su proporción de salud. Antes un jefe casi muerto se recuperaba entero al subir de nivel.
+- El **Liche** es algo más débil: 230 de salud (antes 260) y 20 de daño (antes 24). Sigue disparando a distancia 4. Contra su defensa alta funcionan bien la ballesta (ignora 40%), el báculo/varita y los magos, y poner invocaciones delante.
+
+## Mago, invocador y nigromante (v1.8)
+
+Tres clases nuevas que se eligen a nivel 6 (con especialización a nivel 12), como las demás:
+
+| Clase | Qué hace |
+|---|---|
+| 🔮 **Mago** | +30% de daño con báculo y varita y +1 alcance. Especializaciones: Hechicero, Arcano |
+| 🐾 **Invocador** | +10% salud y +2 defensa. Invoca **lobos** (4 huesos) u **osos** (7 huesos). Especializaciones: Domador (+30% daño a sus invocaciones), Alfa (+35% salud) |
+| 💀 **Nigromante** | +15% de daño mágico. Invoca **esqueletos** (4 huesos). Especializaciones: Señor de huesos (+35% salud), Maldito (+30% daño) |
+
+**Armas mágicas nuevas:** 🪄 Báculo (dos manos, alcance 3, ignora 25% de defensa) y ✨ Varita (una mano, alcance 2, ignora 20% de defensa, admite escudo). Cualquiera puede usarlas, pero solo el mago y el nigromante reciben el bono mágico.
+
+**Invocaciones**
+- Solo se invoca a 2 casillas o menos de una ciudad tuya, gastando huesos de su almacén (botón «Invocar» en la ficha).
+- **Máximo 2 invocaciones por jugador** en total (suma de todos sus invocadores y nigromantes).
+- Son unidades que controlas como las demás, pero no cuentan para el tope de 14/20 unidades, no tienen habilidades ni equipo y no suben de nivel solas: su nivel es el de su invocador (con el tope de la criatura).
+- Si el invocador cae, sus invocaciones desaparecen. Puedes despedirlas desde su ficha.
+- Los bots también eligen estas clases y las usan.
+
+## Crías (v1.7)
+
+Si dos unidades tuyas están **una junto a la otra y a 2 casillas o menos de una ciudad tuya** durante 5 turnos seguidos (ambas con al menos 50% de salud), nace una cría:
+
+- Nivel 1, con un bono fijo de nacimiento: **+10 salud y +2 daño**. Nace con la salud llena y descansa ese turno.
+- Los dos padres (y la cría) deben esperar **15 turnos** antes de otra cría.
+- Tope de **20 unidades** por jugador (el reclutamiento normal sigue limitado a 14). Si hay 20, la pareja espera a que haya sitio.
+- Si se separan, se alejan de la ciudad o una queda herida, la cuenta vuelve a 0.
+- El anfitrión lo ajusta en «Ajustes del mundo»: desactivadas, 5 turnos o 3 turnos. Las partidas ya empezadas antes de la v1.7 lo tienen desactivado.
+- En la ficha de cada unidad se ve el progreso («💞 Junto a Nombre: 3/5 turnos»).
+
+## Armas (v1.6)
+
+| Arma | Daño base | Alcance | Manos | Particularidad |
+|---|---|---|---|---|
+| Daga | 4 | 1 | 1 | Ignora 25% de defensa, +1 movimiento |
+| Espada | 7 | 1 | 1 | Equilibrada |
+| **Hacha** | 8 | 1 | 1 | Más daño que la espada, admite escudo |
+| **Katana** | 9 | 1 | 1 | Ignora 20% de defensa |
+| **Hacha de batalla** | 13 | 1 | 2 | Ignora 15% de defensa, pesada: −1 movimiento |
+| **Lanza** | 8 | 1–2 | 2 | Alcance 2 y sin penalización a quemarropa |
+| Arco / Arco largo / Ballesta | 5 / 6 / 10 | 3 / 2–5 / 4 | 2 | Como antes |
+
+Se fabrican en las ciudades (pestaña forja), caen como objetos raros con efectos, y los bots también las usan.
+
+## Renombrar unidades
+
+En la ficha de una unidad, el botón ✏️ (arriba a la derecha) permite cambiarle el nombre (máx. 16 letras). Solo puedes renombrar las tuyas.
 
 ## Partidas de días: ausencias, relevos y avisos
 

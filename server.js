@@ -6,6 +6,7 @@ const path = require('path');
 const crypto = require('crypto');
 const E = require('./engine.js');
 const WS = require('./ws-lite.js');
+const S = require('./shared.js');
 const Push = require('./push.js');
 const { makeStores } = require('./store.js');
 
@@ -176,6 +177,18 @@ function notifyAttacks(g, before) { // ataques de otros jugadores en tiempo real
     }
   }
 }
+function notifyChat(g, msg) { // aviso al celular de quien no está mirando la partida (máx. uno cada 3 min por jugador)
+  if (!vapid) return;
+  const now = Date.now(), from = g.players[msg.p]; if (!from) return;
+  for (const p of g.players) {
+    if (p.bot || p.id === msg.p || !p.push || !p.push.length) continue;
+    if (msg.al && E.pactOf(g, msg.p, p.id) !== 'alianza') continue;
+    if ([...conns].some(([c, ci]) => c.open && ci.code === g.code && ci.pid === p.id)) continue; // ya la está viendo
+    if (p._lc && now - p._lc < 3 * 60000) continue;
+    p._lc = now;
+    notify(g, p, { title: '💬 ' + from.name + (msg.al ? ' (aliados)' : '') + ' · ' + g.code, body: msg.x.slice(0, 120), tag: 'chat-' + g.code, url: '/' }, { ttl: 3600, urgency: 'normal', topic: 'chat' + g.code });
+  }
+}
 const NT_TITLE = { prop: '📨 Propuesta de pacto', pact: '🤝 Diplomacia', horde: '🐺 ¡Horda en camino!' };
 function notifyEvents(g, before) { // propuestas, pactos y hordas: aviso inmediato a los humanos implicados
   if (!vapid) return;
@@ -273,6 +286,18 @@ function onMessage(c, text) {
       joined(c, g, p, m.token);
       return pushState(c);
     }
+    if (m.t === 'leave') { conns.delete(c); return send(c, { t: 'left' }); } // salió al menú: ya no recibe esa partida
+    if (m.t === 'mygames') { // estado de las partidas guardadas en el celular
+      const out = [];
+      for (const q of (Array.isArray(m.games) ? m.games : []).slice(0, 30)) {
+        const code = String((q && q.code) || '').toUpperCase().trim();
+        const g = games.get(code), p = g && playerOf(g, q.token);
+        if (!p) { out.push({ code, ok: false }); continue; }
+        out.push({ code, ok: true, status: g.status, turn: g.turn, n: g.players.length, name: p.name, host: g.players[0] === p,
+          ready: !!p.ready, auto: !!p.auto, alive: p.alive !== false, endsAt: g.endsAt || 0, winner: g.winner === undefined ? null : g.winner, you: p.id });
+      }
+      return send(c, { t: 'mygames', now: Date.now(), games: out });
+    }
     if (!ci) return;
     const g = games.get(ci.code); if (!g) return;
     const pid = ci.pid;
@@ -326,12 +351,23 @@ function onMessage(c, text) {
         if (mt >= 0 && mt <= 1000) g.cfg.maxTurns = mt;
         if (['facil', 'normal', 'dificil'].includes(m.botLevel)) g.cfg.botLevel = m.botLevel;
         if (m.idleTurns !== undefined) { const it = m.idleTurns | 0; if (it >= 0 && it <= 10) g.cfg.idleTurns = it; }
+        for (const k of Object.keys(S.WORLD_OPTS)) { // ajustes del mundo: solo valores permitidos
+          const o = S.WORLD_OPTS[k];
+          if (m[k] !== undefined && Object.prototype.hasOwnProperty.call(o.o, String(m[k]))) g.cfg[k] = typeof o.def === 'number' ? Number(m[k]) : String(m[k]);
+        }
       }
       else if (m.a === 'start') {
         const err = E.startGame(g);
         if (err) return send(c, { t: 'err', m: err });
       }
       touchGame(g, true);
+      return broadcast(g);
+    }
+    if (m.t === 'chat') { // mensajes entre jugadores
+      const err = E.chat(g, pid, m.text, !!m.al);
+      if (err) return send(c, { t: 'err', m: err });
+      try { notifyChat(g, g.chat[g.chat.length - 1]); } catch (e) { console.error('chat push', e.message); }
+      touchGame(g);
       return broadcast(g);
     }
     if (m.t === 'cmd') {
