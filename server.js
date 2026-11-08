@@ -177,7 +177,8 @@ function notifyAttacks(g, before) { // ataques de otros jugadores en tiempo real
     }
   }
 }
-function notifyChat(g, msg) { // aviso al celular de quien no está mirando la partida (máx. uno cada 3 min por jugador)
+function notifyChat(g, msg) {
+  if (!msg) return; // aviso al celular de quien no está mirando la partida (máx. uno cada 3 min por jugador)
   if (!vapid) return;
   const now = Date.now(), from = g.players[msg.p]; if (!from) return;
   for (const p of g.players) {
@@ -366,7 +367,7 @@ function onMessage(c, text) {
     if (m.t === 'chat') { // mensajes entre jugadores
       const err = E.chat(g, pid, m.text, !!m.al);
       if (err) return send(c, { t: 'err', m: err });
-      try { notifyChat(g, g.chat[g.chat.length - 1]); } catch (e) { console.error('chat push', e.message); }
+      try { notifyChat(g, [...g.chat].reverse().find(x => x.p === pid && !x.bot)); } catch (e) { console.error('chat push', e.message); }
       touchGame(g);
       return broadcast(g);
     }

@@ -97,6 +97,16 @@ Al crear la partida, el anfitrión puede elegir en el lobby, bajo «🌍 Ajustes
 
 Notas: el desierto es un terreno nuevo (arena, se camina como la pradera). En «solo bosque» los caminos entre ciudades quedan despejados. Los sitios (cofres y ruinas) y las criaturas escalan con el tamaño del mapa. Las partidas guardadas antiguas reciben los valores normales.
 
+## Bots que hablan (v1.13)
+
+Los bots escriben en el chat con una etiqueta 🤖 y frases propias según su personalidad (granjero, equilibrado, conquistador). Es un guion, no una IA: reconocen palabras clave.
+
+- **Hablarles:** escribe su nombre en el mensaje («Vlad, hagamos la paz») o la palabra «bots» (contesta uno al azar). Reconocen saludos, paz, alianza, amenazas, insultos, agradecimientos, peticiones de ayuda y «¿cómo vas?». Si no los nombras, no contestan.
+- **Paz y alianza:** el chat no firma pactos (eso se hace en «Jugadores» 🤝), pero el bot te dice la verdad sobre su ánimo: si hubo guerra reciente se niega; si no, te invita a mandarle la propuesta. Cuando le mandas una propuesta, contesta en el chat si la acepta o la rechaza (y por qué).
+- **Solos:** saludan al empezar y comentan de vez en cuando cuando matan o pierden una unidad contigo, conquistan o pierden una ciudad, aparece un jefe o una horda, los eliminan o termina la partida. Máximo 2 comentarios de bots por turno y cada bot calla al menos 3 turnos entre comentarios.
+- **Canal de aliados:** solo lo leen y contestan los bots que son tus aliados.
+- El anfitrión puede apagarlo en «Ajustes del mundo» (Los bots hablan en el chat: Sí/No). Las partidas empezadas antes de la v1.13 lo tienen apagado.
+
 ## Carreta (v1.12)
 
 Una mejora de ciudad (pestaña **Construir** de la ciudad, abajo del todo) que crea una **carreta**: un almacén móvil.
@@ -267,3 +277,52 @@ test/              pruebas
 ## Ajustar el equilibrio
 
 Casi todo está en `shared.js` (armas, criaturas, recetas) y al inicio de `engine.js` (límites, pesos de habilidades de los bots, fórmulas de daño en `calcDamage`).
+
+## 9 personalidades de bots (v1.14)
+Ahora hay 9 personalidades, una por cada bot posible de la sala (anfitrión + 9 bots). Cada una cambia cómo construye, a quién ataca, cómo acepta pactos y qué dice en el chat:
+- 🌾 Granjero · ⚔️ Conquistador · ⚖️ Equilibrado (las originales)
+- 🏹 Cazador: vive de cazar criaturas, rara vez ataca a jugadores.
+- 🕊️ Diplomático: acepta casi siempre paz y alianzas.
+- 🛡️ Defensor: murallas primero, mucho ejército en casa.
+- 🗡️ Saqueador: oportunista, desde el turno 15 ataca a los débiles y a unidades sueltas.
+- 🔨 Forjador: herrería primero; ataca cuando ya está bien armado (turno 60).
+- 🐉 Cazajefes: va por el Rey Lobo, el Liche y el Dragón.
+Al elegir «Personalidad al azar» se reparten sin repetir mientras queden libres (9 bots = 9 personalidades distintas). Los parámetros están en `shared.js` (`PERS[...].b`) y las frases en `botchat.js`.
+
+## Jefes que se recuperan menos (v1.14.1)
+Los jefes (Rey Lobo, Liche, Dragón) ahora recuperan solo un 3% de su salud por turno cuando no los golpean (antes 10%, igual que cualquier criatura). Así, un aventurero solo que se retira a curarse ya no ve al jefe volver casi a tope, como pasaba en el reto de una unidad. Las criaturas normales no cambian.
+
+## Jefes ajustables (v1.15)
+- Nuevo ajuste del mundo «Recuperación de los jefes»: Lenta (3% por turno, por defecto), Normal (10%) o Ninguna.
+- En el reto de una unidad los jefes (Rey Lobo, Liche, Dragón) tienen 60% de vida y 80% de daño.
+
+## Más armas y armaduras (v1.16)
+- **Calidad Dracónica** (5.ª): daño ×4,1 y defensa ×5,3 (el Alma era ×3,0 y ×3,8). Se forja o se mejora con 🐉 **escamas de dragón** (las suelta el Dragón de Ceniza; los demás jefes a veces sueltan 1) + almas. El Dragón también puede soltar objetos dracónicos.
+- **8 efectos nuevos** (ahora hay 16): armas → 🔥 Fuego (quema 2 turnos), ❄️ Hielo (ralentiza −2 de movimiento un turno), 💥 Crítico (×1,8), 💀 Ejecutor (+daño a enemigos bajo la mitad de vida), 🐺 Cazabestias (+daño a criaturas); armaduras → 💪 Vigor (+% salud), 📚 Erudito (+% experiencia), 🛡️ Bloqueo (probabilidad de reducir a la mitad un golpe).
+- **Rareza Legendaria** 🟠: tres efectos, con la potencia más alta. El tercer efecto se añade en la forja (calidad Alma o superior) por 6 almas + 2 escamas. Los jefes, y con poca probabilidad las ruinas y élites, pueden soltar equipo legendario ya hecho.
+- **Reforjar** 🔄: cambia un efecto del objeto por otro al azar (2 almas).
+- **Sets de armadura** 🧩: 3 piezas de la misma calidad (de las 7 ranuras de defensa, calidad hierro o mejor) dan +salud; 6 piezas dan además defensa, regeneración y (dracónico) espinas. Se ve en la hoja de la unidad.
+- Lo que sigue pendiente: engarces/gemas.
+
+## Nueva escala de rareza (v1.17)
+La rareza ahora es el número de efectos del objeto (reemplaza la de la v1.16):
+| Rareza | Color | Efectos | Para añadir el efecto |
+|---|---|---|---|
+| Común | ⚪ gris | 0 | — |
+| Poco común | 🟢 verde | 1 | 3 almas |
+| Raro | 🔵 azul | 2 | 3 almas |
+| Épico | 🟣 morado | 3 | 4 almas · calidad Acero o superior |
+| Legendario | 🟡 amarillo | 4 | 6 almas + 2 escamas · calidad Alma o superior |
+| Mítico | 🔴 rojo | 5 | 9 almas + 4 escamas · calidad Dracónica |
+Cada efecto gana potencia con la rareza (sus 5 valores están en `shared.js`, `AFFIX[...].v`). El botín de cofres da sobre todo Poco común/Raro; ruinas y élites un poco más; los jefes dan Épico, Legendario y, con poca probabilidad, Mítico. Los objetos guardados de versiones anteriores conservan sus efectos (la rareza se calcula por el nº de efectos).
+
+## Reto del Rey Demonio (v1.18)
+Nuevo modo de juego (se elige en «Ajustes del mundo → Modo de juego»):
+- Al empezar, **un jugador al azar** (humano o bot) es el 👑 Rey Demonio. Los demás jugadores quedan **aliados entre sí automáticamente** y en guerra con el Rey; las alianzas no se pueden cambiar ni negociar en este modo.
+- El Rey **solo recluta bestias** (Lobo, Oso, Goblin, Esqueleto, Orco, Troll; cada una con su coste en la ciudad) y empieza con 6 bestias de nivel 3. Las bestias no usan equipo ni clases ni protagonista, pero suben de nivel, gastan puntos de habilidad, cargan botín y se curan en ciudad como cualquier unidad.
+- **Victoria**: si el Rey cae (sin unidades ni forma de reclutar), gana la alianza (victoria compartida). Si el Rey elimina a todos los demás, gana el Rey.
+- Los bots lo entienden: el bot Rey recluta bestias y ataca a todos; los bots aliados siempre atacan al Rey.
+- Parámetros en `shared.js` (`KING`): bestias, costes, unidades y nivel iniciales.
+
+### Protagonista del Rey Demonio (v1.18.1)
+El Rey Demonio también tiene protagonista (si «Protagonista» está en Sí): al empezar le toca **al azar uno de los tres jefes** (🐺 Rey Lobo, 🧙 Liche o 🐉 Dragón de Ceniza) como su unidad inicial. Tiene la mitad de la vida y el 60% del daño de un jefe salvaje (`KING.boss` en `shared.js`), da +10% de daño y defensa a las bestias cercanas, gana +50% de experiencia y, si cae, vuelve a su ciudad en 3 turnos con 2 niveles menos. No se puede cambiar de protagonista. Sustituye a una de las 6 bestias iniciales.

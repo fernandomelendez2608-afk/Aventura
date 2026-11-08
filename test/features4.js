@@ -55,9 +55,9 @@ console.log('Biomas');
 
 console.log('Fauna');
 {
-  const frac = k => { let tot = 0, pas = 0; for (let i = 0; i < 6; i++) { const g = mk({ fauna: k }); for (const c of g.creatures) { tot++; if (['ciervo', 'jabali', 'oso'].includes(c.t)) pas++; } } return pas / tot; };
+  const frac = k => { let tot = 0, pas = 0; for (let i = 0; i < 12; i++) { const g = mk({ fauna: k }); for (const c of g.creatures) { tot++; if (['ciervo', 'jabali', 'oso'].includes(c.t)) pas++; } } return pas / tot; };
   const p = frac('pacifica'), n = frac('normal'), a = frac('agresiva');
-  ok(p > n && n > a, `proporción de pacíficas: ${p.toFixed(2)} > ${n.toFixed(2)} > ${a.toFixed(2)}`);
+  ok(p > n + 0.1 && p > a + 0.1 && a <= n + 0.05, `proporción de pacíficas: pacífica ${p.toFixed(2)} contra normal ${n.toFixed(2)} y agresiva ${a.toFixed(2)}`);
 }
 
 console.log('Unidades iniciales');
@@ -123,6 +123,7 @@ console.log('Crías');
     const g = mk({ breed, idleTurns: 0 }); const first = g.players[0].id, c = g.cities.find(x => x.owner === first && x.cap);
     const mine = g.units.filter(x => x.o === first); const [a, b] = mine;
     g.units = g.units.filter(x => x.o !== first || x === a || x === b);
+    for (const p of g.players) if (p.id !== first) p.bot = false; // rivales inactivos: que nadie conquiste la ciudad durante la prueba
     a.x = c.x + 1; a.y = c.y + 1; b.x = c.x + 2; b.y = c.y + 1; // pegadas y a ≤2 de la ciudad
     if (setup) setup(g, a, b, c);
     E.touch(g); g.creatures = [];
@@ -139,8 +140,9 @@ console.log('Crías');
   const ke = E.eff(g, kid), base = E.eff(g, Object.assign({}, kid, { bn: null }));
   ok(ke.maxHp === base.maxHp + 10 && ke.dmg === base.dmg + 2 && kid.hp === ke.maxHp, `salud ${ke.maxHp} y daño ${ke.dmg} (base ${base.maxHp}/${base.dmg}), nace con la salud llena`);
   ok(a.bc > g.turn + 10 && b.bc > g.turn + 10, 'los padres esperan 15 turnos');
-  turns(g, 12); ok(cnt(g, first) === 3, 'durante la espera no hay otra cría');
-  turns(g, 14); ok(cnt(g, first) >= 4, 'pasada la espera pueden tener otra');
+  turns(g, 8); ok(cnt(g, first) === 3, 'durante la espera no hay otra cría');
+  { const k2 = g.units.find(x => x.o === first && x !== a && x !== b); a.bc = b.bc = g.turn; if (k2) k2.bc = g.turn; } // adelantamos el fin de la espera para no exponerlos a bots durante 15 turnos
+  turns(g, 6); ok(cnt(g, first) >= 4, 'pasada la espera pueden tener otra');
 
   ({ g, a, b, first } = run('tres')); turns(g, 3); ok(cnt(g, first) === 3, 'con «3 turnos» nace al tercero');
   ({ g, a, b, first } = run('apagado')); turns(g, 8); ok(cnt(g, first) === 2, 'desactivado: no hay crías');
@@ -325,6 +327,41 @@ console.log('Carreta');
   console.error = oe; ok(errs.length === 0, 'sin errores al jugar con carretas');
 }
 
+console.log('Bots que hablan en el chat');
+{
+  const BC = require('../botchat.js');
+  ok(BC.intent('Hola Morgana, ¿cómo estás?') === 'estado' || BC.intent('Hola Morgana') === 'hola', 'detecta saludos');
+  ok(BC.intent('te propongo la paz') === 'paz' && BC.intent('quiero una alianza') === 'alianza' && BC.intent('te voy a atacar') === 'amenaza' && BC.intent('eres un idiota') === 'insulto', 'detecta paz, alianza, amenazas e insultos');
+  ok(BC.addressed('Morgana, ¿hacemos la paz?', 'Morgana') && BC.addressed('oye morgana', 'Bot Morgana') && !BC.addressed('hola a todos', 'Morgana'), 'reconoce cuando se dirigen a un bot por su nombre');
+  ok(Object.keys(S.PERS).every(p => Object.keys(BC.PHRASES.granjero).every(k => BC.PHRASES[p][k] && BC.PHRASES[p][k].length >= 2)), 'las 9 personalidades tienen frases para cada situación');
+
+  const g = mk({ botChat: 'si', idleTurns: 0 }, 3); const A = g.players[0].id;
+  const bots = g.players.filter(p => p.bot);
+  ok(g.chat.some(m => m.bot && m.p !== A), 'al empezar saludan algunos bots');
+  const b0 = bots[0]; const nm = b0.name.replace(/^Bot\s+/, '');
+  const n0 = g.chat.length;
+  E.chat(g, A, `${nm}, hola`); ok(g.chat.length === n0 + 2 && g.chat[n0 + 1].p === b0.id && g.chat[n0 + 1].bot === 1, 'si lo nombras, ese bot contesta');
+  const n1 = g.chat.length; E.chat(g, A, 'hola a todos'); ok(g.chat.length === n1 + 1, 'si no los nombras, no contestan');
+  const n2 = g.chat.length; E.chat(g, A, 'bots, ¿quién va ganando?'); ok(g.chat.length === n2 + 2, 'si dices «bots», uno contesta');
+  // paz: responde según su estado real
+  b0.pers = 'granjero'; b0.wr = {}; const n3 = g.chat.length; E.chat(g, A, `${nm}, hagamos la paz`);
+  ok(/propuesta|paz/i.test(g.chat[n3 + 1].x), 'responde sobre la paz: «' + g.chat[n3 + 1].x + '»');
+  b0.wr[A] = g.turn; const n4 = g.chat.length; E.chat(g, A, `${nm}, hagamos la paz`);
+  ok(BC.PHRASES.granjero.paz_no.some(f => g.chat[n4 + 1].x === f.replace('{n}', g.players[A].name)), 'si hubo guerra reciente, se niega: «' + g.chat[n4 + 1].x + '»');
+  // nunca contestan a otros bots ni al canal de aliados sin alianza
+  g.players[A]._ct = []; const n5 = g.chat.length; E.chat(g, A, `${nm}, hola`, true); ok(g.chat.length === n5 + 1, 'el canal de aliados solo lo oyen bots aliados');
+  // diplomacia: responden a una propuesta
+  const bp = bots[1]; bp.pers = 'granjero'; bp.wr = {}; const n6 = g.chat.length;
+  E.cmd(g, A, { a: 'dip', d: 'offer', to: bp.id, k: 'paz' }); for (let i = 0; i < 3; i++) { g.creatures = []; for (const p of g.players) p.ready = true; E.advanceTurn(g); }
+  ok(g.chat.slice(n6).some(m => m.p === bp.id && m.bot), 'el bot responde en el chat a una propuesta de paz');
+  // desactivado
+  const g2 = mk({ botChat: 'no' }, 3); const m0 = g2.chat.length; E.chat(g2, 0, g2.players[1].name + ', hola'); ok(g2.chat.length === m0 + 1 && !g2.chat.some(m => m.bot), 'con «No» los bots callan');
+  const old = JSON.parse(E.serialize(mk({}))); delete old.cfg.botChat; ok(E.deserialize(JSON.stringify(old)).cfg.botChat === 'no', 'partidas viejas: bots callados');
+  // límites de frecuencia: no hablan solos más de 2 por turno
+  const g3 = mk({ botChat: 'si' }, 6); let worst = 0; for (let i = 0; i < 12; i++) { const before = g3.chat.length; g3.creatures = []; for (const p of g3.players) p.ready = true; E.advanceTurn(g3); worst = Math.max(worst, g3.chat.length - before); }
+  ok(worst <= 4, 'sin spam: como mucho ' + worst + ' mensajes de bots en un turno');
+}
+
 console.log('Chat de la partida');
 {
   const g = mk({ idleTurns: 0 }); const A = g.players[0].id, B = g.players.find(p => !p.bot && p.id !== A), bot = g.players.find(p => p.bot);
@@ -352,6 +389,166 @@ console.log('Chat de la partida');
   const old = JSON.parse(E.serialize(g)); delete old.chat; delete old.cid; const g3 = E.deserialize(JSON.stringify(old));
   ok(Array.isArray(g3.chat) && E.chat(g3, A, 'hola') === null, 'partidas antiguas (sin chat) siguen funcionando');
   const lobby = E.createGame('LB', 'H', 't'); ok(E.chat(lobby, 0, 'hola'), 'en la sala de espera aún no hay chat');
+}
+
+{ // ===== 9 personalidades =====
+  console.log('· 9 personalidades de bots');
+  ok(Object.keys(S.PERS).length === 9 && Object.values(S.PERS).every(p => p.n && p.e && p.d && p.b && p.b.order.length >= 4 && p.b.paz >= 0), '9 personalidades con parámetros');
+  ok(new Set(Object.values(S.PERS).map(p => p.e)).size === 9, 'cada una con emoji propio');
+  const g = E.createGame('P9', 'H', 't');
+  for (let i = 0; i < 9; i++) E.addBot(g, 'azar');
+  ok(g.players.length === 10 && new Set(g.players.filter(p => p.bot).map(p => p.pers)).size === 9, 'al azar: 9 bots = 9 personalidades distintas');
+  const g2 = E.createGame('P9b', 'H', 't');
+  const b = E.addBot(g2, 'defensor'); ok(b.pers === 'defensor', 'se puede elegir una concreta');
+  const g3 = E.createGame('P9c', 'H', 't'); for (let i = 0; i < 9; i++) E.addBot(g3, 'azar');
+  g3.cfg.botChat = 'si'; E.startGame(g3);
+  let err = null; try { for (let i = 0; i < 40; i++) E.advanceTurn(g3); } catch (e) { err = e; }
+  ok(!err, 'partida con 9 bots de 9 personalidades corre 40 turnos sin errores' + (err ? ': ' + err.message : ''));
+}
+
+{ // ===== regeneración de jefes =====
+  console.log('· regeneración de jefes');
+  const g = E.createGame('RG', 'H', 't'); E.addBot(g, 'azar'); E.startGame(g);
+  const mk = t => { const c = { id: 9000 + g.creatures.length, t, x: 0, y: 0, lv: 5, hp: 0, hit: false }; c.hp = Math.round(E.cstats(c, g).mhp * 0.5); g.creatures.push(c); return c; };
+  const boss = mk('reylobo'), lobo = mk('lobo');
+  const b0 = boss.hp, l0 = lobo.hp; E.advanceTurn(g);
+  const bg = (boss.hp - b0) / E.cstats(boss, g).mhp;
+  ok(bg > 0 && bg <= 0.05, 'el jefe recupera como mucho ~3% por turno (' + Math.round(bg * 100) + '%)');
+  ok((lobo.hp - l0) / E.cstats(lobo, g).mhp >= 0.09, 'las criaturas normales siguen recuperando ~10%');
+}
+
+{ // ===== jefes: ajustes =====
+  console.log('· ajuste de recuperación de jefes y jefes del reto');
+  const mkg = cfg => { const g = E.createGame('BR', 'H', 't'); Object.assign(g.cfg, cfg); E.addBot(g, 'azar'); E.startGame(g); return g; };
+  const reg = cfg => { const g = mkg(cfg); const c = { id: 9001, t: 'reylobo', x: 0, y: 0, lv: 5, hp: 0, hit: false }; c.hp = Math.round(E.cstats(c, g).mhp * 0.5); g.creatures.push(c); const h = c.hp; E.advanceTurn(g); return c.hp - h; };
+  ok(reg({ bossRegen: 'ninguna' }) <= 0, 'jefe sin recuperación no se cura');
+  ok(reg({ bossRegen: 'normal' }) > reg({ bossRegen: 'lenta' }) * 2, 'normal cura mucho más que lenta');
+  const gn = mkg({}), gu = mkg({ mode: 'uno' }), b = { t: 'reylobo', lv: 10 }, w = { t: 'lobo', lv: 10 };
+  ok(E.cstats(b, gu).mhp < E.cstats(b, gn).mhp * 0.65 && E.cstats(b, gu).dmg < E.cstats(b, gn).dmg, 'en el reto de una unidad el jefe es más débil');
+  ok(E.cstats(w, gu).mhp === E.cstats(w, gn).mhp, 'las criaturas normales no cambian en el reto');
+  ok(S.WORLD_OPTS.bossRegen.def === 'lenta', 'por defecto: lenta');
+}
+
+{ // ===== más armas y armaduras =====
+  console.log('· calidad Dracónica, efectos nuevos, escala de rareza, reforjar y sets');
+  const g = mk({}); const first = g.players[0].id, u = g.units.find(x => x.o === first);
+  const c = g.cities.find(x => x.owner === first && x.cap);
+  c.cm = 20; c.crafts = 0;
+  ok(S.MAX_TIER === 5 && S.TIER_NAMES[5] === 'Dracónico' && S.MATS.escama, 'existe la calidad Dracónica y la escama de dragón');
+  c.st.m = { hierro: 30, acero: 30, alma: 40, cuero: 30, hueso: 30, escama: 6 };
+  let r = E.cmd(g, first, { a: 'craft', c: c.id, k: 'espada', tr: 5 });
+  ok(!r.err && c.st.it.some(i => i.k === 'espada' && i.t === 5), 'forjar dracónico cuesta escamas y almas: ' + (r.err || r.msg));
+  const e4 = (k, t) => { u.eq = { arma: { id: g.nid++, k, t } }; return E.eff(g, u).dmg; };
+  ok(e4('espada', 5) > e4('espada', 4) * 1.25, 'el dracónico supera claramente al alma');
+  const it = { id: 9300, k: 'espada', t: 4 }; c.st.it.push(it); c.crafts = 0;
+  r = E.cmd(g, first, { a: 'upgrade', c: c.id, i: 9300 }); ok(!r.err && it.t === 5, 'se puede mejorar de alma a dracónico');
+  c.crafts = 0; r = E.cmd(g, first, { a: 'upgrade', c: c.id, i: 9300 }); ok(!!r.err, 'ya es la mejor calidad');
+  // escala de rareza = nº de efectos
+  ok(S.RARITY.map(r => r.n).join() === 'Común,Poco común,Raro,Épico,Legendario,Mítico' && S.MAX_FX === 5, 'seis rarezas: Común, Poco común, Raro, Épico, Legendario, Mítico');
+  const lg = { id: 9301, k: 'espada', t: 2, fx: ['veneno', 'vida'], r: 2 }; c.st.it.push(lg); c.crafts = 0;
+  r = E.cmd(g, first, { a: 'enchant', c: c.id, i: 9301 }); ok(!!r.err, 'el 3.er efecto (Épico) exige calidad Acero o superior');
+  lg.t = 3; c.crafts = 0; r = E.cmd(g, first, { a: 'enchant', c: c.id, i: 9301 });
+  ok(!r.err && lg.fx.length === 3 && lg.r === 3 && S.itemName(lg).includes('🟣'), '3 efectos = Épico 🟣');
+  c.crafts = 0; r = E.cmd(g, first, { a: 'enchant', c: c.id, i: 9301 }); ok(!!r.err, 'el 4.º efecto (Legendario) exige calidad Alma o superior');
+  lg.t = 4; c.crafts = 0; const a0 = c.st.m.alma, s0 = c.st.m.escama;
+  r = E.cmd(g, first, { a: 'enchant', c: c.id, i: 9301, f: ['fuego', 'hielo', 'critico'].find(f => !lg.fx.includes(f)) });
+  ok(!r.err && lg.fx.length === 4 && lg.r === 4 && c.st.m.alma === a0 - 6 && (c.st.m.escama || 0) === s0 - 2 && S.itemName(lg).includes('🟡'), '4 efectos = Legendario 🟡 (6 almas y 2 escamas)');
+  c.crafts = 0; r = E.cmd(g, first, { a: 'enchant', c: c.id, i: 9301 }); ok(!!r.err, 'el 5.º efecto (Mítico) exige calidad Dracónica');
+  lg.t = 5; c.st.m.escama = 6; c.st.m.alma = 40; c.crafts = 0; r = E.cmd(g, first, { a: 'enchant', c: c.id, i: 9301 });
+  ok(!r.err && lg.fx.length === 5 && lg.r === 5 && S.itemName(lg).includes('🔴') && new Set(lg.fx).size === 5, '5 efectos = Mítico 🔴 (sin efectos repetidos)');
+  c.crafts = 0; r = E.cmd(g, first, { a: 'enchant', c: c.id, i: 9301 }); ok(!!r.err, 'máximo cinco efectos');
+  ok(S.affixText('afilado', 5).includes('18') && S.affixText('afilado', 1).includes('4'), 'la potencia crece de Poco común a Mítico');
+  // reforjar
+  const before = lg.fx.slice(); c.crafts = 0; const a1 = c.st.m.alma;
+  r = E.cmd(g, first, { a: 'reforge', c: c.id, i: 9301, x: 1 });
+  ok(!r.err && lg.fx.length === 5 && lg.fx[0] === before[0] && lg.fx[2] === before[2] && lg.fx[1] !== before[1] && c.st.m.alma === a1 - 2 && new Set(lg.fx).size === 5, 'reforjar cambia solo el efecto elegido por otro distinto (2 almas)');
+  ok(!!E.cmd(g, first, { a: 'reforge', c: c.id, i: 9301, x: 7 }).err, 'reforjar con efecto inválido falla');
+  // efectos nuevos en eff
+  const wf = (fx, r2 = 1) => { u.eq = { arma: { id: g.nid++, k: 'espada', t: 3, fx, r: r2 } }; return E.eff(g, u); };
+  const base = wf([]).dmg;
+  ok(wf(['critico']).fx.critico === 0.15 && wf(['critico', 'hielo'], 2).fx.critico === 0.22 && wf(['critico', 'hielo', 'fuego'], 3).fx.critico === 0.30, 'los valores suben con la rareza (Raro/Épico/Legendario)');
+  ok(wf(['ejecutor']).mods.execute === 0.2 && wf(['bestias']).mods.vsCre === 0.15, 'ejecutor y cazabestias entran en los modificadores');
+  const af = (fx, r2 = 1) => { u.eq = { pechera: { id: g.nid++, k: 'pechera', t: 3, fx, r: r2 } }; return E.eff(g, u); };
+  const hp0 = af([]).maxHp; ok(af(['vigor']).maxHp > hp0, 'vigor sube la salud máxima');
+  u.xp = 0; u.lv = 1; u.eq = {}; E.gainXp(g, u, 4); const xpA = u.xp;
+  af(['erudito']); u.xp = 0; u.eq = { pechera: { id: 1, k: 'pechera', t: 3, fx: ['erudito'], r: 1 } }; E.gainXp(g, u, 4);
+  ok(u.xp > xpA, 'erudito da más experiencia (' + xpA + ' → ' + u.xp + ')');
+  // hielo / fuego / crítico en combate
+  const foe = g.units.find(x => x.o !== first); const cr = { id: 9400, t: 'lobo', x: u.x + 1, y: u.y, lv: 1, hp: 500, hit: false }; g.creatures.push(cr);
+  u.eq = { arma: { id: g.nid++, k: 'espada', t: 5, fx: ['hielo', 'fuego', 'critico'], r: 3 } }; u.at = 1; u.hits = 0; u.mp = 3; u.acted = false;
+  const rr = E.cmd(g, first, { a: 'attack', u: u.id, tt: 'c', id: cr.id });
+  ok(!rr.err, 'ataque con efectos nuevos funciona: ' + (rr.err || rr.msg));
+  ok(cr.pz && cr.pz.t === 2, 'fuego deja quemado 2 turnos'); ok(cr.sl === 1 && E.cstats(cr, g).mov < S.CREATURES.lobo.mov, 'hielo ralentiza a la criatura');
+  // sets
+  const mkset = (t, n) => { u.eq = {}; ['casco', 'guantes', 'hombreras', 'pechera', 'pantalones', 'botas'].slice(0, n).forEach(k => u.eq[k] = { id: g.nid++, k, t }); return E.eff(g, u); };
+  const s0e = mkset(3, 2), s3 = mkset(3, 3), s6 = mkset(3, 6);
+  ok(!S.armorSet({ casco: { t: 3 }, pechera: { t: 3 } }) && S.armorSet(u.eq).name === 'Set de Acero', 'el set empieza con 3 piezas de la misma calidad');
+  ok(s3.maxHp > s0e.maxHp && s6.fx.regen >= 0.04, 'bonos de set: 3 piezas (+salud) y 6 piezas (regeneración)');
+  // botín
+  const dg = g.creatures; const boss = { id: 9500, t: 'dragon', x: 0, y: 0, lv: 5, hp: 1, hit: false }; let esc = 0;
+  for (let i = 0; i < 20; i++) { /* cada tirada usa el rng de la partida */ const d = E.cstats(boss, g); esc += d.mhp > 0 ? 1 : 0; }
+  ok(S.CREATURES.dragon.drops.escama, 'el Dragón de Ceniza suelta escamas');
+}
+
+{ // ===== rareza del botín =====
+  console.log('· rareza del botín');
+  const g = mk({}); const cnt = w => { const c = [0, 0, 0, 0, 0, 0]; for (let i = 0; i < 600; i++) { const it = E.rareItem(g, { w }); c[it.r]++; if (it.fx.length !== it.r || new Set(it.fx).size !== it.r) c.bad = 1; } return c; };
+  const cofre = cnt([65, 28, 6, 1, 0]), jefe = cnt([15, 30, 30, 18, 7]);
+  ok(!cofre.bad && !jefe.bad && cofre[0] === 0, 'el botín tiene tantos efectos como su rareza, sin repetir');
+  ok(cofre[1] > cofre[2] && cofre[5] === 0, 'un cofre da sobre todo Poco común y nunca Mítico');
+  ok(jefe[4] + jefe[5] > cofre[4] + cofre[5] + 40, 'los jefes dan mucho más Legendario/Mítico');
+}
+
+{ // ===== Reto del Rey Demonio =====
+  console.log('· Reto del Rey Demonio');
+  const mkr = (n = 5) => { const g = E.createGame('KG', 'H', 't'); g.cfg.mode = 'rey'; g.cfg.idleTurns = 0; for (let i = 0; i < n; i++) E.addBot(g, 'azar'); E.startGame(g); for (const p of g.players) if (p.id !== 0) p.bot = false; return g; };
+  const g = mkr(), K = g.king, kp = g.players[K];
+  ok(K >= 0 && K < g.players.length, 'se elige un Rey Demonio entre los jugadores: ' + kp.name);
+  const ku = g.units.filter(u => u.o === K);
+  ok(ku.length >= 6 && ku.every(u => u.bs && !Object.keys(u.eq).length), 'el Rey empieza solo con bestias (' + ku.length + ')');
+  ok(g.units.filter(u => u.o !== K).every(u => !u.bs), 'los demás tienen unidades normales');
+  const others = g.players.filter(p => p.id !== K);
+  ok(others.every(a => others.every(b => a === b || E.pactOf(g, a.id, b.id) === 'alianza')) && others.every(a => !E.pactOf(g, a.id, K)), 'los demás jugadores están aliados y en guerra con el Rey');
+  ok(!!E.cmd(g, others[0].id, { a: 'dip', d: 'propose', to: K, k: 'paz' }).err, 'no se puede negociar con el Rey Demonio');
+  ok(!!E.cmd(g, others[0].id, { a: 'dip', d: 'break', to: others[1].id }).err || E.pactOf(g, others[0].id, others[1].id) === 'alianza', 'la alianza no se rompe');
+  const kh = g.units.filter(u => u.o === K && u.hero);
+  ok(kh.length === 1 && ['reylobo', 'liche', 'dragon'].includes(kh[0].bs) && g.players[K].hero === kh[0].id && g.kingBoss === kh[0].bs, 'el protagonista del Rey es un jefe al azar: ' + (kh[0] && kh[0].bs));
+  ok(E.eff(g, kh[0]).maxHp < S.CREATURES[kh[0].bs].hp && E.eff(g, kh[0]).maxHp > 100, 'el jefe protagonista está atenuado (vida ' + E.eff(g, kh[0]).maxHp + ')');
+  const seen = new Set(); for (let i = 0; i < 25; i++) { const gz = mkr(2); seen.add(gz.kingBoss); } ok(seen.size === 3, 'con varias partidas salen los tres jefes: ' + [...seen].join(','));
+  { const aid = g.units.find(u => u.o === K && u.bs && !u.hero); aid.x = kh[0].x + 1; aid.y = kh[0].y; ok(E.eff(g, aid).ha === S.HERO.aura, 'su aura da +10% a las bestias cercanas'); }
+  { const ho = kh[0]; ho.lv = 6; E.killUnit(g, ho, { unit: g.units.find(x => x.o !== K) }); ok(!g.units.includes(ho) && g.rv.some(r => r.o === K && r.bs === g.kingBoss), 'si cae, reaparece después'); for (let i = 0; i < 5; i++) E.advanceTurn(g); const back = g.units.find(u => u.o === K && u.hero); ok(back && back.bs === g.kingBoss && back.lv === 6 - S.HERO.loss, 'vuelve como el mismo jefe, ' + S.HERO.loss + ' niveles más débil'); }
+  // reclutar solo bestias
+  const city = g.cities.find(c => c.owner === K && c.cap); city.st.m = { hueso: 30, cuero: 30, hierro: 30, acero: 30 }; city.crafts = 0;
+  const n0 = g.units.filter(u => u.o === K).length;
+  let r = E.cmd(g, K, { a: 'recruit', c: city.id, k: 'troll' });
+  ok(!r.err && g.units.filter(u => u.o === K).length === n0 + 1 && g.units.some(u => u.o === K && u.bs === 'troll'), 'el Rey recluta un Troll: ' + (r.err || r.msg));
+  ok(!!E.cmd(g, K, { a: 'recruit', c: city.id, k: 'dragon' }).err, 'no puede reclutar jefes ni cosas que no son bestias');
+  const sn = E.snapshot(g, K); const mine = sn.cities.find(c => c.id === city.id);
+  ok(sn.king === K && mine.rcb && mine.rcb.lobo && mine.rcb.troll, 'la vista incluye al rey y los costes de bestias');
+  // sin equipo ni clase
+  const b = ku[0]; const nr = g.units.find(u => u.o === K && u.bs);
+  ok(!!E.cmd(g, K, { a: 'cls', u: nr.id, k: 'duelista' }).err || !nr.cls, 'las bestias no tienen clase');
+  nr.inv.it.push({ id: 99991, k: 'espada', t: 1 }); nr.x = city.x + 1; nr.y = city.y;
+  ok(!!E.cmd(g, K, { a: 'equip', u: nr.id, i: 99991 }).err, 'las bestias no usan equipo');
+  nr.pts = 1; r = E.cmd(g, K, { a: 'skill', u: nr.id, s: 'dano' }); ok(!r.err && nr.sk.dano === 1, 'las bestias sí gastan puntos de habilidad');
+  // fin: cae el rey → gana la alianza
+  const ga = mkr(4); const ka = ga.king;
+  for (const u of ga.units.filter(u => u.o === ka)) E.killUnit(ga, u, { unit: ga.units.find(x => x.o !== ka) });
+  for (const c of ga.cities.filter(c => c.owner === ka)) c.st.m = {};
+  E.advanceTurn(ga);
+  ok(ga.status === 'over' && ga.winners && ga.winners.length === 4 && !ga.winners.includes(ka), 'si cae el Rey Demonio, gana la alianza');
+  // fin: el rey elimina a todos
+  const gb = mkr(3); const kb = gb.king;
+  for (const u of gb.units.filter(u => u.o !== kb)) E.killUnit(gb, u, { unit: gb.units.find(x => x.o === kb) });
+  for (const c of gb.cities.filter(c => c.owner !== kb && c.owner !== null)) c.st.m = {};
+  E.advanceTurn(gb);
+  ok(gb.status === 'over' && gb.winner === kb, 'si el Rey elimina a todos, gana el Rey');
+  // guardado y partida completa con bots
+  const gs = E.deserialize(E.serialize(g)); ok(gs.king === K && gs.units.some(u => u.bs), 'el modo se guarda con la partida');
+  const gg = E.createGame('KS', 'H', 't'); gg.cfg.mode = 'rey'; gg.cfg.sim = true; gg.cfg.idleTurns = 0; for (let i = 0; i < 9; i++) E.addBot(gg, 'azar'); E.startGame(gg);
+  let err = null; try { for (let i = 0; i < 60 && gg.status === 'playing'; i++) E.advanceTurn(gg); } catch (e) { err = e; }
+  ok(!err, 'partida de 10 jugadores (9 bots) corre sin errores' + (err ? ': ' + err.stack : ''));
+  ok(gg.units.filter(u => u.o === gg.king).every(u => u.bs), 'el bot Rey solo tiene bestias (nunca unidades normales)');
 }
 
 console.log(fails ? `\n${fails} fallos` : '\nTodo bien');

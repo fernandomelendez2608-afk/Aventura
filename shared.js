@@ -22,12 +22,14 @@
     hierro: { n: 'Hierro', e: '⛓️' },
     acero: { n: 'Acero', e: '🔩' },
     alma: { n: 'Alma', e: '👻' },
+    escama: { n: 'Escama de dragón', e: '🐉' },
   };
-  const MAT_ORDER = ['cuero', 'hueso', 'hierro', 'acero', 'alma'];
+  const MAT_ORDER = ['cuero', 'hueso', 'hierro', 'acero', 'alma', 'escama'];
 
-  const TIER_NAMES = [null, 'Cuero', 'Hierro', 'Acero', 'Alma'];
-  const WM = [0, 1, 1.5, 2.1, 3.0];   // multiplicador de daño de armas
-  const AM = [0, 1, 1.7, 2.6, 3.8];   // multiplicador de defensa de armaduras
+  const TIER_NAMES = [null, 'Cuero', 'Hierro', 'Acero', 'Alma', 'Dracónico'];
+  const MAX_TIER = 5;
+  const WM = [0, 1, 1.5, 2.1, 3.0, 4.1];   // multiplicador de daño de armas
+  const AM = [0, 1, 1.7, 2.6, 3.8, 5.3];   // multiplicador de defensa de armaduras
 
   const KINDS = {
     daga:      { n: 'Daga',        e: '🗡️', slot: 'arma',       w: true, base: 4,  range: 1, min: 1, pierce: 0.25, mov: 1, d: 'Ignora 25% de defensa, +1 movimiento' },
@@ -57,6 +59,7 @@
   const COUNT = { daga: 1, espada: 3, hacha: 3, katana: 4, hachabatalla: 5, lanza: 3, baston: 4, varita: 2, arco: 2, arcolargo: 3, ballesta: 4, escudo: 3, casco: 2, guantes: 1, hombreras: 2, pechera: 4, pantalones: 3, botas: 2 };
   function recipe(kind, t) {
     const weapon = !!KINDS[kind].w;
+    if (t === 5) return { escama: Math.max(1, Math.ceil(COUNT[kind] / 2)), alma: COUNT[kind] }; // dracónico: escamas de dragón + almas
     const main = [null, weapon ? 'hueso' : 'cuero', 'hierro', 'acero', 'alma'][t];
     const aux = [null, weapon ? 'cuero' : null, 'cuero', 'hierro', 'acero'][t];
     const r = {}; r[main] = COUNT[kind];
@@ -69,32 +72,63 @@
   }
   function tierName(kind, t) { return t === 1 ? (KINDS[kind].w ? 'Hueso' : 'Cuero') : TIER_NAMES[t]; }
   // ---- equipo raro: efectos (afijos) ----
-  const RARITY = [null, { n: 'Raro', e: '🔷' }, { n: 'Épico', e: '🟣' }];
+  // la rareza es el nº de efectos: 0 Común (gris), 1 Poco común (verde), 2 Raro (azul), 3 Épico (morado), 4 Legendario (amarillo), 5 Mítico (rojo)
+  const RARITY = [{ n: 'Común', e: '⚪' }, { n: 'Poco común', e: '🟢' }, { n: 'Raro', e: '🔵' }, { n: 'Épico', e: '🟣' }, { n: 'Legendario', e: '🟡' }, { n: 'Mítico', e: '🔴' }];
+  const MAX_FX = 5;
   const pc = v => Math.round(v * 100) + '%';
+  // v = valor según la rareza (nº de efectos del objeto): [1, 2, 3, 4, 5]
   const AFFIX = {
-    vida:    { n: 'Robo de vida', e: '🩸', w: true,  v: [0.20, 0.30], d: v => `recupera ${pc(v)} del daño que hace` },
-    veneno:  { n: 'Veneno',       e: '☠️', w: true,  v: [0.20, 0.30], d: v => `envenena 3 turnos (${pc(v)} de su daño por turno)` },
-    afilado: { n: 'Afilado',      e: '🗡️', w: true,  v: [4, 6],       d: v => `+${v} de daño` },
-    certero: { n: 'Certero',      e: '🎯', w: true,  v: [0.20, 0.30], d: v => `ignora ${pc(v)} más de defensa` },
-    regen:   { n: 'Regeneración', e: '🌿', w: false, v: [0.08, 0.12], d: v => `cura ${pc(v)} de la salud al empezar el turno` },
-    espinas: { n: 'Espinas',      e: '🌵', w: false, v: [0.25, 0.40], d: v => `devuelve ${pc(v)} del daño cuerpo a cuerpo` },
-    dureza:  { n: 'Dureza',       e: '🧱', w: false, v: [4, 6],       d: v => `+${v} de defensa` },
-    agil:    { n: 'Ágil',         e: '💨', w: false, v: [1, 1],       d: v => `+${v} de movimiento` },
+    vida:    { n: 'Robo de vida', e: '🩸', w: true,  v: [0.2, 0.3, 0.4, 0.5, 0.6], d: v => `recupera ${pc(v)} del daño que hace` },
+    veneno:  { n: 'Veneno',       e: '☠️', w: true,  v: [0.2, 0.3, 0.4, 0.5, 0.6], d: v => `envenena 3 turnos (${pc(v)} de su daño por turno)` },
+    afilado: { n: 'Afilado',      e: '🗡️', w: true,  v: [4, 6, 9, 13, 18],          d: v => `+${v} de daño` },
+    certero: { n: 'Certero',      e: '🎯', w: true,  v: [0.2, 0.3, 0.4, 0.5, 0.6], d: v => `ignora ${pc(v)} más de defensa` },
+    fuego:   { n: 'Fuego',        e: '🔥', w: true,  v: [0.35, 0.5, 0.7, 0.9, 1.2], d: v => `quema 2 turnos (${pc(v)} de su daño por turno)` },
+    hielo:   { n: 'Hielo',        e: '❄️', w: true,  v: [0.5, 0.7, 1, 1, 1], d: v => `${pc(v)} de probabilidad de ralentizar al enemigo (−2 movimiento un turno)` },
+    critico: { n: 'Crítico',      e: '💥', w: true,  v: [0.15, 0.22, 0.3, 0.38, 0.45], d: v => `${pc(v)} de probabilidad de golpe crítico (×1,8 de daño)` },
+    ejecutor:{ n: 'Ejecutor',     e: '💀', w: true,  v: [0.2, 0.3, 0.45, 0.6, 0.8], d: v => `+${pc(v)} de daño contra enemigos bajo la mitad de salud` },
+    bestias: { n: 'Cazabestias',  e: '🐺', w: true,  v: [0.15, 0.25, 0.4, 0.55, 0.75], d: v => `+${pc(v)} de daño contra criaturas` },
+    regen:   { n: 'Regeneración', e: '🌿', w: false, v: [0.08, 0.12, 0.16, 0.2, 0.25], d: v => `cura ${pc(v)} de la salud al empezar el turno` },
+    espinas: { n: 'Espinas',      e: '🌵', w: false, v: [0.25, 0.4, 0.55, 0.7, 0.9], d: v => `devuelve ${pc(v)} del daño cuerpo a cuerpo` },
+    dureza:  { n: 'Dureza',       e: '🧱', w: false, v: [4, 6, 9, 13, 18],          d: v => `+${v} de defensa` },
+    agil:    { n: 'Ágil',         e: '💨', w: false, v: [1, 1, 2, 2, 3],          d: v => `+${v} de movimiento` },
+    vigor:   { n: 'Vigor',        e: '💪', w: false, v: [0.08, 0.12, 0.18, 0.25, 0.35], d: v => `+${pc(v)} de salud máxima` },
+    erudito: { n: 'Erudito',      e: '📚', w: false, v: [0.15, 0.25, 0.4, 0.55, 0.75], d: v => `+${pc(v)} de experiencia ganada` },
+    bloqueo: { n: 'Bloqueo',      e: '🛡️', w: false, v: [0.12, 0.18, 0.25, 0.32, 0.4], d: v => `${pc(v)} de probabilidad de reducir a la mitad un golpe recibido` },
   };
   const WEAPON_FX = Object.keys(AFFIX).filter(k => AFFIX[k].w);
   const ARMOR_FX = Object.keys(AFFIX).filter(k => !AFFIX[k].w);
-  const affixText = (f, r) => AFFIX[f] ? AFFIX[f].e + ' ' + AFFIX[f].n + ': ' + AFFIX[f].d(AFFIX[f].v[Math.max(1, r || 1) - 1]) : f;
+  const affixText = (f, r) => AFFIX[f] ? AFFIX[f].e + ' ' + AFFIX[f].n + ': ' + AFFIX[f].d(AFFIX[f].v[Math.min(5, Math.max(1, r || 1)) - 1]) : f;
   function itemName(it) {
     let s = KINDS[it.k].n + ' de ' + tierName(it.k, it.t);
     if (it.fx && it.fx.length) s += ' ' + it.fx.map(f => AFFIX[f] ? AFFIX[f].e : '').join('');
-    return (RARITY[it.r || 0] ? RARITY[it.r].e + ' ' : '') + s;
+    return (it.r >= 1 && RARITY[it.r] ? RARITY[it.r].e + ' ' : '') + s;
   }
   function upgradeCost(kind, newTier) { // mejorar de calidad cuesta menos que forjar de cero
     const r = recipe(kind, newTier), o = {};
     for (const m in r) o[m] = Math.max(1, Math.ceil(r[m] * 0.6));
     return o;
   }
-  const ENCHANT_COST = { alma: 3 };
+  // coste de añadir el efecto nº (n+1) a un objeto que ya tiene n efectos, y calidad mínima que exige
+  const ENCHANT_STEPS = [{ cost: { alma: 3 }, tier: 1 }, { cost: { alma: 3 }, tier: 1 }, { cost: { alma: 4 }, tier: 3 }, { cost: { alma: 6, escama: 2 }, tier: 4 }, { cost: { alma: 9, escama: 4 }, tier: 5 }];
+  const ENCHANT_COST = ENCHANT_STEPS[0].cost;
+  const REFORGE_COST = { alma: 2 };      // cambiar un efecto por otro al azar
+  // ---- sets de armadura: piezas de la misma calidad (de las 7 ranuras de defensa) ----
+  const SET_BONUS = {
+    2: { n: 'Set de Hierro',     3: { hpPct: 0.05 }, 6: { def: 3 } },
+    3: { n: 'Set de Acero',      3: { hpPct: 0.08 }, 6: { def: 5, regen: 0.04 } },
+    4: { n: 'Set de Alma',       3: { hpPct: 0.10 }, 6: { def: 6, regen: 0.06 } },
+    5: { n: 'Set Dracónico',     3: { hpPct: 0.12 }, 6: { def: 8, regen: 0.05, espinas: 0.15 } },
+  };
+  function armorSet(eq) {
+    const cnt = {};
+    for (const slot of SLOTS) { if (slot === 'arma') continue; const it = eq && eq[slot]; if (it && it.t >= 2) cnt[it.t] = (cnt[it.t] || 0) + 1; }
+    let t = 0; for (const k in cnt) if (cnt[k] >= 3 && +k > t) t = +k;
+    if (!t) return null;
+    const n = cnt[t], def = SET_BONUS[t], b = {}, txt = [];
+    for (const th of [3, 6]) if (n >= th) { for (const k in def[th]) b[k] = (b[k] || 0) + def[th][k]; txt.push(`${th} piezas: ` + Object.keys(def[th]).map(k => ({ hpPct: `+${Math.round(def[th][k] * 100)}% salud`, def: `+${def[th][k]} defensa`, regen: `cura ${Math.round(def[th][k] * 100)}%/turno`, espinas: `espinas ${Math.round(def[th][k] * 100)}%` })[k]).join(', ')); }
+    return { t, n, name: def.n, b, txt };
+  }
+
 
   // ---- estaciones ----
   const SEASON_LEN = 12;
@@ -109,10 +143,28 @@
   const SITES = { cofre: { n: 'Cofre', e: '🎁' }, ruina: { n: 'Ruinas antiguas', e: '🏛️' } };
 
   // ---- bots y diplomacia ----
+  // b = parámetros de comportamiento: rec (reclutas extra), order (construcción), al ('recent' | 'always' | turno desde el que ataca),
+  // need (exigencia para atacar jugadores), cNeed (para criaturas), cVal/bVal (valor de criaturas/jefes), nCity (ciudades libres),
+  // cityVal/uVal (ciudades/unidades enemigas), paz/ali (probabilidad de aceptar)
   const PERS = {
-    granjero:     { n: 'Granjero',     e: '🌾', d: 'Caza, recolecta y construye. Solo pelea contra jugadores si lo atacan.' },
-    conquistador: { n: 'Conquistador', e: '⚔️', d: 'Agresivo desde el primer turno: busca ciudades y jugadores débiles.' },
-    equilibrado:  { n: 'Equilibrado',  e: '⚖️', d: 'Cuida su economía y ataca cuando se siente fuerte.' },
+    granjero:     { n: 'Granjero',     e: '🌾', d: 'Caza, recolecta y construye. Solo pelea contra jugadores si lo atacan.',
+      b: { rec: 2, order: ['cuartel', 'herreria', 'muralla', 'atalaya'], al: 'recent', need: 1, cNeed: 0.85, cVal: 1.3, bVal: 1, nCity: 40, cityVal: 46, uVal: 1, paz: 1, ali: 0.5 } },
+    conquistador: { n: 'Conquistador', e: '⚔️', d: 'Agresivo desde el primer turno: busca ciudades y jugadores débiles.',
+      b: { rec: 1, order: ['herreria', 'cuartel', 'muralla', 'atalaya'], al: 'always', need: 0.85, cNeed: 1, cVal: 0.8, bVal: 1, nCity: 34, cityVal: 60, uVal: 1.3, paz: 0.2, ali: 0.1 } },
+    equilibrado:  { n: 'Equilibrado',  e: '⚖️', d: 'Cuida su economía y ataca cuando se siente fuerte.',
+      b: { rec: 0, order: ['muralla', 'cuartel', 'herreria', 'atalaya'], al: 40, need: 1, cNeed: 1, cVal: 1, bVal: 1, nCity: 34, cityVal: 46, uVal: 1, paz: 0.6, ali: 0.3 } },
+    cazador:      { n: 'Cazador',      e: '🏹', d: 'Vive de cazar criaturas y subir de nivel. Rara vez ataca a otros jugadores.',
+      b: { rec: 1, order: ['cuartel', 'herreria', 'atalaya', 'muralla'], al: 'recent', need: 1.1, cNeed: 0.7, cVal: 1.6, bVal: 1.1, nCity: 34, cityVal: 46, uVal: 1, paz: 0.8, ali: 0.4 } },
+    diplomatico:  { n: 'Diplomático',  e: '🕊️', d: 'Busca paz y alianzas con todos. Solo pelea si lo atacan.',
+      b: { rec: 1, order: ['muralla', 'atalaya', 'cuartel', 'herreria'], al: 'recent', need: 1.2, cNeed: 1, cVal: 1, bVal: 1, nCity: 38, cityVal: 46, uVal: 1, paz: 1, ali: 0.9 } },
+    defensor:     { n: 'Defensor',     e: '🛡️', d: 'Se atrinchera: murallas primero y mucho ejército en casa. Contraataca a quien lo ataque.',
+      b: { rec: 2, order: ['muralla', 'atalaya', 'cuartel', 'herreria'], al: 'recent', need: 1.3, cNeed: 1.15, cVal: 0.9, bVal: 0.8, nCity: 34, cityVal: 46, uVal: 1, paz: 0.9, ali: 0.5 } },
+    saqueador:    { n: 'Saqueador',    e: '🗡️', d: 'Oportunista: tras un tiempo ataca solo a los más débiles y a unidades sueltas.',
+      b: { rec: 1, order: ['herreria', 'cuartel', 'atalaya', 'muralla'], al: 15, need: 0.7, cNeed: 1, cVal: 0.9, bVal: 0.9, nCity: 34, cityVal: 50, uVal: 1.5, paz: 0.3, ali: 0.15 } },
+    mercader:     { n: 'Forjador',     e: '🔨', d: 'Obsesionado con el equipo: herrería y encantamientos. Pelea cuando ya está bien armado.',
+      b: { rec: 1, order: ['herreria', 'herreria', 'cuartel', 'muralla'], al: 60, need: 0.9, cNeed: 0.95, cVal: 1.1, bVal: 1, nCity: 36, cityVal: 46, uVal: 1, paz: 0.7, ali: 0.4 } },
+    cazajefes:    { n: 'Cazajefes',    e: '🐉', d: 'Su meta son los jefes del mapa (Rey Lobo, Liche, Dragón). Ignora a los demás salvo que lo ataquen.',
+      b: { rec: 2, order: ['cuartel', 'herreria', 'muralla', 'atalaya'], al: 'recent', need: 1.1, cNeed: 0.8, cVal: 1.1, bVal: 2.2, nCity: 34, cityVal: 46, uVal: 1, paz: 0.7, ali: 0.35 } },
   };
   const BOT_LEVELS = { facil: 'Fácil', normal: 'Normal', dificil: 'Difícil' };
   // ---- clases (nivel 6) y especializaciones (nivel 12) ----
@@ -174,11 +226,13 @@
 
   // ---- ajustes del mundo que elige el anfitrión ----
   const WORLD_OPTS = {
-    mode:       { n: 'Modo de juego', def: 'normal', o: { normal: 'Normal', uno: 'Reto de una unidad: cada jugador (y bot) solo tiene 1 unidad y si cae queda eliminado' } },
+    mode:       { n: 'Modo de juego', def: 'normal', o: { normal: 'Normal', uno: 'Reto de una unidad: cada jugador (y bot) solo tiene 1 unidad y si cae queda eliminado', rey: 'Reto del Rey Demonio: un jugador al azar es el Rey Demonio (solo recluta bestias) y los demás están aliados contra él' } },
     mapSize:    { n: 'Tamaño del mapa', def: 'normal', o: { pequeno: 'Pequeño (partidas más rápidas)', normal: 'Normal', grande: 'Grande', enorme: 'Enorme (partidas muy largas)' } },
     cities:     { n: 'Ciudades neutrales (aldeas)', def: 'normal', o: { pocas: 'Pocas', normal: 'Normal', muchas: 'Muchas', abundantes: 'Abundantes' } },
     biome:      { n: 'Bioma', def: 'azar', o: { azar: 'Mixto (al azar)', bosque: 'Solo bosque', pradera: 'Solo pradera', desierto: 'Solo desierto' } },
     fauna:      { n: 'Criaturas', def: 'normal', o: { pacifica: 'Más pacíficas', normal: 'Normal', agresiva: 'Más agresivas' } },
+    bossRegen:  { n: 'Recuperación de los jefes', def: 'lenta', o: { lenta: 'Lenta (3% por turno)', normal: 'Normal (10% por turno, como las demás criaturas)', ninguna: 'Ninguna' } },
+    botChat:    { n: 'Los bots hablan en el chat', def: 'si', o: { si: 'Sí', no: 'No' } },
     hero:       { n: 'Protagonista (una unidad especial por jugador)', def: 'si', o: { si: 'Sí', no: 'No' } },
     breed:      { n: 'Crías (dos unidades juntas cerca de una ciudad)', def: 'cinco', o: { apagado: 'Desactivadas', cinco: 'Tras 5 turnos juntas', tres: 'Tras 3 turnos juntas' } },
     startUnits: { n: 'Unidades iniciales por jugador', def: 4, o: { 4: '4 (normal)', 8: '8', 14: '14 (máximo)' } },
@@ -186,6 +240,19 @@
     startArmor: { n: 'Armadura inicial', def: 'ninguna', o: { ninguna: 'Sin armadura', hierro: 'Armadura de hierro completa', acero: 'Armadura de acero completa' } },
   };
 
+  // Reto del Rey Demonio: bestias que puede reclutar (coste base; la mejora de cuartel lo reduce)
+  const KING = {
+    beasts: {
+      lobo:      { cost: { hueso: 2, cuero: 2 } },
+      oso:       { cost: { hueso: 3, cuero: 3 } },
+      goblin:    { cost: { hierro: 2, cuero: 2 } },
+      esqueleto: { cost: { hueso: 5, hierro: 1 } },
+      orco:      { cost: { hierro: 4, cuero: 3, hueso: 2 } },
+      troll:     { cost: { hierro: 6, acero: 2, hueso: 3 } },
+    },
+    start: ['lobo', 'lobo', 'oso', 'oso', 'goblin', 'esqueleto'], n: 6, lv: 3,
+    heroes: ['reylobo', 'liche', 'dragon'], boss: { hp: 0.5, dmg: 0.6 }, // protagonista del Rey: un jefe al azar (con la mitad de vida y 60% del daño de un jefe salvaje)
+  };
   const PACTS = { guerra: { n: 'Guerra', e: '⚔️' }, paz: { n: 'Paz', e: '🕊️' }, alianza: { n: 'Alianza', e: '🤝' } };
 
   const TERR = {
@@ -209,7 +276,7 @@
     troll:     { n: 'Troll',     e: '🦍', hp: 120, dmg: 17, def: 10, mov: 2, agg: 4, max: 10, xp: 26, drops: { acero: [1, 3], hierro: [1, 2] }, soul: 0.08 },
     reylobo:   { n: 'Rey Lobo',  e: '🐺', hp: 220, dmg: 20, def: 12, mov: 4, agg: 5, max: 15, xp: 70,  boss: true, drops: { acero: [3, 5], cuero: [4, 6], alma: [2, 3] } },
     liche:     { n: 'Liche',     e: '🧙', hp: 230, dmg: 20, def: 10, mov: 3, agg: 6, max: 15, xp: 90,  boss: true, rng: 4, drops: { alma: [3, 5], acero: [2, 4], hierro: [3, 5] } },
-    dragon:    { n: 'Dragón de Ceniza', e: '🐉', hp: 480, dmg: 34, def: 20, mov: 3, agg: 6, max: 15, xp: 160, boss: true, rng: 2, drops: { alma: [5, 8], acero: [4, 6] } },
+    dragon:    { n: 'Dragón de Ceniza', e: '🐉', hp: 480, dmg: 34, def: 20, mov: 3, agg: 6, max: 15, xp: 160, boss: true, rng: 2, drops: { alma: [5, 8], acero: [4, 6], escama: [2, 3] } },
   };
 
   const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
@@ -255,8 +322,8 @@
 
   return {
     SKILLS, SKILL_ORDER, MATS, MAT_ORDER, TIER_NAMES, WM, AM, KINDS, WEAPON_KINDS, GEAR_KINDS, SLOTS, SLOT_NAMES,
-    recipe, itemValue, itemName, tierName, RARITY, AFFIX, WEAPON_FX, ARMOR_FX, affixText, upgradeCost, ENCHANT_COST,
-    CART, HERO, SUMMON, WORLD_OPTS, CLASS_LV, SUB_LV, CLASSES, classMods, BUILDINGS, BUILD_ORDER, BUILD_MAX, ORDERS,
+    recipe, itemValue, MAX_TIER, ENCHANT_STEPS, MAX_FX, REFORGE_COST, SET_BONUS, armorSet, itemName, tierName, RARITY, AFFIX, WEAPON_FX, ARMOR_FX, affixText, upgradeCost, ENCHANT_COST,
+    CART, HERO, KING, SUMMON, WORLD_OPTS, CLASS_LV, SUB_LV, CLASSES, classMods, BUILDINGS, BUILD_ORDER, BUILD_MAX, ORDERS,
     SEASON_LEN, SEASONS, seasonIdx, ELITE_NAMES, SITES, PERS, BOT_LEVELS, PACTS, TERR, CREATURES, DIRS, cheb, reach,
   };
 });

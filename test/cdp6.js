@@ -31,6 +31,11 @@ let bad = 0; const check = (n, c, x) => { if (!c) bad++; console.log((c ? '✓ '
   await shot('c1-chat-vacio');
   await ev(`(()=>{const i=document.getElementById('chIn'); i.value='Hola desde el celular 👋'; document.querySelector('[data-ui=chsend]').click()})()`); await wait(600);
   check('mi mensaje aparece en la lista', (await ev(`document.getElementById('chList').innerText`)).includes('Hola desde el celular'));
+  const botName = await ev(`S.players.find(p => p.bot).name`);
+  await ev(`(()=>{const i=document.getElementById('chIn'); i.value=${JSON.stringify(botName + ', hagamos la paz')}; document.querySelector('[data-ui=chsend]').click()})()`); await wait(700);
+  const txt = await ev(`document.getElementById('chList').innerText`);
+  check('el bot contesta en el chat con su etiqueta 🤖', txt.includes('🤖') && /paz/i.test(txt.split('hagamos la paz').pop()), txt.split('\n').slice(-2).join(' | '));
+  await shot('c4-chat-bot');
   w2.send(JSON.stringify({ t: 'chat', text: '¡Hola Fercho! Vamos por el jefe', al: false })); await wait(700);
   check('el mensaje del amigo llega en vivo', (await ev(`document.getElementById('chList').innerText`)).includes('Vamos por el jefe'));
   await shot('c2-chat-conversacion');

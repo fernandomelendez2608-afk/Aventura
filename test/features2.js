@@ -109,7 +109,7 @@ console.log('Equipo raro, mejorar y encantar');
   r2 = E.cmd(g, 0, { a: 'enchant', c: c.id, i: 9100 });
   ok(!r2.err && it.fx.length === 2 && it.r === 2, 'segundo encantamiento → épico');
   r2 = E.cmd(g, 0, { a: 'enchant', c: c.id, i: 9100 });
-  ok(!!r2.err, 'máximo dos efectos');
+  ok(!r2.err && it.fx.length === 3 && it.r === 3, 'tercer efecto (calidad Acero) → Épico');
   ok(S.itemName(it).includes('🟣'), 'nombre con rareza: ' + S.itemName(it));
 }
 
