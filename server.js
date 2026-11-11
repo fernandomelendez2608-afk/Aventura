@@ -232,7 +232,7 @@ function advance(g) {
   broadcast(g);
 }
 function maybeAdvance(g) {
-  if (g.status !== 'playing') return;
+  if (g.status !== 'playing' || g.cfg.mode === 'mundo') return; // el mundo abierto solo avanza con el reloj
   const humans = g.players.filter(p => p.alive && !p.bot && !p.auto);
   if (humans.length && humans.every(p => p.ready)) advance(g);
 }
@@ -264,7 +264,14 @@ function onMessage(c, text) {
       const token = newToken();
       if (g.status === 'lobby') {
         const p = E.addPlayer(g, name, false, token);
-        if (!p) return send(c, { t: 'err', m: 'La partida está llena (máx. 10)' });
+        if (!p) return send(c, { t: 'err', m: 'La partida está llena' });
+        bind(c, g, p); touchGame(g, true);
+        joined(c, g, p, token);
+        return broadcast(g);
+      }
+      if (g.cfg.mode === 'mundo') { // mundo abierto: se entra cuando se quiera, con un lugar nuevo para nacer
+        const p = E.joinWorld(g, name, token);
+        if (!p) return send(c, { t: 'err', m: 'El mundo está lleno o no hay un lugar libre para nacer' });
         bind(c, g, p); touchGame(g, true);
         joined(c, g, p, token);
         return broadcast(g);

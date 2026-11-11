@@ -326,3 +326,101 @@ Nuevo modo de juego (se elige en «Ajustes del mundo → Modo de juego»):
 
 ### Protagonista del Rey Demonio (v1.18.1)
 El Rey Demonio también tiene protagonista (si «Protagonista» está en Sí): al empezar le toca **al azar uno de los tres jefes** (🐺 Rey Lobo, 🧙 Liche o 🐉 Dragón de Ceniza) como su unidad inicial. Tiene la mitad de la vida y el 60% del daño de un jefe salvaje (`KING.boss` en `shared.js`), da +10% de daño y defensa a las bestias cercanas, gana +50% de experiencia y, si cae, vuelve a su ciudad en 3 turnos con 2 niveles menos. No se puede cambiar de protagonista. Sustituye a una de las 6 bestias iniciales.
+
+## Modo «Por equipos» (v1.19)
+En «Ajustes del mundo → Modo de juego» elige **Por equipos** y, en el ajuste **Equipos**, si serán **2 equipos** o **5 equipos**.
+- Al empezar, los jugadores (humanos y bots) se reparten **al azar y de forma equilibrada** (10 jugadores: 2 equipos de 5, o 5 equipos de 2; con menos jugadores los equipos quedan lo más parejos posible y nunca hay más equipos que jugadores).
+- Los compañeros quedan **aliados automáticamente** y los otros equipos son enemigos; las alianzas y pactos no se pueden cambiar en este modo. En «Jugadores» cada uno muestra su equipo (🔶 🔷 🟩 🟪 🟫).
+- **Gana el último equipo con jugadores vivos** (victoria compartida para todo el equipo). Los bots atacan siempre a los otros equipos, sea cual sea su personalidad.
+
+## Modo Historia (v1.20)
+Nuevo modo cooperativo: «Ajustes del mundo → Modo de juego → Historia». Es una campaña de **6 capítulos dentro de una sola partida**, «La Ceniza del Dragón». Todos los jugadores (humanos y bots) están **aliados contra el mundo** (sin PvP ni diplomacia) y los jefes aleatorios no aparecen: solo los que manda la historia.
+
+| Capítulo | Objetivo (entre todos) |
+|---|---|
+| 1. El eco de la ceniza | Derrotar 12 criaturas |
+| 2. Tierras propias | Que el grupo tenga (jugadores + 3) ciudades |
+| 3. Acero y leyenda | Una unidad de nivel 8 y equipar algo de calidad Acero o mejor |
+| 4. El rey de los lobos | Derrotar al Rey Lobo (aparece al empezar el capítulo) |
+| 5. La noche del Liche | Derrotar al Liche |
+| 6. El Dragón de Ceniza | Derrotar al Dragón → **victoria compartida** |
+
+- Al completar un capítulo, **cada capital recibe materiales y un objeto de botín** (mejor cuanto más avanzado), y se cuenta el siguiente capítulo.
+- Los jefes salen con un nivel parecido al de tu mejor unidad (con mínimos y máximos por capítulo); si el jefe de un capítulo desaparece, vuelve a aparecer.
+- Si cae todo el grupo, la historia termina en derrota.
+- Botón 📖 en el mapa: capítulo actual, objetivos con progreso, capítulos anteriores y prólogo. Se abre solo al empezar y al cambiar de capítulo.
+- Todos los textos y objetivos están en `shared.js` (`STORY`): se pueden editar o añadir capítulos sin tocar el motor.
+
+## Mundo abierto (v1.21) — fase 1
+Modo para un mundo **siempre abierto entre amigos**: «Ajustes del mundo → Modo de juego → Mundo abierto». El anfitrión crea la partida, la inicia (aunque esté solo) y los demás **entran cuando quieran** con el código, incluso días después; cada uno nace en un sitio libre y lejos de los demás (con una zona sin monstruos alrededor).
+- **Tamaño:** Grande 120×120, Enorme 160×160 (por defecto) o Gigante 220×220, con más de 100 ciudades neutrales y mucha fauna. Hasta **24 jugadores**, sin bots, sin fin de partida y sin eliminar a nadie.
+- **Tiempo:** el mundo avanza solo con el reloj (no hay «Fin de turno»). Al elegir este modo el turno pasa a 1 hora (se puede cambiar). Los jugadores actúan cuando entran; sus unidades se recuperan en cada turno.
+- **Sin reclutar:** solo hay **crías** (dos unidades juntas junto a una ciudad tuya; viene activado). Si te quedas sin unidades, unos refugiados te acompañan; si pierdes también tus ciudades, vuelves a nacer en otro lugar.
+- **Ciudades:** se pueden conquistar, pero **si pasan N turnos sin unidades tuyas cerca (≤ 2 casillas) vuelven a ser neutrales** (12, 24, 48 o 96 turnos; avisa 3 turnos antes). Una capital abandonada queda como «Ruinas de …».
+- **Monstruos:** salen de **cualquier nivel al azar** (más bajos que altos) y **ya no suben con el tiempo**; los jefes salen con nivel al azar entre 5 y 15.
+- La diplomacia (paz y alianzas) sigue disponible. El chat funciona para todo el mundo.
+- Recomendaciones: un celular o computador «vigía» conectado mantiene Render despierto, pero **si el servidor se reinicia o subes una versión nueva, el mundo se reinicia** (en Render gratis el disco es temporal). Con «Gigante» cada actualización de estado pesa ~100 KB: para muchos jugadores es mejor «Enorme».
+
+## Tutorial, modos rápidos y resumen final (v1.22)
+
+- **Tutorial**: la primera vez que entras a una partida aparece una guía de 7-8 pasos (mover, combatir, ciudades, crías, fin de turno, y un paso extra según el modo). Se puede saltar y se recuerda en el dispositivo. El botón ❓ la vuelve a abrir.
+- **Modos rápidos** (lobby, anfitrión): Clásica, Rápida, Épica, Reto, Equipos, Rey Demonio, Historia y Mundo abierto. Un toque aplica todos los ajustes del modo; los ajustes no nombrados vuelven a su valor por defecto y se pueden afinar después. Definidos en `PRESETS` (shared.js).
+- **Resumen final**: al terminar la partida aparece 📊 con clasificación (puntos, criaturas, jefes, jugadores derrotados, ciudades, mejor unidad) y premios. El servidor lo calcula en `summary(g)` (engine.js) y viaja en el estado como `sum`.
+
+## Engarces, gemas y tipos de final (v1.23)
+
+**Gemas y engarces**
+- 6 gemas (🔴 rubí, 🔵 zafiro, 🟢 esmeralda, 🟡 topacio, 🟣 amatista, ⚪ diamante) en 3 calidades (astillada, normal, perfecta). Se guardan como materiales (`rubi1`, `rubi2`, `rubi3`…), así que se llevan en la mochila, se depositan y se retiran como el resto.
+- Cada gema da un efecto distinto en armas y en armaduras (ej. rubí: +daño en arma, +salud en armadura).
+- Los objetos raros salen con 0-3 engarces según su rareza; los demás se perforan en la forja (pestaña Mejorar; cuesta acero/alma y exige calidad mínima). Máximo 3.
+- Se engasta una gema del almacén en un engarce libre; si no hay, se elige cuál sustituir (la vieja se pierde). 3 gemas iguales se funden en 1 de la calidad siguiente.
+- Botín: jefes (casi siempre, 2), élites y criaturas normales (a veces, más con el nivel), cofres y ruinas. Las gemas se guardan antes que los materiales para que no se pierdan con la mochila llena. Los bots también las engastan.
+
+**Tipos de final** (ajuste «Tipo de final», modos Normal y Reto de una unidad)
+- Último en pie (por defecto), Por tiempo (40 turnos si no hay otro límite), Dominación (la mitad de las ciudades 4 turnos seguidos), Cazajefes (2 jefes; aparecen más a menudo), Campeón (unidad a nivel 12) y Carrera de puntos (600).
+- El progreso se muestra en la hoja de Jugadores y se avisa en el registro.
+
+## v1.23.1
+- Nivel máximo de unidad: de 20 a **53**, justo lo necesario para llenar todas las habilidades (suma de topes = 53, 1 punto por nivel).
+
+## Crías con herencia (v1.24)
+- La cría hereda el mejor bonus de nacimiento de sus dos padres y le suma el bonus base (+10 salud, +2 daño): cada generación es más fuerte que la anterior (gen. 1: +10/+2, gen. 2: +20/+4, …). Se muestra la generación en la hoja de la unidad y en el aviso de nacimiento. El protagonista que reaparece conserva su generación.
+
+## Comercio entre jugadores (v1.25)
+- En la hoja de Jugadores, junto a quien tengas en paz o alianza, aparece 🛒 Comerciar: eliges tu ciudad de salida, lo que das (materiales, gemas y/o un objeto) y lo que pides (materiales y gemas).
+- Lo que ofreces queda en depósito (sale de tu ciudad). El otro jugador acepta (la mercancía llega a la ciudad suya que tenga lo que pides; lo que pides llega a tu ciudad de salida), rechaza, o la oferta caduca a los 5 turnos; en los dos últimos casos se devuelve todo. Máx. 3 ofertas pendientes por jugador. No hay comercio en el Reto de una unidad.
+- Los bots (y los jugadores ausentes) aceptan tratos que valgan al menos un 90% de lo que piden (valores: cuero/hueso 1, hierro 1,5, acero 3, alma 4, escama 8, gemas 5/14/40) y rechazan los abusivos. Los bots no proponen tratos.
+- Código: `doTrade`, `tradeAccept`, `tradeTick` (engine.js); estado `trades` en el snapshot.
+
+## Eventos del mundo: clima, torneos y mercaderes (v1.26)
+Ajuste «Eventos del mundo»: Clima + torneos + mercaderes (por defecto) / Solo clima / Nada.
+- **Clima** (☀️ despejado, 🌧️ lluvia, ⛈️ tormenta, 🌫️ niebla, 🌨️ ventisca): cambia cada 2-4 turnos según la estación y se ve junto al turno. Lluvia: armas a distancia −25% y el fuego no quema. Tormenta: −1 de movimiento, distancia −35%, magia (bastón/varita) +25%. Niebla: sin críticos y la distancia alcanza 1 casilla menos. Ventisca (solo invierno): −1 de movimiento y el hielo ralentiza siempre. Las armas cuerpo a cuerpo no se ven afectadas por la lluvia.
+- **Torneos** 🏟️: desde el turno 10 y cada 18 turnos aparece una arena en el mapa (visible para todos) durante 4 turnos. Al terminar gana la mejor unidad (nivel, daño, defensa, salud) que esté en la arena o pegada a ella: 2 gemas, un objeto raro y experiencia (lo que no cabe en la mochila va a la capital). Los bots no acuden (todavía). Sin torneos en Historia.
+- **Mercaderes ambulantes** 🛒: cada 8 turnos aparece uno (hasta 3; más en Mundo abierto), se queda 7 turnos y deambula. Con una unidad pegada a él, toca el mercader para ver sus ofertas: gemas, lotes de materiales, un objeto raro y un mapa del tesoro (crea un cofre cercano). Se paga con lo que lleva la unidad en la mochila; cada oferta se vende una sola vez. Los bots no compran.
+
+## Ciudades de 3×3 con edificios visibles (v1.27)
+- Cada ciudad ocupa un **solar de 3×3** (el centro sigue siendo la casilla de la ciudad; el solar nunca es agua ni montaña). En el mapa se dibuja el suelo, la torre del homenaje (crece con las mejoras) y los edificios: 🔨 herrería (oeste), 🏕️ cuartel (este), 🐴 establo (norte, cuando la ciudad tiene su carreta), 🧱 murallas de piedra alrededor con puerta al sur y 🔭 atalayas en las esquinas. Cada edificio cambia de aspecto en el nivel 2 (herrería con chimenea, cuartel con tienda de guerra, muralla más gruesa con torreones, atalaya más alta con tejado dorado y bandera).
+- Las **mejoras no se pierden al conquistar** una ciudad ni cuando vuelve a quedar neutral: las conserva quien la tome.
+- **Bonos al estar en la ciudad** (`CITY_GUARD` en shared.js): contra jugadores +8 de defensa en el centro y +4 en el anillo de 3×3. Contra hordas que asaltan la ciudad: +10/+6 de defensa y +30%/+20% de ataque para quien la defiende.
+
+## Más clases y armas (v1.28)
+**6 armas nuevas** (se forjan, salen de botín y las usan los bots): 🤺 Estoque (dos ataques por turno; el segundo hace 60%), 🔨 Maza (35% de aturdir: −2 de movimiento un turno), 🪃 Bumerán (alcance 3, una mano), 🪢 Látigo (alcance 2 sin penalización a quemarropa, +1 movimiento, una mano), 🌾 Guadaña (+30% de daño a enemigos por debajo de la mitad de salud, dos manos) y 🔮 Orbe (mágica: alcance 3, ignora 20% de defensa, una mano). Las armas mágicas (báculo, varita, orbe) usan ahora la marca `magic` en `KINDS`.
+
+**6 clases nuevas** (nivel 6, 2 especializaciones cada una a nivel 12): 😡 Berserker (Frenesí, Titán), ⚜️ Paladín (Cruzado, Inquebrantable), 🥋 Monje (Puño de hierro, Maestro zen), 🎵 Bardo (Trovador, Juglar), ⚗️ Alquimista (Toxicólogo, Boticario) y 🌋 Elementalista (Piromante, Criomante; sus golpes queman o ralentizan: nuevos efectos de clase `fuego` y `hielo`). En total hay 15 clases.
+
+## Más criaturas y jefes (v1.29)
+- **Pacíficas** (no atacan; se defienden si las atacas): 🐇 conejo, 🐐 cabra montés, 🐂 toro (golpea fuerte), 🐢 tortuga gigante (mucha defensa).
+- **Agresivas**: 🦇 murciélago, 🐍 serpiente, 🕷️ araña gigante, 🦂 escorpión, 🥷 bandido, 🧟 zombi, 👻 fantasma (ataca a distancia 2, deja almas) y 🗿 gólem de piedra (lento y muy duro). Salen en las zonas de las tablas de fauna (normal, pacífica y agresiva); las zonas lejanas traen las más peligrosas.
+- **Jefes nuevos** (4, ahora hay 7): 🐃 Minotauro del Laberinto, 🐲 Hidra de las Ciénagas (a distancia 2), ⛰️ Coloso de Piedra (lentísimo y blindado) y 🧛 Conde Vampiro. Aparecen al azar junto a los anteriores; en el modo Historia siguen los tres de siempre.
+- Reto del Rey Demonio: su protagonista puede ser cualquiera de los 7 jefes y ahora también puede reclutar 🕷️ arañas, 🧟 zombis y 🗿 gólems.
+
+## Mazmorras (v1.30)
+
+- Entradas 🕳️ repartidas por el mapa, de 5 niveles (Cueva → … → el más profundo). Cuanto mayor el nivel, más duras las criaturas, más trampas y más botín.
+- Al entrar, la unidad pasa a otra "instancia" (una franja subterránea bajo el mapa, aislada por muros). La puerta 🚪 te devuelve al sitio por el que entraste.
+- Cada mazmorra tiene 6 salas: criaturas, tesoros 💎 y trampas ⚠️ ocultas (se descubren al pisarlas).
+- Al fondo hay un jefe con recompensa extra. Despejada, se reabastece a los 20 turnos.
+- Los bots no entran. Las unidades dentro solo las ve su dueño.
+
+### Fortaleza del Rey Demonio (v1.30.1)
+En el modo «Reto del Rey Demonio», la ciudad del rey se dibuja como fortaleza oscura: suelo carmesí, torres de pinchos, antorchas 🔥, volcán y 😈 sobre el torreón. Los edificios (muralla, herrería, cuartel, atalayas) se siguen viendo.
