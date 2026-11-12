@@ -147,12 +147,12 @@ console.log('Edificios');
   const rb = E.cmd(g, 0, { a: 'build', c: c.id, k: 'atalaya' }); if (rb.err) console.log('   (construir atalaya:', rb.err + ')');
   const vis1 = E.snapshot(g, 0).vis.split('1').length;
   ok(vis1 > vis0, 'la atalaya amplía la visión');
-  // conquista degrada
-  const before = c.b.muralla; c.owner = null; const enemy = g.units.find(x => x.o === 1);
+  // conquista: las mejoras se conservan
+  const before = c.b.muralla, beforeH = c.b.herreria; c.owner = null; const enemy = g.units.find(x => x.o === 1);
   c.owner = 0; enemy.x = c.x + 1; enemy.y = c.y; E.touch(g); enemy.mp = 5;
   const rm = E.cmd(g, 1, { a: 'move', u: enemy.id, x: c.x, y: c.y });
   ok(c.owner === 1 || rm.err, 'conquista intentada');
-  if (c.owner === 1) ok(c.b.muralla === before - 1 && c.b.herreria === 1, 'al conquistarla los edificios bajan un nivel');
+  if (c.owner === 1) ok(c.b.muralla === before && c.b.herreria === beforeH, 'al conquistarla las mejoras se conservan (v1.27)');
   // bots construyen solos
   const g2 = mk(2); const bc = city(g2, 1); bc.st.m = { hierro: 60, acero: 30, cuero: 60, hueso: 60 };
   for (let i = 0; i < 8; i++) { g2.status = 'playing'; g2.creatures = []; E.touch(g2); E.advanceTurn(g2); }

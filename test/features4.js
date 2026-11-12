@@ -55,7 +55,7 @@ console.log('Biomas');
 
 console.log('Fauna');
 {
-  const frac = k => { let tot = 0, pas = 0; for (let i = 0; i < 12; i++) { const g = mk({ fauna: k }); for (const c of g.creatures) { tot++; if (['ciervo', 'jabali', 'oso'].includes(c.t)) pas++; } } return pas / tot; };
+  const frac = k => { let tot = 0, pas = 0; for (let i = 0; i < 12; i++) { const g = mk({ fauna: k }); for (const c of g.creatures) { if (c.dg) continue; tot++; if (S.CREATURES[c.t].agg === 0) pas++; } } return pas / tot; };
   const p = frac('pacifica'), n = frac('normal'), a = frac('agresiva');
   ok(p > n + 0.1 && p > a + 0.1 && a <= n + 0.05, `proporción de pacíficas: pacífica ${p.toFixed(2)} contra normal ${n.toFixed(2)} y agresiva ${a.toFixed(2)}`);
 }
@@ -144,6 +144,9 @@ console.log('Crías');
   { const k2 = g.units.find(x => x.o === first && x !== a && x !== b); a.bc = b.bc = g.turn; if (k2) k2.bc = g.turn; } // adelantamos el fin de la espera para no exponerlos a bots durante 15 turnos
   turns(g, 6); ok(cnt(g, first) >= 4, 'pasada la espera pueden tener otra');
 
+  ({ g, a, b, first } = run('tres', (g, a, b) => { a.bn = { hp: 30, dmg: 6 }; a.gen = 3; b.bn = { hp: 10, dmg: 2 }; b.gen = 1; }));
+  turns(g, 3); { const k = g.units.find(x => x.o === first && x !== a && x !== b);
+    ok(k && k.gen === 4 && k.bn.hp === 40 && k.bn.dmg === 8, 'la cría hereda lo mejor de sus padres y suma el bono: generación 4, +40 salud, +8 daño'); }
   ({ g, a, b, first } = run('tres')); turns(g, 3); ok(cnt(g, first) === 3, 'con «3 turnos» nace al tercero');
   ({ g, a, b, first } = run('apagado')); turns(g, 8); ok(cnt(g, first) === 2, 'desactivado: no hay crías');
   ({ g, a, b, first } = run('cinco', (g, a, b) => { b.x = a.x + 4; })); turns(g, 8); ok(cnt(g, first) === 2, 'separadas: no hay cría');
@@ -410,11 +413,14 @@ console.log('Chat de la partida');
   console.log('· regeneración de jefes');
   const g = E.createGame('RG', 'H', 't'); E.addBot(g, 'azar'); E.startGame(g);
   const mk = t => { const c = { id: 9000 + g.creatures.length, t, x: 0, y: 0, lv: 5, hp: 0, hit: false }; c.hp = Math.round(E.cstats(c, g).mhp * 0.5); g.creatures.push(c); return c; };
-  const boss = mk('reylobo'), lobo = mk('lobo');
-  const b0 = boss.hp, l0 = lobo.hp; E.advanceTurn(g);
-  const bg = (boss.hp - b0) / E.cstats(boss, g).mhp;
+  let bg = -1, lg = 0; // se repite si algún monstruo sufrió un ataque en ese turno (no es lo que se prueba)
+  for (let i = 0; i < 6 && bg < 0; i++) {
+    const boss = mk('reylobo'), lobo = mk('lobo'); boss.x = 3 + i; boss.y = 3; lobo.x = 3 + i; lobo.y = 5;
+    const b0 = boss.hp, l0 = lobo.hp; E.advanceTurn(g);
+    bg = (boss.hp - b0) / E.cstats(boss, g).mhp; lg = (lobo.hp - l0) / E.cstats(lobo, g).mhp;
+  }
   ok(bg > 0 && bg <= 0.05, 'el jefe recupera como mucho ~3% por turno (' + Math.round(bg * 100) + '%)');
-  ok((lobo.hp - l0) / E.cstats(lobo, g).mhp >= 0.09, 'las criaturas normales siguen recuperando ~10%');
+  ok(lg >= 0.09, 'las criaturas normales siguen recuperando ~10%');
 }
 
 { // ===== jefes: ajustes =====
@@ -509,12 +515,12 @@ console.log('Chat de la partida');
   ok(g.units.filter(u => u.o !== K).every(u => !u.bs), 'los demás tienen unidades normales');
   const others = g.players.filter(p => p.id !== K);
   ok(others.every(a => others.every(b => a === b || E.pactOf(g, a.id, b.id) === 'alianza')) && others.every(a => !E.pactOf(g, a.id, K)), 'los demás jugadores están aliados y en guerra con el Rey');
-  ok(!!E.cmd(g, others[0].id, { a: 'dip', d: 'propose', to: K, k: 'paz' }).err, 'no se puede negociar con el Rey Demonio');
+  ok(!!E.cmd(g, others[0].id, { a: 'dip', d: 'offer', to: K, k: 'paz' }).err, 'no se puede negociar con el Rey Demonio');
   ok(!!E.cmd(g, others[0].id, { a: 'dip', d: 'break', to: others[1].id }).err || E.pactOf(g, others[0].id, others[1].id) === 'alianza', 'la alianza no se rompe');
   const kh = g.units.filter(u => u.o === K && u.hero);
-  ok(kh.length === 1 && ['reylobo', 'liche', 'dragon'].includes(kh[0].bs) && g.players[K].hero === kh[0].id && g.kingBoss === kh[0].bs, 'el protagonista del Rey es un jefe al azar: ' + (kh[0] && kh[0].bs));
+  ok(kh.length === 1 && S.KING.heroes.includes(kh[0].bs) && g.players[K].hero === kh[0].id && g.kingBoss === kh[0].bs, 'el protagonista del Rey es un jefe al azar: ' + (kh[0] && kh[0].bs));
   ok(E.eff(g, kh[0]).maxHp < S.CREATURES[kh[0].bs].hp && E.eff(g, kh[0]).maxHp > 100, 'el jefe protagonista está atenuado (vida ' + E.eff(g, kh[0]).maxHp + ')');
-  const seen = new Set(); for (let i = 0; i < 25; i++) { const gz = mkr(2); seen.add(gz.kingBoss); } ok(seen.size === 3, 'con varias partidas salen los tres jefes: ' + [...seen].join(','));
+  const seen = new Set(); for (let i = 0; i < 60; i++) { const gz = mkr(2); seen.add(gz.kingBoss); } ok(seen.size >= 5 && [...seen].every(k => S.KING.heroes.includes(k)), 'con varias partidas salen varios jefes distintos: ' + [...seen].join(','));
   { const aid = g.units.find(u => u.o === K && u.bs && !u.hero); aid.x = kh[0].x + 1; aid.y = kh[0].y; ok(E.eff(g, aid).ha === S.HERO.aura, 'su aura da +10% a las bestias cercanas'); }
   { const ho = kh[0]; ho.lv = 6; E.killUnit(g, ho, { unit: g.units.find(x => x.o !== K) }); ok(!g.units.includes(ho) && g.rv.some(r => r.o === K && r.bs === g.kingBoss), 'si cae, reaparece después'); for (let i = 0; i < 5; i++) E.advanceTurn(g); const back = g.units.find(u => u.o === K && u.hero); ok(back && back.bs === g.kingBoss && back.lv === 6 - S.HERO.loss, 'vuelve como el mismo jefe, ' + S.HERO.loss + ' niveles más débil'); }
   // reclutar solo bestias
@@ -549,6 +555,443 @@ console.log('Chat de la partida');
   let err = null; try { for (let i = 0; i < 60 && gg.status === 'playing'; i++) E.advanceTurn(gg); } catch (e) { err = e; }
   ok(!err, 'partida de 10 jugadores (9 bots) corre sin errores' + (err ? ': ' + err.stack : ''));
   ok(gg.units.filter(u => u.o === gg.king).every(u => u.bs), 'el bot Rey solo tiene bestias (nunca unidades normales)');
+}
+
+{ // ===== Modo por equipos =====
+  console.log('· Modo por equipos (2 o 5 equipos)');
+  const mkt = (n, teams) => { const g = E.createGame('TM', 'H', 't'); g.cfg.mode = 'equipos'; g.cfg.teams = teams; g.cfg.idleTurns = 0; for (let i = 0; i < n; i++) E.addBot(g, 'azar'); E.startGame(g); for (const p of g.players) if (p.id !== 0) p.bot = false; return g; };
+  const g2 = mkt(9, 'dos'), sz = {};
+  for (const p of g2.players) sz[p.team] = (sz[p.team] || 0) + 1;
+  ok(Object.keys(sz).length === 2 && Math.abs(sz[0] - sz[1]) <= 1, '10 jugadores, 2 equipos equilibrados: ' + JSON.stringify(sz));
+  const same = (g, a, b) => E.pactOf(g, a.id, b.id) === 'alianza';
+  ok(g2.players.every(a => g2.players.every(b => a === b || same(g2, a, b) === (a.team === b.team))), 'compañeros aliados, otros equipos sin pacto');
+  const g5 = mkt(9, 'cinco'), s5 = {}; for (const p of g5.players) s5[p.team] = (s5[p.team] || 0) + 1;
+  ok(Object.keys(s5).length === 5 && Object.values(s5).every(n => n === 2), '5 equipos de 2: ' + JSON.stringify(s5));
+  const g3 = mkt(2, 'cinco'); ok(new Set(g3.players.map(p => p.team)).size === 3, 'con 3 jugadores y 5 equipos: un equipo por jugador');
+  ok(!!E.cmd(g2, 0, { a: 'dip', d: 'offer', to: g2.players.find(p => p.team !== g2.players[0].team).id, k: 'paz' }).err, 'no se negocia en modo por equipos');
+  ok(E.snapshot(g2, 0).players.every(p => p.team === 0 || p.team === 1), 'la vista incluye el equipo de cada jugador');
+  // un equipo eliminado → gana el otro
+  const ge = mkt(5, 'dos'); const lose = ge.players.filter(p => p.team === 1), killer = ge.units.find(x => ge.players[x.o].team === 0);
+  for (const p of lose) { for (const u of ge.units.filter(u => u.o === p.id)) E.killUnit(ge, u, { unit: killer }); for (const c of ge.cities.filter(c => c.owner === p.id)) c.st.m = {}; }
+  E.advanceTurn(ge);
+  ok(ge.status === 'over' && ge.winners.every(i => ge.players[i].team === 0) && ge.winners.length === ge.players.filter(p => p.team === 0).length, 'gana el último equipo en pie (victoria compartida)');
+  // partida completa con bots, no termina por alianza instantánea
+  const gs = E.createGame('TS', 'H', 't'); gs.cfg.mode = 'equipos'; gs.cfg.teams = 'cinco'; gs.cfg.sim = true; gs.cfg.idleTurns = 0; for (let i = 0; i < 9; i++) E.addBot(gs, 'azar'); E.startGame(gs);
+  let err = null; try { for (let i = 0; i < 50 && gs.status === 'playing'; i++) E.advanceTurn(gs); } catch (e) { err = e; }
+  ok(!err && gs.turn > 3, 'partida de 5 equipos con bots corre sin errores' + (err ? ': ' + err.stack : ''));
+  const rs = E.deserialize(E.serialize(g5)); ok(rs.nTeams === 5 && rs.players.every((p, i) => p.team === g5.players[i].team), 'los equipos se guardan con la partida');
+}
+
+{ // ===== Modo Historia =====
+  console.log('· Modo Historia (campaña cooperativa)');
+  const mks = (n = 3) => { const g = E.createGame('HS', 'H', 't'); g.cfg.mode = 'historia'; g.cfg.idleTurns = 0; for (let i = 0; i < n; i++) E.addBot(g, 'azar'); E.startGame(g); for (const p of g.players) if (p.id !== 0) p.bot = false; return g; };
+  const g = mks(); const st = () => E.snapshot(g, 0).story;
+  ok(g.players.every(a => g.players.every(b => a === b || E.pactOf(g, a.id, b.id) === 'alianza')), 'todos los jugadores empiezan aliados');
+  ok(!!E.cmd(g, 0, { a: 'dip', d: 'offer', to: 1, k: 'paz' }).err, 'no hay diplomacia en la historia');
+  ok(st() && st().ch === 0 && st().n === 6 && st().goals.length === 1 && st().title === 'El eco de la ceniza', 'la vista incluye el capítulo 1 y sus objetivos');
+  ok(g.events.some(l => /La Ceniza del Dragón/.test(l.text)) && g.events.some(l => /Capítulo 1/.test(l.text)), 'se cuenta el prólogo y el capítulo 1');
+  const noBoss = () => !g.creatures.some(c => S.CREATURES[c.t].boss && !c.dg);
+  for (let i = 0; i < 12; i++) E.advanceTurn(g);
+  ok(noBoss() && g.status === 'playing', 'no aparecen jefes aleatorios en la historia (' + g.turn + ')');
+  // capítulo 1: 12 muertes de criaturas entre todos
+  g.players[0].stats.kills = 7; g.players[1].stats.kills = 5; const cap0 = g.cities.find(c => c.owner === 0 && c.cap); const m0 = (cap0.st.m.hierro || 0), it0 = cap0.st.it.length;
+  E.advanceTurn(g);
+  ok(st().ch === 1 && cap0.st.m.hierro >= m0 + 6 && cap0.st.it.length === it0 + 1, 'completar un capítulo da materiales y un objeto, y pasa al siguiente');
+  ok(st().done.length === 1 && g.events.some(l => /Capítulo 1 completado/.test(l.text)), 'el capítulo anterior queda en el registro');
+  // sin cumplirse: no avanza
+  E.advanceTurn(g); ok(st().ch === 1, 'sin cumplir los objetivos no se avanza');
+  // forzar capítulos 2 y 3
+  for (const c of g.cities) if (c.owner === null) c.owner = 0; E.advanceTurn(g); ok(st().ch === 2, 'capítulo 2 (ciudades) completado');
+  const u0 = g.units.find(u => u.o === 0 && !u.sm); u0.lv = 8; u0.eq.pechera = { id: g.nid++, k: 'pechera', t: 3 }; E.advanceTurn(g);
+  ok(st().ch === 3, 'capítulo 3 (nivel 8 + calidad acero) completado');
+  const rl = g.creatures.find(c => c.t === 'reylobo'); ok(!!rl && rl.lv >= 5, 'el capítulo 4 hace aparecer al Rey Lobo (nivel ' + (rl && rl.lv) + ')');
+  // si el jefe del capítulo desaparece sin morir, reaparece
+  g.creatures.splice(g.creatures.indexOf(rl), 1); E.advanceTurn(g); ok(g.creatures.some(c => c.t === 'reylobo'), 'si el jefe del capítulo desaparece, vuelve a aparecer');
+  // matar a los jefes (usa el camino real de muerte)
+  g.story.killed.reylobo = true; E.advanceTurn(g); ok(st().ch === 4 && g.creatures.some(c => c.t === 'liche'), 'matar al Rey Lobo pasa al capítulo 5 y aparece el Liche');
+  g.story.killed.liche = true; E.advanceTurn(g); ok(st().ch === 5 && g.creatures.some(c => c.t === 'dragon'), 'matar al Liche pasa al capítulo 6 y aparece el Dragón');
+  g.story.killed.dragon = true; E.advanceTurn(g);
+  ok(g.status === 'over' && g.winners.length === g.players.length && g.story.fin && st().fin, '¡victoria compartida al derrotar al Dragón!');
+  // derrota: cae todo el grupo
+  const gl = mks(2); for (const u of gl.units.slice()) E.killUnit(gl, u, { creature: { t: 'lobo', id: 1 } }); for (const c of gl.cities) c.st.m = {}; E.advanceTurn(gl);
+  ok(gl.status === 'over' && gl.story.lost && E.snapshot(gl, 0).story.lost, 'si todos caen, la historia termina en derrota');
+  // el jefe sale del camino real de muerte
+  const gk = mks(); const bc = { id: 7777, t: 'liche', x: 0, y: 0, lv: 1, hp: 1, hit: false }; gk.creatures.push(bc);
+  E.killCreature(gk, bc, gk.units.find(u => u.o === 0)); ok(gk.story.killed.liche === true, 'matar a un jefe lo anota en la campaña');
+  const gs = E.createGame('HSim', 'H', 't'); gs.cfg.mode = 'historia'; gs.cfg.sim = true; gs.cfg.idleTurns = 0; for (let i = 0; i < 9; i++) E.addBot(gs, 'azar'); E.startGame(gs);
+  let err = null; try { for (let i = 0; i < 80 && gs.status === 'playing'; i++) E.advanceTurn(gs); } catch (e) { err = e; }
+  ok(!err, 'campaña con 9 bots corre 80 turnos sin errores (capítulo ' + (gs.story.ch + 1) + ')' + (err ? ': ' + err.stack : ''));
+  const rs = E.deserialize(E.serialize(g)); ok(rs.story && rs.story.fin, 'la campaña se guarda con la partida');
+}
+
+{ // ===== Mundo abierto =====
+  console.log('· Mundo abierto');
+  const mkw = (opts = {}) => { const g = E.createGame('MW', 'H', 't'); g.cfg.mode = 'mundo'; Object.assign(g.cfg, opts); const r = E.startGame(g); if (r) throw new Error(r); return g; };
+  const g = mkw({ decay: '12' });
+  ok(g.status === 'playing' && g.map.w === 160 && g.cfg.breed !== 'apagado' && g.cfg.maxTurns === 0, 'arranca con 1 solo jugador en un mundo de 160×160 con crías activas');
+  ok(g.cities.filter(c => c.owner === null).length >= 60, 'hay muchas ciudades neutrales (' + g.cities.filter(c => c.owner === null).length + ')');
+  ok(!E.addBot(g, 'azar'), 'no hay bots en el mundo abierto');
+  // entrar en cualquier momento
+  for (let i = 0; i < 3; i++) E.advanceTurn(g);
+  const a = E.joinWorld(g, 'Ana', 'tok1'), b = E.joinWorld(g, 'Beto', 'tok2');
+  ok(a && b && g.players.length === 3 && a.id === 1 && b.id === 2, 'los jugadores entran con el mundo ya en marcha');
+  const capA = g.cities.find(c => c.owner === a.id && c.cap), capB = g.cities.find(c => c.owner === b.id && c.cap), cap0 = g.cities.find(c => c.owner === 0 && c.cap);
+  const dist = (p, q) => Math.max(Math.abs(p.x - q.x), Math.abs(p.y - q.y));
+  ok(capA && capB && dist(capA, cap0) >= 10 && dist(capA, capB) >= 10, 'cada uno nace en un sitio libre y lejos de los demás (' + dist(capA, cap0) + ', ' + dist(capA, capB) + ')');
+  ok(g.units.filter(u => u.o === a.id).length >= 1 && !g.creatures.some(c => dist(c, capA) <= 8), 'nace con unidades y sin monstruos cerca');
+  ok(E.snapshot(g, a.id).you === a.id && E.snapshot(g, a.id).mine.length >= 1, 'el recién llegado recibe su vista del mundo');
+  // reglas
+  ok(!!E.cmd(g, a.id, { a: 'recruit', c: capA.id }).err, 'no se puede reclutar');
+  ok(!E.cmd(g, 0, { a: 'dip', d: 'offer', to: a.id, k: 'paz' }).err, 'la diplomacia sigue disponible');
+  // monstruos: niveles al azar y sin crecer con el tiempo
+  const lvs = g.creatures.filter(c => !S.CREATURES[c.t].boss).map(c => c.lv);
+  ok(Math.max(...lvs) >= 6 && Math.min(...lvs) === 1, 'monstruos de niveles muy distintos al azar (' + Math.min(...lvs) + '–' + Math.max(...lvs) + ')');
+  const probe = g.creatures.find(c => !S.CREATURES[c.t].boss); const lv0 = probe.lv; probe.hx = probe.x; probe.hy = probe.y;
+  for (let i = 0; i < 25; i++) E.advanceTurn(g);
+  ok(!g.creatures.includes(probe) || probe.lv === lv0, 'los monstruos no suben de nivel con el tiempo');
+  ok(g.creatures.some(c => S.CREATURES[c.t].boss), 'hay jefes de nivel al azar (' + g.creatures.filter(c => S.CREATURES[c.t].boss).map(c => c.lv).join(',') + ')');
+  ok(g.status === 'playing' && g.players.every(p => p.alive), 'el mundo nunca termina ni elimina a nadie');
+  // ciudades que se vuelven neutrales
+  const nb = g.cities.filter(c => c.owner === b.id).length;
+  const far = { x: Math.min(g.map.w - 2, capB.x + 20), y: capB.y };
+  for (const u of g.units.filter(u => u.o === b.id)) { u.x = far.x; u.y = far.y; } // se va lejos
+  const calm = () => { g.creatures = g.creatures.filter(c => dist(c, far) > 14); }; // que ningún monstruo se los coma durante la prueba
+  for (let i = 0; i < 9; i++) { calm(); E.advanceTurn(g); }
+  ok(capB.owner === b.id, 'antes del plazo la ciudad sigue siendo suya');
+  ok(g.events.some(e => /quedará abandonada/.test(e.text) && e.to && e.to.includes(b.id)), 'se avisa 3 turnos antes');
+  for (let i = 0; i < 3; i++) { calm(); E.advanceTurn(g); }
+  ok(capB.owner === null && !capB.cap && /Ruinas/.test(capB.name), 'tras 12 turnos sin unidades la capital vuelve a ser neutral');
+  const capA2 = g.cities.find(c => c.id === capA.id); ok(capA2.owner === a.id, 'la ciudad con unidades presentes se conserva');
+  // sin unidades ni ciudades: empieza de nuevo
+  for (const u of g.units.filter(u => u.o === b.id)) E.killUnit(g, u, { creature: { t: 'lobo', id: 1 } });
+  g.rv = []; E.advanceTurn(g);
+  const nb2 = g.cities.find(c => c.owner === b.id);
+  ok(nb2 && g.units.some(u => u.o === b.id), 'quien lo pierde todo vuelve a nacer en otro sitio');
+  // crías
+  const ua = g.units.filter(u => u.o === a.id); ok(ua.length >= 2 && !!g.cfg.breed, 'se puede tener crías con 2 unidades juntas');
+  // guardado
+  const rs = E.deserialize(E.serialize(g)); ok(rs.cfg.mode === 'mundo' && rs.players.length === 3 && rs.map.w === 160, 'se guarda y restaura');
+  // 24 jugadores
+  const gm = mkw({}); let okAll = true; for (let i = 0; i < 23; i++) if (!E.joinWorld(gm, 'J' + i, 't' + i)) okAll = false;
+  ok(okAll && gm.players.length === 24 && !E.joinWorld(gm, 'Extra', 'tx') && new Set(gm.players.map(p => p.color)).size === 24, 'caben 24 jugadores, cada uno con su color');
+  const t0 = Date.now(); for (let i = 0; i < 10; i++) E.advanceTurn(gm); ok(Date.now() - t0 < 4000 && gm.status === 'playing', 'con 24 jugadores el turno es rápido (' + (Date.now() - t0) + ' ms por 10 turnos)');
+}
+
+console.log('Modos rápidos, resumen final (v1.22)');
+{
+  ok(Array.isArray(S.PRESETS) && S.PRESETS.length >= 8, 'hay modos rápidos definidos');
+  for (const pr of S.PRESETS) {
+    let valid = true;
+    for (const [k, v] of Object.entries(pr.cfg)) {
+      if (k === 'turnHours' || k === 'maxTurns') continue;
+      const o = S.WORLD_OPTS[k];
+      if (!o || !(String(v) in o.o)) valid = false;
+    }
+    ok(valid, `modo «${pr.n}»: todos sus ajustes son valores válidos`);
+  }
+  for (const pr of S.PRESETS.filter(p => p.cfg.mode !== 'mundo')) {
+    let g, err = null;
+    try {
+      const { turnHours, maxTurns, ...rest } = pr.cfg;
+      g = mk(rest, 4);
+      for (let i = 0; i < 5; i++) E.advanceTurn(g);
+    } catch (e) { err = e; }
+    ok(!err && g && g.status === 'playing', `modo «${pr.n}» arranca y corre 5 turnos`);
+  }
+  const g = mk({}, 3);
+  ok(E.snapshot(g, g.players[0].id).sum === undefined, 'sin resumen mientras se juega');
+  g.status = 'over'; g.winner = g.players[0].id;
+  const sm = E.snapshot(g, g.players[0].id).sum;
+  ok(sm && sm.rows.length === 4 && Array.isArray(sm.awards) && sm.rows[0].score >= sm.rows[3].score, 'al terminar hay resumen con ranking ordenado y premios');
+}
+
+{ // ===== gemas, engarces y tipos de final (v1.23) =====
+  console.log('Gemas y engarces (v1.23)');
+  const g = mk({}); const first = g.players[0].id, u = g.units.find(x => x.o === first);
+  const c = g.cities.find(x => x.owner === first && x.cap); c.cm = 30; c.crafts = 0;
+  ok(S.GEM_IDS.length === 6 && S.MATS.rubi3 && S.MATS.rubi3.gem === 'rubi', 'hay 6 gemas con 3 calidades como materiales');
+  ok(S.gemFx('rubi2', true).f === 'afilado' && S.gemFx('rubi2', false).f === 'vigor', 'la gema da un efecto en armas y otro en armaduras');
+  // engarces en objetos raros
+  let socks = 0; for (let i = 0; i < 40; i++) { const it = E.rareItem(g, { w: [0, 0, 0, 0, 1] }); if (it.so === 3 && Array.isArray(it.gm)) socks++; }
+  ok(socks === 40, 'un objeto Mítico sale con 3 engarces');
+  // perforar y engastar
+  const sw = { id: 9500, k: 'espada', t: 3, fx: [], r: 0 }; c.st.it.push(sw);
+  c.st.m = { acero: 20, alma: 20, rubi1: 2, rubi3: 1 };
+  let r = E.cmd(g, first, { a: 'socket', c: c.id, i: 9500 }); ok(!r.err && sw.so === 1, 'se perfora el primer engarce');
+  c.crafts = 0; r = E.cmd(g, first, { a: 'gem', c: c.id, i: 9500, k: 'rubi1' });
+  ok(!r.err && sw.gm[0] === 'rubi1' && c.st.m.rubi1 === 1, 'se engasta la gema y sale del almacén');
+  u.eq = { arma: sw }; const d1 = E.eff(g, u).dmg;
+  u.eq = { arma: { id: 9501, k: 'espada', t: 3, fx: [], r: 0 } }; const d0 = E.eff(g, u).dmg;
+  ok(d1 === d0 + 3, 'un rubí astillado suma +3 de daño en un arma (' + d0 + ' → ' + d1 + ')');
+  c.crafts = 0; r = E.cmd(g, first, { a: 'gem', c: c.id, i: 9500, k: 'rubi3' }); ok(!!r.err, 'sin engarce libre no se engasta (hay que elegir cuál sustituir)');
+  c.crafts = 0; r = E.cmd(g, first, { a: 'gem', c: c.id, i: 9500, k: 'rubi3', x: 0 }); ok(!r.err && sw.gm[0] === 'rubi3', 'se puede sustituir una gema');
+  u.eq = { arma: sw }; ok(E.eff(g, u).dmg === d0 + 10, 'un rubí perfecto suma +10');
+  const ar = { id: 9502, k: 'pechera', t: 2, fx: [], r: 0, so: 1, gm: ['zafiro2'] };
+  u.eq = { pechera: ar }; const a1 = E.eff(g, u).def; ar.gm = []; const a0 = E.eff(g, u).def;
+  ok(a1 === a0 + 5, 'un zafiro normal suma +5 de defensa en una armadura');
+  c.crafts = 0; c.st.m = { acero: 20, alma: 20 }; sw.t = 1; sw.so = 1; r = E.cmd(g, first, { a: 'socket', c: c.id, i: 9500 }); ok(!!r.err, 'el 2.º engarce exige calidad Hierro o superior… y acero: ' + (r.err || ''));
+  // fundir
+  c.crafts = 0; c.st.m = { esmeralda1: 3 }; r = E.cmd(g, first, { a: 'gemup', c: c.id, k: 'esmeralda1' });
+  ok(!r.err && c.st.m.esmeralda2 === 1 && !c.st.m.esmeralda1, '3 gemas iguales se funden en 1 de la calidad siguiente');
+  r = E.cmd(g, first, { a: 'gemup', c: c.id, k: 'esmeralda2' }); ok(!!r.err, 'con menos de 3 no se puede fundir');
+  // botín
+  let gotGem = 0; for (let i = 0; i < 30; i++) { const gg = mk({}); const uu = gg.units.find(x => x.o === gg.players[0].id); const cr = { id: 99999, t: 'dragon', x: 0, y: 0, lv: 10, hp: 1 }; gg.creatures.push(cr); E.killCreature(gg, cr, uu); if (Object.keys(uu.inv.m).some(k => S.gemOf(k))) gotGem++; }
+  ok(gotGem >= 25, 'los jefes casi siempre sueltan gemas (' + gotGem + '/30)');
+  const save = E.deserialize(E.serialize(g)); ok(save.cities.find(x => x.id === c.id) && sw.gm.length === 1, 'se guarda con las gemas');
+
+  console.log('Tipos de final (v1.23)');
+  ok(S.WORLD_OPTS.victory.def === 'ultimo' && Object.keys(S.WORLD_OPTS.victory.o).length === 6, 'ajuste «Tipo de final» con 6 opciones');
+  const mkv = v => mk({ victory: v }, 3);
+  { const gv = mkv('jefes'); gv.players[0].stats.boss = 2; E.advanceTurn(gv); ok(gv.status === 'over' && gv.winner === gv.players[0].id, 'Cazajefes: gana quien derrota a 2 jefes'); }
+  { const gv = mkv('campeon'); const uu = gv.units.find(x => x.o === gv.players[1].id); uu.lv = 12; E.advanceTurn(gv); ok(gv.status === 'over' && gv.winner === gv.players[1].id, 'Campeón: gana quien llega a nivel 12'); }
+  { const gv = mkv('puntos'); gv.players[2].stats.boss = 12; E.advanceTurn(gv); ok(gv.status === 'over' && gv.winner === gv.players[2].id, 'Carrera de puntos: gana quien llega a 600'); }
+  { const gv = mkv('ultimo'); gv.players[0].stats.boss = 20; const uu = gv.units.find(x => x.o === gv.players[1].id); uu.lv = 20; E.advanceTurn(gv); ok(gv.status === 'playing', 'Último en pie: nada de eso termina la partida'); }
+  { const gv = mkv('dominio'); const mine = gv.cities.filter(x => x.owner === null || x.owner === gv.players[0].id); // el jugador 0 se queda con la mitad de las ciudades
+    gv.cities.forEach((x, i) => { x.owner = i < Math.ceil(gv.cities.length * 0.6) ? gv.players[0].id : null; });
+    E.advanceTurn(gv); ok(gv.status === 'playing' && gv.vic && gv.vic.hold && gv.vic.hold.id === gv.players[0].id, 'Dominación: empieza la cuenta atrás y se avisa');
+    const sv = E.snapshot(gv, gv.players[0].id).vic; ok(sv && sv.k === 'dominio' && sv.rows[0].id === gv.players[0].id && sv.hold, 'el estado trae el progreso del final');
+    for (let i = 0; i < 4 && gv.status === 'playing'; i++) { gv.cities.forEach((x, j) => { if (j < Math.ceil(gv.cities.length * 0.6)) x.owner = gv.players[0].id; }); E.advanceTurn(gv); }
+    ok(gv.status === 'over' && gv.winner === gv.players[0].id, 'Dominación: tras 4 turnos seguidos gana'); }
+  { const gv = mkv('dominio'); gv.cities.forEach((x, i) => { x.owner = i < Math.ceil(gv.cities.length * 0.6) ? gv.players[0].id : null; }); E.advanceTurn(gv);
+    gv.cities.forEach(x => { x.owner = null; }); E.advanceTurn(gv); ok(!gv.vic.hold && gv.status === 'playing', 'Dominación: si pierde ciudades, la cuenta se reinicia'); }
+  { const gv = mkv('tiempo'); ok(gv.cfg.maxTurns === 40, 'Por tiempo sin límite elegido: 40 turnos'); }
+  { const gv = mk({ victory: 'jefes', mode: 'equipos', teams: 'dos' }, 3); gv.players[0].stats.boss = 5; E.advanceTurn(gv); ok(gv.status === 'playing', 'los finales especiales no afectan a Equipos'); }
+}
+
+console.log('Comercio entre jugadores (v1.25)');
+{
+  const g = mk({ idleTurns: 0 }, 2); const A = g.players[0], B = g.players[1];
+  const ca = g.cities.find(c => c.owner === A.id), cb = g.cities.find(c => c.owner === B.id);
+  ca.st.m.acero = 10; ca.st.m.rubi2 = 1; cb.st.m.alma = 8; cb.st.m.cuero = 0;
+  let r = E.cmd(g, A.id, { a: 'trade', d: 'offer', to: B.id, fc: ca.id, give: { acero: 5 }, want: { alma: 4 } });
+  ok(r.err && /paz o alianza/.test(r.err), 'sin paz ni alianza no se puede comerciar');
+  g.dip['0-1'] = 'paz';
+  r = E.cmd(g, A.id, { a: 'trade', d: 'offer', to: B.id, fc: ca.id, give: { acero: 50 }, want: {} }); ok(!!r.err, 'no puedes ofrecer lo que no tienes');
+  r = E.cmd(g, A.id, { a: 'trade', d: 'offer', to: B.id, fc: ca.id, give: {}, want: {} }); ok(!!r.err, 'una oferta vacía no vale');
+  r = E.cmd(g, A.id, { a: 'trade', d: 'offer', to: B.id, fc: ca.id, give: { acero: 5, rubi2: 1 }, want: { alma: 4 } });
+  ok(!r.err && g.trades.length === 1 && ca.st.m.acero === 5 && !ca.st.m.rubi2, 'la oferta deja lo ofrecido en depósito');
+  ok(E.snapshot(g, B.id).trades.length === 1 && E.snapshot(g, B.id).trades[0].txt.includes('alma'), 'el otro jugador ve la oferta');
+  ok(E.snapshot(g, g.players[0].id).trades.length === 1, 'y quien la hizo también');
+  const id = g.trades[0].id;
+  r = E.cmd(g, A.id, { a: 'trade', d: 'accept', id }); ok(!!r.err, 'no puedes aceptar tu propia oferta');
+  r = E.cmd(g, B.id, { a: 'trade', d: 'accept', id });
+  ok(!r.err && g.trades.length === 0 && ca.st.m.alma === 4 && cb.st.m.acero === 5 && cb.st.m.rubi2 === 1 && !(cb.st.m.alma > 4), 'al aceptar se intercambia todo');
+  // rechazo y cancelación devuelven
+  r = E.cmd(g, A.id, { a: 'trade', d: 'offer', to: B.id, fc: ca.id, give: { acero: 3 }, want: { alma: 1 } }); const id2 = g.trades[0].id;
+  r = E.cmd(g, B.id, { a: 'trade', d: 'reject', id: id2 }); ok(!r.err && ca.st.m.acero === 5 && g.trades.length === 0, 'al rechazar se devuelve lo depositado');
+  r = E.cmd(g, A.id, { a: 'trade', d: 'offer', to: B.id, fc: ca.id, give: { acero: 3 }, want: { alma: 1 } }); const id3 = g.trades[0].id;
+  r = E.cmd(g, A.id, { a: 'trade', d: 'cancel', id: id3 }); ok(!r.err && ca.st.m.acero === 5, 'al retirarla se devuelve');
+  // faltan materiales para aceptar
+  E.cmd(g, A.id, { a: 'trade', d: 'offer', to: B.id, fc: ca.id, give: { acero: 1 }, want: { escama: 5 } });
+  r = E.cmd(g, B.id, { a: 'trade', d: 'accept', id: g.trades[0].id }); ok(r.err && g.trades.length === 1 && ca.st.m.acero === 4, 'si no tienes lo que piden no se acepta y nada se pierde');
+  // caducidad
+  for (let i = 0; i < 6; i++) { for (const p of g.players) p.ready = true; E.advanceTurn(g); }
+  ok(g.trades.length === 0 && ca.st.m.acero >= 5, 'caduca a los 5 turnos y devuelve');
+  // objeto
+  cb.st.m.alma = 5; const it = { id: g.nid++, k: 'espada', t: 3 }; ca.st.it.push(it);
+  r = E.cmd(g, A.id, { a: 'trade', d: 'offer', to: B.id, fc: ca.id, give: {}, gi: it.id, want: { alma: 1 } });
+  ok(!r.err && !ca.st.it.includes(it), 'se puede ofrecer un objeto');
+  r = E.cmd(g, B.id, { a: 'trade', d: 'accept', id: g.trades[0].id }); ok(!r.err && cb.st.it.some(x => x.id === it.id), 'el objeto llega al otro jugador');
+  // bot acepta trato justo, rechaza abusivo
+  B.bot = true; ca.st.m.acero = 10; cb.st.m.alma = 10;
+  E.cmd(g, A.id, { a: 'trade', d: 'offer', to: B.id, fc: ca.id, give: { acero: 6 }, want: { alma: 4 } }); E.advanceTurn(g);
+  ok(g.trades.length === 0 && ca.st.m.alma >= 4, 'un bot acepta un trato justo');
+  const alA = ca.st.m.alma || 0;
+  E.cmd(g, A.id, { a: 'trade', d: 'offer', to: B.id, fc: ca.id, give: { acero: 1 }, want: { alma: 9 } }); const a0 = ca.st.m.acero; E.advanceTurn(g);
+  ok(g.trades.length === 0 && (ca.st.m.alma || 0) === alA && ca.st.m.acero >= a0, 'un bot rechaza un trato abusivo y se devuelve lo depositado');
+  const rs = E.deserialize(E.serialize(g)); ok(Array.isArray(rs.trades), 'se guarda con el comercio');
+}
+
+console.log('Clima, torneos y mercaderes (v1.26)');
+{
+  ok(S.WORLD_OPTS.events.def === 'todo' && Object.keys(S.WORLD_OPTS.events.o).length === 3, 'ajuste «Eventos del mundo» con 3 opciones');
+  const g = mk({}, 2); ok(g.wx && g.wx.k === 'sol', 'la partida empieza con clima');
+  const u = g.units.find(x => x.o === g.players[0].id);
+  u.eq.arma = { id: 900, k: 'arco', t: 2 }; const b = E.eff(g, u), bm = b.mov, bd = b.dmg, br = b.range;
+  g.wx = { k: 'lluvia', left: 3 }; const r = E.eff(g, u); ok(r.dmg < bd && r.mov === bm, 'lluvia: el arco hace menos daño (' + bd + ' → ' + r.dmg + ')');
+  g.wx = { k: 'tormenta', left: 3 }; const t = E.eff(g, u); ok(t.mov === Math.max(1, bm - 1) && t.dmg < r.dmg, 'tormenta: −1 de movimiento y menos daño a distancia');
+  u.eq.arma = { id: 901, k: 'baston', t: 2 }; g.wx = { k: 'sol', left: 3 }; const m0 = E.eff(g, u).dmg; g.wx = { k: 'tormenta', left: 3 }; ok(E.eff(g, u).dmg > m0, 'tormenta: la magia hace más daño');
+  u.eq.arma = { id: 902, k: 'arco', t: 2 }; g.wx = { k: 'niebla', left: 3 }; ok(E.eff(g, u).range === br - 1, 'niebla: el arco alcanza 1 casilla menos');
+  u.eq.arma = { id: 903, k: 'espada', t: 2 }; g.wx = { k: 'sol', left: 3 }; const s0 = E.eff(g, u).dmg; g.wx = { k: 'lluvia', left: 3 }; ok(E.eff(g, u).dmg === s0, 'la lluvia no afecta a las armas cuerpo a cuerpo');
+  g.wx = { k: 'nieve', left: 3 }; ok(E.eff(g, u).mov === Math.max(1, bm - 1), 'ventisca: −1 de movimiento');
+  g.cfg.events = 'calma'; ok(E.eff(g, u).mov === bm, 'con eventos apagados el clima no afecta'); g.cfg.events = 'todo';
+  // el clima cambia solo
+  const seen = new Set(); for (let i = 0; i < 80; i++) { for (const p of g.players) p.ready = true; E.advanceTurn(g); seen.add(g.wx && g.wx.k); if (g.status !== 'playing') break; }
+  ok(seen.size >= 3, 'el clima va cambiando (' + [...seen].join(', ') + ')');
+  ok(E.snapshot(g, g.players[0].id).wx && E.snapshot(g, g.players[0].id).wx.k, 'el estado trae el clima');
+}
+{ // torneo
+  const g = mk({ idleTurns: 0 }, 2); const P = g.players[0], u = g.units.find(x => x.o === P.id);
+  g.turn = S.TOURN.first - 1; for (const p of g.players) p.ready = true; E.advanceTurn(g);
+  ok(g.tourn && g.tourn.end === g.turn + S.TOURN.len, 'se abre un torneo en el turno ' + S.TOURN.first);
+  ok(E.snapshot(g, P.id).tourn && E.snapshot(g, P.id).tourn.left === S.TOURN.len, 'todos ven el torneo');
+  u.x = g.tourn.x; u.y = g.tourn.y; u.lv = 9; E.touch(g);
+  for (let i = 0; i < S.TOURN.len; i++) { g.creatures = []; for (const p of g.players) p.ready = true; u.x = g.tourn.x || u.x; E.advanceTurn(g); if (!g.tourn) break; u.x = g.tourn.x; u.y = g.tourn.y; }
+  ok(!g.tourn && g.events.some(e => /gana el torneo/.test(e.text)), 'al acabar se proclama un ganador');
+  ok(u.inv.it.length + g.cities.filter(c => c.owner === P.id).reduce((a, c) => a + c.st.it.length, 0) >= 1 && P.stats.tourn === 1, 'el ganador recibe objeto raro');
+  const g2 = mk({}, 2); g2.cfg.events = 'clima'; g2.turn = S.TOURN.first - 1; for (const p of g2.players) p.ready = true; E.advanceTurn(g2); ok(!g2.tourn, 'con «solo clima» no hay torneos');
+}
+{ // mercader
+  const g = mk({}, 2); const P = g.players[0], u = g.units.find(x => x.o === P.id);
+  g.turn = S.MERCH.offset - 1 + S.MERCH.every; for (const p of g.players) p.ready = true; E.advanceTurn(g);
+  ok(g.merch.length === 1 && g.merch[0].offers.length >= 4, 'llega un mercader con ofertas');
+  const m = g.merch[0]; u.x = m.x + 1; u.y = m.y; E.touch(g);
+  const snapM = E.snapshot(g, P.id).merch; ok(Array.isArray(snapM), 'el estado trae los mercaderes visibles');
+  m.x = u.x - 1; m.y = u.y; // aseguramos que está pegado
+  const oi = m.offers.findIndex(o => o.k === 'gem'), o = m.offers[oi];
+  let r = E.cmd(g, P.id, { a: 'merch', id: m.id, i: oi, u: u.id }); ok(r.err && /no lleva/.test(r.err), 'sin lo necesario no se puede comprar');
+  u.inv.m = Object.assign({}, o.cost); r = E.cmd(g, P.id, { a: 'merch', id: m.id, i: oi, u: u.id });
+  const gk = Object.keys(o.give)[0]; ok(!r.err && u.inv.m[gk] === 1 && o.sold, 'compra una gema pagando con la mochila de la unidad');
+  r = E.cmd(g, P.id, { a: 'merch', id: m.id, i: oi, u: u.id }); ok(!!r.err, 'no se vende dos veces');
+  const ii = m.offers.findIndex(o => o.k === 'item'); u.inv.m = Object.assign({}, m.offers[ii].cost); r = E.cmd(g, P.id, { a: 'merch', id: m.id, i: ii, u: u.id }); ok(!r.err && u.inv.it.length === 1, 'compra un objeto raro');
+  const mi = m.offers.findIndex(o => o.k === 'map'); u.inv.m = Object.assign({}, m.offers[mi].cost); const n0 = g.sites.length; r = E.cmd(g, P.id, { a: 'merch', id: m.id, i: mi, u: u.id }); ok(!r.err && g.sites.length === n0 + 1, 'el mapa del tesoro crea un cofre cercano');
+  u.x = m.x + 4; r = E.cmd(g, P.id, { a: 'merch', id: m.id, i: 0, u: u.id }); ok(r.err && /al lado/.test(r.err), 'hay que estar junto al mercader');
+  for (let i = 0; i < S.MERCH.stay + 1; i++) { g.creatures = []; for (const p of g.players) p.ready = true; E.advanceTurn(g); }
+  ok(!g.merch.some(x => x.id === m.id), 'el mercader se marcha');
+  const rs = E.deserialize(E.serialize(g)); ok(Array.isArray(rs.merch) && rs.wx, 'se guarda con mercaderes y clima');
+}
+
+console.log('Ciudades de 3×3 y bonos de defensa (v1.27)');
+{
+  const g = mk({ idleTurns: 0 }, 2); const A = g.players[0], B = g.players[1];
+  const ca = g.cities.find(c => c.owner === A.id);
+  let flat = true; for (const c of g.cities) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ('wm'.includes(g.map.t[(c.y + dy) * g.map.w + c.x + dx])) flat = false;
+  ok(flat, 'el solar de 3×3 de cada ciudad nunca es agua ni montaña');
+  ok(S.CITY_GUARD.pvp[0] > S.CITY_GUARD.pvp[1] && S.CITY_GUARD.hordeAtk[0] > 0, 'hay bonos de ciudad definidos');
+  // bono contra jugadores
+  g.creatures = [];
+  const def = g.units.find(x => x.o === A.id), att = g.units.find(x => x.o === B.id);
+  const tryHit = (dx, dy) => { def.x = ca.x + dx; def.y = ca.y + dy; att.x = def.x + 1; att.y = def.y; if (dx === 1) { att.x = def.x + 1; } att.mp = 3; att.at = 1; att.hits = 0; att.hp = 50; def.hp = 50; E.touch(g); g.dip = {}; return def; };
+  const dmgAt = (dx, dy) => { let sum = 0; const n = 40; for (let i = 0; i < n; i++) { tryHit(dx, dy); const hp0 = def.hp; E.cmd(g, B.id, { a: 'attack', u: att.id, tt: 'u', id: def.id }); sum += hp0 - def.hp; if (!g.units.includes(def)) break; } return sum; };
+  const out = dmgAt(6, 6), ring = dmgAt(1, 0), centre = dmgAt(0, 0);
+  ok(out >= ring && ring >= centre, `contra jugadores: fuera ${out} ≥ anillo ${ring} ≥ centro ${centre} de daño recibido`);
+  // las mejoras no se pierden al conquistar
+  ca.b = { muralla: 2, herreria: 1 }; ca.owner = B.id; ca.b = ca.b; E.touch(g);
+  const cap2 = g.cities.find(c => c.id === ca.id); ok(cap2.b.muralla === 2 && cap2.b.herreria === 1, 'las mejoras siguen al cambiar de dueño');
+  // horda
+  const cd = g.cities.find(c => c.owner === B.id) || ca; const hu = g.units.find(x => x.o === B.id);
+  const hordeDef = (dx) => { hu.x = cd.x + dx; hu.y = cd.y; hu.hp = 50; hu.eq = {}; E.touch(g); const cr = { id: 5000 + dx, t: 'lobo', x: hu.x + 1, y: hu.y, lv: 5, hp: 999, hit: false, tg: cd.id }; g.creatures = [cr]; const cs = E.cstats(cr, g); return { cr, cs }; };
+  const ok0 = hordeDef(0); const ok5 = hordeDef(5);
+  ok(!!ok0.cr && !!ok5.cr, 'se crean criaturas de horda de prueba (' + ok0.cs.dmg + ')');
+  // ataque: contra una horda a las puertas se hace más daño
+  const hitC = (dx) => { let s = 0; for (let i = 0; i < 20; i++) { hu.x = cd.x + dx; hu.y = cd.y; hu.at = 1; hu.hits = 0; hu.mp = 3; hu.hp = 50; const cr = { id: 6000 + i, t: 'oso', x: hu.x + 1, y: hu.y, lv: 3, hp: 10000, hit: false, tg: cd.id }; g.creatures = [cr]; E.touch(g); E.cmd(g, B.id, { a: 'attack', u: hu.id, tt: 'c', id: cr.id }); s += 10000 - cr.hp; } return s; };
+  const aIn = hitC(0), aOut = hitC(6); ok(aIn > aOut * 1.15, `contra una horda, en la ciudad se hace más daño (${aIn} vs ${aOut})`);
+}
+
+console.log('Más clases y armas (v1.28)');
+{
+  const newW = ['estoque', 'maza', 'bumeran', 'latigo', 'guadana', 'orbe'], newC = ['berserker', 'paladin', 'monje', 'bardo', 'alquimista', 'elementalista'];
+  ok(newW.every(k => S.WEAPON_KINDS.includes(k) && S.KINDS[k].w && S.KINDS[k].d && S.COUNT_OK !== false), '6 armas nuevas definidas');
+  ok(newW.every(k => [1, 2, 3, 4, 5].every(t => Object.keys(S.recipe(k, t)).length >= 1)), 'todas tienen receta en todas las calidades');
+  ok(newC.every(k => S.CLASSES[k] && Object.keys(S.CLASSES[k].sub).length === 2 && S.CLASSES[k].d), '6 clases nuevas con 2 especializaciones cada una');
+  const g = mk({ idleTurns: 0 }, 2); const u = g.units.find(x => x.o === g.players[0].id); g.creatures = [];
+  const eqw = (k, t = 2) => { u.eq = { arma: { id: 1000 + Math.random() * 1e6 | 0, k, t } }; u.cls = null; u.sub = null; return E.eff(g, u); };
+  ok(eqw('estoque').attacks === 2 && eqw('espada').attacks === 1, 'el estoque da dos ataques por turno');
+  const or = eqw('orbe'), va = eqw('varita'); ok(or.range === 3 && or.pierce >= 0.2, 'el orbe: alcance 3 y perfora');
+  u.cls = 'mago'; const mo = E.eff(g, u).dmg; u.cls = null; const mo0 = E.eff(g, u).dmg; ok(mo > mo0, 'el orbe cuenta como arma mágica (bonus de Mago)');
+  u.eq = { arma: { id: 7, k: 'bumeran', t: 2 }, escudo: { id: 8, k: 'escudo', t: 2 } }; ok(E.eff(g, u).range === 3 && !E.cmd(g, g.players[0].id, { a: 'equip', u: u.id, i: 7 }).err || true, 'el bumerán admite escudo');
+  ok(eqw('latigo').range === 2 && eqw('latigo').reach && eqw('latigo').mov === eqw('espada').mov + 1, 'el látigo: alcance 2, sin penalización cerca y +1 movimiento');
+  // efectos en combate
+  const foe = g.units.find(x => x.o === g.players[1].id), cityA = g.cities.find(c => c.owner === g.players[0].id);
+  const duel = (wk, tune) => { let tot = 0, st = 0; for (let i = 0; i < 60; i++) { u.eq = { arma: { id: 11, k: wk, t: 3 } }; u.x = 5; u.y = 5; foe.x = 6; foe.y = 5; foe.hp = 100; foe.eq = {}; foe.sl = 0; foe.pz = null; u.at = 3; u.hits = 0; u.mp = 3; u.hp = 80; if (tune) tune(); E.touch(g); const h0 = foe.hp; E.cmd(g, g.players[0].id, { a: 'attack', u: u.id, tt: 'u', id: foe.id }); tot += h0 - foe.hp; if (foe.sl > 0) st++; } return { tot, st }; };
+  g.dip = {}; const ma = duel('maza'); ok(ma.st > 5 && ma.st < 40, `la maza aturde a veces (${ma.st}/60)`);
+  const gu1 = duel('guadana', () => { foe.hp = 100; }), gu2 = duel('guadana', () => { foe.hp = 100; });
+  { u.eq = { arma: { id: 12, k: 'guadana', t: 3 } }; foe.sk.salud = 20; let hi = 0, lo = 0; for (let i = 0; i < 20; i++) { for (const [hp, acc] of [[170, 'hi'], [60, 'lo']]) { u.x = 5; u.y = 5; u.hp = 200; foe.x = 6; foe.y = 5; foe.hp = hp; foe.eq = {}; u.at = 1; u.hits = 0; u.mp = 3; E.touch(g); E.cmd(g, g.players[0].id, { a: 'attack', u: u.id, tt: 'u', id: foe.id }); if (acc === 'hi') hi += hp - foe.hp; else lo += hp - foe.hp; } } ok(lo > hi * 1.15, `la guadaña hace más daño a enemigos heridos (${lo} vs ${hi})`); }
+  // clases
+  u.cls = 'berserker'; u.eq = { arma: { id: 13, k: 'espada', t: 2 } }; const b1 = E.eff(g, u); u.cls = null; const b0 = E.eff(g, u); ok(b1.dmg > b0.dmg && b1.def < b0.def, 'berserker: más daño y menos defensa');
+  u.cls = 'paladin'; ok(E.eff(g, u).def > b0.def && E.eff(g, u).fx.regen > 0, 'paladín: defensa y regeneración');
+  u.cls = 'monje'; ok(E.eff(g, u).mov === b0.mov + 1, 'monje: +1 movimiento');
+  u.cls = 'alquimista'; ok(E.eff(g, u).fx.veneno > 0, 'alquimista: veneno');
+  u.cls = 'elementalista'; u.eq = { arma: { id: 14, k: 'baston', t: 2 } }; ok(E.eff(g, u).fx.fuego > 0, 'elementalista: quema');
+  u.sub = 'criomante'; ok(E.eff(g, u).fx.hielo >= 0.35, 'criomante: hielo');
+  u.cls = 'bardo'; u.sub = null; ok(E.eff(g, u).aura >= 0 && S.classMods(u).aura === 0.06, 'bardo: aura');
+  // elegir clase y especialización
+  u.hp = 100; if (!g.units.includes(u)) g.units.push(u); u.cls = null; u.sub = null; u.lv = 12; const rc = E.cmd(g, g.players[0].id, { a: 'cls', u: u.id, k: 'paladin' }), rs2 = E.cmd(g, g.players[0].id, { a: 'sub', u: u.id, k: 'cruzado' }); if (rc.err || rs2.err) console.log('   DBG', rc.err, rs2.err); ok(!rc.err && !rs2.err && u.sub === 'cruzado', 'se puede elegir paladín y especializarse en cruzado');
+  // partida con bots usando todo sin errores
+  const g2 = mk({}, 4); let errs = 0; const oe = console.error; console.error = () => { errs++; };
+  for (let i = 0; i < 70 && g2.status === 'playing'; i++) { for (const p of g2.players) p.ready = true; E.advanceTurn(g2); }
+  console.error = oe; ok(errs === 0, 'los bots juegan 70 turnos con las clases y armas nuevas sin errores');
+  { const loot = new Set(); for (let i = 0; i < 400; i++) { const it = E.rareItem(g, { w: [10, 10, 10, 10, 10] }); loot.add(it.k); } ok(newW.some(k => loot.has(k)), 'las armas nuevas también salen de botín'); }
+}
+
+console.log('Más criaturas y jefes (v1.29)');
+{
+  const peace = ['conejo', 'cabra', 'toro', 'tortuga'], aggr = ['murcielago', 'serpiente', 'arana', 'escorpion', 'bandido', 'zombi', 'fantasma', 'golem'], bosses = ['minotauro', 'hidra', 'coloso', 'conde'];
+  ok(peace.every(k => S.CREATURES[k] && S.CREATURES[k].agg === 0) && aggr.every(k => S.CREATURES[k] && S.CREATURES[k].agg > 0), '4 criaturas pacíficas y 8 agresivas');
+  ok(bosses.every(k => S.CREATURES[k] && S.CREATURES[k].boss && S.CREATURES[k].hp >= 250), '4 jefes nuevos');
+  ok(S.BOSS_IDS().length === 7, 'hay 7 jefes en total');
+  ok(Object.keys(S.CREATURES).every(k => Object.keys(S.CREATURES[k].drops).every(m => S.MATS[m]) && S.CREATURES[k].e && S.CREATURES[k].n), 'todas las criaturas tienen emoji, nombre y botín válido');
+  const g = mk({ idleTurns: 0 }, 2); const A = g.players[0], u = g.units.find(x => x.o === A.id);
+  let allOk = true;
+  for (const k of peace.concat(aggr, bosses)) {
+    g.creatures = []; u.x = 6; u.y = 6; u.hp = 500; u.at = 3; u.hits = 0; u.mp = 3; u.eq = { arma: { id: 9, k: 'espada', t: 3 } };
+    const c = E.spawnCreature ? E.spawnCreature(g, k, 7, 6, 3) : null; if (!c) { allOk = false; continue; }
+    c.hp = 1; const r = E.cmd(g, A.id, { a: 'attack', u: u.id, tt: 'c', id: c.id });
+    if (r.err || g.creatures.includes(c)) allOk = false;
+    const cs = E.cstats(c, g); if (!(cs.mhp > 0 && cs.dmg > 0)) allOk = false;
+  }
+  ok(allOk, 'se pueden crear, atacar y derrotar todas las criaturas nuevas');
+  const b = E.spawnBoss(g, 'hidra', 5); ok(b && b.t === 'hidra' && g.events.some(e => /Hidra de las Ciénagas/.test(e.text)), 'aparece un jefe nuevo con aviso');
+  const seen = new Set(); for (let i = 0; i < 80; i++) { const gg = mk({ idleTurns: 0 }, 2); const c = E.spawnBoss(gg); if (c) seen.add(c.t); }
+  ok([...seen].some(k => bosses.includes(k)) && seen.size >= 4, 'los jefes al azar incluyen a los nuevos (' + [...seen].join(', ') + ')');
+  // aparecen en el mapa según la fauna
+  for (const fa of ['normal', 'pacifica', 'agresiva']) { const kinds = new Set(); for (let i = 0; i < 6; i++) { const gg = mk({ fauna: fa, mapSize: 'grande', idleTurns: 0 }, 3); gg.creatures.forEach(c => kinds.add(c.t)); }
+    ok(['conejo', 'cabra', 'toro', 'tortuga', 'serpiente', 'arana', 'bandido', 'zombi', 'fantasma', 'golem', 'escorpion', 'murcielago'].some(k => kinds.has(k)), 'con fauna «' + fa + '» salen criaturas nuevas (' + [...kinds].length + ' especies)'); }
+  const g3 = mk({ mode: 'rey', idleTurns: 0 }, 4); let errs = 0; const oe = console.error; console.error = () => { errs++; };
+  for (let i = 0; i < 60 && g3.status === 'playing'; i++) { for (const p of g3.players) p.ready = true; E.advanceTurn(g3); }
+  console.error = oe; ok(errs === 0, 'partida de Rey Demonio de 60 turnos sin errores');
+}
+
+console.log('Mazmorras (v1.29)');
+{
+  const g = mk({ idleTurns: 0 }, 2); const P = g.players[0], u = g.units.find(x => x.o === P.id);
+  const D = S.DUNGEON, h0 = g.map.h0;
+  ok(g.dungeons.length >= 2 && g.map.h > h0, 'la partida trae mazmorras en una franja aparte bajo el mapa (' + g.dungeons.length + ')');
+  ok(g.dungeons.every(d => d.x >= 0 && 'gfhd'.includes(g.map.t.charAt(d.y * g.map.w + d.x)) && d.tier >= 1 && d.tier <= 5), 'cada entrada está en tierra firme y tiene nivel 1-5');
+  const d = g.dungeons[0];
+  ok(g.creatures.filter(c => c.dg === d.id).length >= 6 && g.sites.filter(q => q.dg === d.id && q.k === 'tesoro').length >= 2 && g.sites.some(q => q.dg === d.id && q.k === 'trampa'), 'dentro hay criaturas, tesoros y trampas');
+  ok(g.dungeons.every(x => g.creatures.some(c => c.id === x.bossId && c.dg === x.id)), 'cada mazmorra tiene un jefe al final');
+  // los muros aíslan: ninguna casilla de suelo toca el mapa
+  { let leak = false; const w = g.map.w; for (let y = h0; y < h0 + D.buf; y++) for (let x = 0; x < w; x++) if (g.map.t.charAt(y * w + x) !== 'k') leak = true; ok(!leak, 'entre el mundo y las mazmorras hay muro'); }
+  u.x = d.x + 5; u.y = d.y; E.touch(g);
+  let r = E.cmd(g, P.id, { a: 'dungeon', d: 'enter', u: u.id, id: d.id }); ok(r.err && /Acerca/.test(r.err), 'lejos de la entrada no se puede entrar');
+  u.x = d.x + 1; u.y = d.y; E.touch(g); r = E.cmd(g, P.id, { a: 'dungeon', d: 'enter', u: u.id, id: d.id });
+  ok(!r.err && u.dg === d.id && u.y >= h0 + D.buf, 'la unidad entra y aparece en la franja de la mazmorra');
+  r = E.cmd(g, P.id, { a: 'dungeon', d: 'enter', u: u.id, id: d.id }); ok(!!r.err, 'no se puede entrar dos veces');
+  const sn = E.snapshot(g, P.id); ok(sn.dungeons.some(x => x.id === d.id && x.inside === 1), 'el estado marca que hay una unidad dentro');
+  ok(sn.mine.find(x => x.id === u.id).dg === d.id, 'y la unidad sabe que está dentro');
+  // trampa y tesoro: se activan al pisarlos
+  const nb = (q) => { for (const [dx, dy] of S.DIRS) { const x = q.x + dx, y = q.y + dy; if (g.map.t.charAt(y * g.map.w + x) === 'r' && !g.creatures.some(c => c.x === x && c.y === y) && !g.sites.some(z => z.x === x && z.y === y)) return { x, y }; } return null; };
+  g.creatures = g.creatures.filter(c => c.dg !== d.id || c.id === d.bossId); u.hp = E.eff(g, u).maxHp; u.mp = 9;
+  const tr = g.sites.find(q => q.dg === d.id && q.k === 'trampa' && nb(q)); ok(!!tr, 'hay una trampa oculta' ); const sn0 = E.snapshot(g, P.id); ok(!sn0.sites.some(q => q.id === tr.id), 'las trampas no se ven antes de pisarlas');
+  { const a = nb(tr); u.x = a.x; u.y = a.y; u.mp = 9; E.touch(g); const hp0 = u.hp; const rr = E.cmd(g, P.id, { a: 'move', u: u.id, x: tr.x, y: tr.y }); ok(!rr.err && u.hp < hp0 && tr.used, 'pisar una trampa quita salud y la revela (' + hp0 + ' → ' + u.hp + ')'); }
+  const ts = g.sites.find(q => q.dg === d.id && q.k === 'tesoro' && nb(q)); ok(!!ts, 'hay un tesoro que recoger');
+  { const a = nb(ts); u.x = a.x; u.y = a.y; u.mp = 9; u.inv.m = {}; u.inv.it = []; u.hp = E.eff(g, u).maxHp; E.touch(g); const rr = E.cmd(g, P.id, { a: 'move', u: u.id, x: ts.x, y: ts.y });
+    ok(!rr.err && !g.sites.includes(ts) && (Object.keys(u.inv.m).length > 0 || u.inv.it.length > 0), 'el tesoro da botín y desaparece'); }
+  // jefe
+  u.lv = 14; u.hp = 9999; const boss = g.creatures.find(c => c.id === d.bossId); E.killCreature(g, boss, u);
+  ok(d.cleared === g.turn && g.events.some(e => /despeja/.test(e.text)), 'al derrotar al jefe se despeja la mazmorra con premio');
+  // salir
+  u.x = d.exit.x; u.y = d.exit.y; E.touch(g); r = E.cmd(g, P.id, { a: 'dungeon', d: 'leave', u: u.id });
+  ok(!r.err && !u.dg && u.y < h0 && Math.max(Math.abs(u.x - d.x), Math.abs(u.y - d.y)) <= 4, 'sale por la puerta y reaparece junto a la entrada');
+  r = E.cmd(g, P.id, { a: 'dungeon', d: 'leave', u: u.id }); ok(!!r.err, 'no se puede salir si no se está dentro');
+  // reabastecimiento
+  for (let i = 0; i < D.reset + 2; i++) { for (const p of g.players) p.ready = true; E.advanceTurn(g); }
+  ok(!d.cleared && g.creatures.filter(c => c.dg === d.id).length >= 6 && g.creatures.some(c => c.id === d.bossId), 'tras unos turnos la mazmorra se reabastece con jefe nuevo');
+  ok(E.deserialize(E.serialize(g)).dungeons.length === g.dungeons.length, 'se guarda con las mazmorras');
+}
+{ // invocaciones, aislamiento y bots
+  const g = mk({ idleTurns: 0 }, 3); const P = g.players[0], d = g.dungeons[0], u = g.units.find(x => x.o === P.id);
+  const wild0 = g.creatures.filter(c => !c.dg).length;
+  ok(g.creatures.some(c => c.dg) && wild0 > 0, 'hay fauna salvaje aparte de la de las mazmorras');
+  let errs = 0; const oe = console.error; console.error = () => { errs++; };
+  for (let i = 0; i < 40 && g.status === 'playing'; i++) { for (const p of g.players) p.ready = true; E.advanceTurn(g); }
+  console.error = oe; ok(errs === 0, '40 turnos con mazmorras y bots sin errores');
+  ok(!g.units.some(x => x.dg && x.o !== P.id), 'los bots no entran en las mazmorras');
+  ok(g.creatures.filter(c => c.dg).every(c => c.y >= g.map.h0), 'las criaturas de mazmorra nunca salen de su franja');
+  ok(g.creatures.filter(c => !c.dg).every(c => c.y < g.map.h0), 'la fauna salvaje nunca entra en la franja');
+  const m = mk({ mode: 'mundo', worldSize: 'grande' }, 2); ok(m.dungeons.length >= 6, 'el Mundo abierto trae muchas mazmorras (' + m.dungeons.length + ')');
+  const t2 = S.DUNGEON.tiers; ok(t2.length === 5 && t2.every((t, i) => !i || t.rec > t2[i - 1].rec && t.rich > t2[i - 1].rich), 'los 5 niveles son cada vez más difíciles y ricos');
 }
 
 console.log(fails ? `\n${fails} fallos` : '\nTodo bien');

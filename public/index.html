@@ -85,6 +85,12 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:0}
 #pushBar .row{gap:8px}
 .menub{min-height:34px;width:40px;border-radius:9px;border:1px solid var(--line);background:#181c27;color:inherit;font-size:18px;margin-right:8px;padding:0}
 #mm{position:absolute;right:8px;top:8px;width:104px;height:104px;border:2px solid var(--line);border-radius:8px;background:#0b0d12;z-index:4;touch-action:none;opacity:.92}
+#tut{position:fixed;inset:0;z-index:30;background:#000b;display:flex;align-items:center;justify-content:center;padding:16px}
+#tut .card{max-width:420px;width:100%;margin:0}
+#tut .big{font-size:42px;text-align:center}
+#tut h3{text-align:center;margin:6px 0 10px}
+#tut .dots{text-align:center;margin:10px 0}#tut .dots i{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--line);margin:0 3px}#tut .dots i.on{background:var(--gold)}
+#tut .row{display:flex;gap:8px;margin-top:8px}#tut .row .btn{flex:1}
 #nav{position:absolute;right:8px;top:120px;z-index:4;display:flex;flex-direction:column;gap:6px}
 #nav button{width:46px;height:46px;border-radius:50%;border:1px solid var(--line);background:#181c27ee;font-size:20px;position:relative}
 #sheet .chm{padding:5px 8px;margin:4px 0;border-radius:10px;background:#ffffff0d}#sheet .chm.me{background:#e6b45a22}#sheet .chm div{word-break:break-word}
@@ -134,6 +140,8 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:0}
       <p class="hint hidden" id="lPersHint"></p>
     </div>
     <div class="card hidden" id="lCfg"><h3>Ajustes (anfitrión)</h3>
+      <label class="dim">Modos rápidos</label>
+      <div id="lPresets" style="margin:6px 0 2px"></div><p class="hint" id="lPresetHint" style="margin:0 0 12px">Elige un modo y se ajusta todo de una vez (reloj, mapa, criaturas…). Después puedes cambiar cada ajuste a mano.</p>
       <label class="dim">Duración de cada turno</label>
       <select id="lTurn" style="margin:6px 0 12px">
         <option value="0.05">3 minutos (prueba)</option>
@@ -173,7 +181,8 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:0}
 
 <section id="game" class="screen hidden">
   <div id="top"><span><button class="menub" id="gMenu" title="Menú principal">☰</button><span class="conn" id="gConn"></span><b id="gTurn">Turno 1</b></span><span class="mid" id="gTimer">--:--:--</span><span id="gReady" class="dim">0/0</span></div>
-  <div id="cvwrap"><canvas id="cv"></canvas><canvas id="mm" width="104" height="104"></canvas><div id="nav"><button id="nHome" title="Ir a mi ciudad">🏠</button><button id="nChat" title="Chat">💬<small id="chCnt" class="hidden">0</small></button><button id="nNext" title="Siguiente unidad con acciones">🛡️<small id="nCnt">0</small></button></div><div id="toast"></div><div id="pushBar" class="hidden"></div></div>
+  <div id="cvwrap"><canvas id="cv"></canvas><canvas id="mm" width="104" height="104"></canvas><div id="nav"><button id="nHome" title="Ir a mi ciudad">🏠</button><button id="nStory" class="hidden" title="Historia">📖</button><button id="nSum" class="hidden" title="Resumen de la partida">📊</button><button id="nHelp" title="Cómo se juega">❓</button><button id="nChat" title="Chat">💬<small id="chCnt" class="hidden">0</small></button><button id="nNext" title="Siguiente unidad con acciones">🛡️<small id="nCnt">0</small></button></div><div id="toast"></div><div id="pushBar" class="hidden"></div></div>
+  <div id="tut" class="hidden"></div>
   <div id="sheet" class="hidden"></div>
   <div id="bar">
     <button data-ui="units"><span>🛡️</span>Unidades<i class="badge hidden" id="bUnits"></i></button>
@@ -311,7 +320,7 @@ function renderLobby() {
   const host = S.you === S.hostId;
   $('lCode').textContent = S.code; $('lCount').textContent = S.players.length;
   $('lPlayers').innerHTML = S.players.map(p => `<div class="it"><span class="sw" style="background:${p.color}"></span><b>${esc(p.name)}</b>${p.id === S.hostId ? '<span class="tag">anfitrión</span>' : ''}${botTag(p)}${p.id === S.you ? '<span class="tag">tú</span>' : ''}<span style="flex:1"></span>${host && p.id !== S.hostId ? `<button class="btn sm red fix" data-ui="rm:${p.id}">Quitar</button>` : ''}</div>`).join('');
-  $('lAdd').classList.toggle('hidden', !host); $('lCfg').classList.toggle('hidden', !host); $('lWait').classList.toggle('hidden', host);
+  $('lAdd').classList.toggle('hidden', !host || S.cfg.mode === 'mundo'); if (host) renderPresets(); $('lCfg').classList.toggle('hidden', !host); $('lWait').classList.toggle('hidden', host);
   if (host) { $('lTurn').value = String(S.cfg.turnHours); if ($('lTurn').value !== String(S.cfg.turnHours)) $('lTurn').value = '4'; $('lMax').value = String(S.cfg.maxTurns); $('lIdle').value = String(S.cfg.idleTurns === undefined ? 2 : S.cfg.idleTurns); $('lLevel').value = S.cfg.botLevel || 'normal'; for (const k in SH.WORLD_OPTS) $('w_' + k).value = String(S.cfg[k] !== undefined ? S.cfg[k] : SH.WORLD_OPTS[k].def); }
 }
 $('lPlayers').addEventListener('click', e => { const b = e.target.closest('[data-ui]'); if (b) send({ t: 'lobby', a: 'remove', id: +b.dataset.ui.split(':')[1] }); });
@@ -319,8 +328,26 @@ for (const [k, v] of Object.entries(SH.PERS)) { const o = document.createElement
 $('lBot').onclick = () => send({ t: 'lobby', a: 'addbot', pers: $('lPers').value });
 $('lPers').onchange = () => { const d = SH.PERS[$('lPers').value]; $('lPersHint').textContent = d ? d.d : 'Cada bot recibe una personalidad distinta al azar (hay 9).'; $('lPersHint').classList.remove('hidden'); };
 $('lWorld').innerHTML = Object.keys(SH.WORLD_OPTS).map(k => { const o = SH.WORLD_OPTS[k]; return `<label class="dim" style="display:block;margin-top:10px">${o.n}</label><select id="w_${k}" data-w="${k}" style="margin-top:6px">${Object.keys(o.o).map(v => `<option value="${v}">${o.o[v]}</option>`).join('')}</select>`; }).join('');
+{ const wm = $('w_mode'); if (wm) wm.addEventListener('change', () => { if (wm.value === 'mundo' && $('lTurn').value === '4') $('lTurn').value = '1'; }); } // el mundo abierto funciona mejor con turnos de 1 hora
 const sendCfg = () => { const m = { t: 'lobby', a: 'cfg', turnHours: +$('lTurn').value, maxTurns: +$('lMax').value, idleTurns: +$('lIdle').value, botLevel: $('lLevel').value }; for (const k in SH.WORLD_OPTS) m[k] = $('w_' + k).value; send(m); };
 for (const id of ['lTurn', 'lMax', 'lIdle', 'lLevel']) $(id).onchange = sendCfg;
+const presetOf = () => { // ¿qué modo rápido coincide con los ajustes actuales?
+  const c = S && S.cfg; if (!c) return null;
+  return SH.PRESETS.find(p => c.turnHours === p.cfg.turnHours && (c.maxTurns | 0) === p.cfg.maxTurns && Object.keys(SH.WORLD_OPTS).every(k => !(k in p.cfg) ? true : String(c[k]) === String(p.cfg[k])) && (p.cfg.mode || 'normal') === (c.mode || 'normal'));
+};
+let presetSel = null;
+function renderPresets() {
+  const act = presetOf(), shown = SH.PRESETS.find(p => p.id === presetSel) || act;
+  $('lPresets').innerHTML = SH.PRESETS.map(p => `<button class="chip btnlike ${act && act.id === p.id ? 'on' : ''}" data-preset="${p.id}">${p.e} ${p.n}</button>`).join('');
+  if (shown) $('lPresetHint').textContent = shown.e + ' ' + shown.n + ': ' + shown.d;
+}
+$('lPresets').addEventListener('click', e => {
+  const b = e.target.closest('[data-preset]'); if (!b) return;
+  const p = SH.PRESETS.find(x => x.id === b.dataset.preset); if (!p) return; presetSel = p.id;
+  $('lTurn').value = String(p.cfg.turnHours); $('lMax').value = String(p.cfg.maxTurns);
+  for (const k in SH.WORLD_OPTS) $('w_' + k).value = String(k in p.cfg ? p.cfg[k] : SH.WORLD_OPTS[k].def);
+  sendCfg(); renderPresets();
+});
 for (const k in SH.WORLD_OPTS) $('w_' + k).onchange = sendCfg;
 $('lStart').onclick = () => { $('lErr').textContent = ''; send({ t: 'lobby', a: 'start' }); };
 $('lLeave').onclick = () => { leave(); toast('Tu partida sigue en «Tus partidas».'); };
@@ -337,6 +364,12 @@ function onState() {
   if (S.status === 'lobby') { show('lobby'); renderLobby(); return; }
   const wasHidden = $('game').classList.contains('hidden');
   show('game');
+  { const dm = {}; for (const u of S.mine) dm[u.id] = u.dg || 0; const pv = window._dgMap || {}; for (const id in dm) if (id in pv && pv[id] !== dm[id]) { const u = S.mine.find(x => x.id == id); if (u) { selId = u.id; centerOn(u.x, u.y); } } window._dgMap = dm; }
+  $('nStory').classList.toggle('hidden', !S.story);
+  $('nSum').classList.toggle('hidden', !(S.status === 'over' && S.sum));
+  if (S.status === 'over' && S.sum && window._sumShown !== S.code) { window._sumShown = S.code; openSheet('summary'); }
+  if (S.status === 'playing' && !window._tutAsked) { window._tutAsked = true; if (!tutSeen()) tutOpen(); }
+  { const sg = S.story ? S.story.ch + ':' + S.story.done.length : null; if (sg !== window._storySig) { const first = window._storySig === undefined; window._storySig = sg; if (S.story && sheet == null && S.status === 'playing' && (!first || S.turn <= 1)) openSheet('story'); } }
   const prevChat = chatPrev; chatPrev = S.chat && S.chat.length ? S.chat[S.chat.length - 1].id : 0;
   maps = { mine: new Map(), cre: new Map(), oth: new Map(), city: new Map() };
   for (const u of S.mine) maps.mine.set(u.y * S.w + u.x, u);
@@ -403,10 +436,12 @@ function fmtTime(ms) {
 }
 function renderTop() {
   if (!S || S.status === 'lobby') return;
-  $('gTurn').textContent = S.status === 'over' ? 'Partida terminada' : 'Turno ' + S.turn + (S.cfg.maxTurns ? ' / ' + S.cfg.maxTurns : '') + (S.season ? ' ' + SH.SEASONS[S.season.i].e : '');
+  $('gTurn').textContent = S.status === 'over' ? 'Partida terminada' : 'Turno ' + S.turn + (S.cfg.maxTurns ? ' / ' + S.cfg.maxTurns : '') + (S.season ? ' ' + SH.SEASONS[S.season.i].e : '') + (S.wx && SH.WEATHER[S.wx.k] ? SH.WEATHER[S.wx.k].e : '');
   $('gTimer').textContent = S.status === 'over' ? '🏁' : fmtTime(S.endsAt - (Date.now() + skew));
   const humans = S.players.filter(p => p.alive && !p.bot && !p.auto);
-  $('gReady').textContent = '✔ ' + humans.filter(p => p.ready).length + '/' + humans.length;
+  const world = S.cfg.mode === 'mundo';
+  $('gReady').textContent = world ? '🌍 ' + S.players.length : '✔ ' + humans.filter(p => p.ready).length + '/' + humans.length;
+  $('bGo').classList.toggle('hidden', world);
   const me = S.players[S.you], go = $('bGo');
   go.classList.toggle('on', !!(me && me.ready));
   go.innerHTML = me && me.ready ? '<span>✅</span>Listo (cancelar)' : '<span>⏭️</span>Fin de turno';
@@ -427,7 +462,7 @@ function openSheet(mode, extra) { ackRecap(); gotoMode = null; sheet = Object.as
 function closeSheet() { ackRecap(); gotoMode = null; sheet = null; selId = null; computeReach(); renderSheet(); resize(); dirty = true; }
 $('bar').addEventListener('click', e => { const b = e.target.closest('[data-ui]'); if (!b) return; const m = b.dataset.ui; selId = null; computeReach(); if (sheet && sheet.mode === m) { sheet = null; renderSheet(); resize(); dirty = true; } else openSheet(m); dirty = true; });
 const matsHtml = m => { const ks = SH.MAT_ORDER.filter(k => m[k] > 0); return ks.length ? ks.map(k => `<span class="chip">${SH.MATS[k].e} ${m[k]} <span class="dim">${SH.MATS[k].n}</span></span>`).join('') : '<span class="dim">vacío</span>'; };
-const itemHtml = it => { const K = SH.KINDS[it.k]; return `${K.e} <b class="r${it.r || 0}">${SH.itemName(it)}</b> <span class="dim">(${K.w ? 'daño' : 'def'} ${SH.itemValue(it)})</span>` + (it.fx && it.fx.length ? it.fx.map(f => `<span class="fxl">${SH.affixText(f, it.r)}</span>`).join('') : ''); };
+const itemHtml = it => { const K = SH.KINDS[it.k]; return `${K.e} <b class="r${it.r || 0}">${SH.itemName(it)}</b> <span class="dim">(${K.w ? 'daño' : 'def'} ${SH.itemValue(it)})</span>` + (it.fx && it.fx.length ? it.fx.map(f => `<span class="fxl">${SH.affixText(f, it.r)}</span>`).join('') : '') + (it.so ? Array.from({ length: it.so }, (_, i) => it.gm && it.gm[i] ? `<span class="fxl">${SH.gemText(it.gm[i], !!K.w)}</span>` : `<span class="fxl dim">◇ Engarce vacío</span>`).join('') : ''); };
 const pct = (a, b) => Math.max(0, Math.min(100, Math.round(a / b * 100)));
 const bar = (cls, a, b) => `<div class="bar ${cls}"><i style="width:${pct(a, b)}%"></i></div>`;
 
@@ -444,11 +479,14 @@ function renderSheet() {
     case 'unit': html += u ? unitSheet(u) : ''; break;
     case 'units': html += hd('Tus unidades') + S.mine.map(m => `<div class="line" data-ui="pick:${m.id}"><div class="g"><b>${esc(m.name)}</b> <span class="dim">niv. ${m.lv}</span> ${clsTag(m)} ${m.pts || classAvail(m) ? '<span class="pips">⭐' + (m.pts || '') + '</span>' : ''}${m.ord ? ' ' + ORD_E[m.ord.t] : ''}${(m.mp > 0 || m.at > 0) && !m.ord ? ' <span class="ok">●</span>' : ''}${bar('hp', m.hp, m.e.maxHp)}</div><span class="dim">${m.hp}/${m.e.maxHp}</span></div>`).join('') || '<p class="dim">No tienes unidades.</p>'; break;
     case 'recap': html += recapSheet(); break;
+    case 'story': html += storySheet(); break;
+    case 'summary': html += summarySheet(); break;
     case 'cities': html += hd('Tus ciudades') + (S.cities.filter(c => c.o === S.you).map(c => `<div class="line" data-ui="city:${c.id}"><div class="g"><b>${esc(c.name)}</b> ${bldHtml(c.b)}<div>${matsHtml(c.st.m)}</div></div><span class="dim">${c.st.it.length} 🎒</span></div>`).join('') || '<p class="dim">No controlas ciudades.</p>'); break;
     case 'city': html += citySheet(); break;
     case 'log': html += hd('Registro') + (S.log.map(l => `<div class="line"><span class="dim fix" style="min-width:38px">T${l.turn}</span><div class="g">${esc(l.text)}</div></div>`).join('') || '<p class="dim">Sin novedades.</p>'); break;
     case 'chat': html += chatSheet(); break;
     case 'players': html += playersSheet(); break;
+    case 'trade': html += sheet.tr ? tradeSheet() : ''; break;
     case 'info': html += infoSheet(); break;
   }
   const key = sheet.mode + ':' + sheet.tab + ':' + (sheet.cityId || '') + (selId || '');
@@ -484,6 +522,7 @@ function unitSheet(u) {
       <div class="stat"><small>Daño</small>${e.dmg}${e.attacks > 1 ? ' ×2' : ''}</div><div class="stat"><small>Defensa</small>${e.def}</div>
       <div class="stat"><small>Alcance</small>${e.min === e.range ? e.range : e.min + '–' + e.range}</div><div class="stat"><small>Movimiento</small>${u.mp}/${e.mov}</div>
       <div class="stat"><small>Ataques</small>${u.at}/${e.attacks}</div><div class="stat"><small>Arma</small>${w ? SH.KINDS[w.k].e + ' ' + SH.itemName(w) : u.bs ? '🐾 Garras' : '✊ Puños'}</div></div>`;
+    h += dgUnitHtml(u);
     if (u.bs) h += `<p class="hint ok">${SH.CREATURES[u.bs].e} Bestia del Rey Demonio: su fuerza viene de su especie y su nivel; no usa equipo ni clases, pero sí gasta puntos de habilidad y carga botín.</p>`;
     if (S.cfg && S.cfg.hero !== 'no' && !u.sm && !u.bs) {
       if (u.hr) h += `<p class="hint ok">${u.hr} <b>Protagonista</b>: +50% de experiencia y +${Math.round(SH.HERO.aura * 100)}% de daño y defensa a tus unidades a ${SH.HERO.range} casillas. Si cae, vuelve a tu ciudad en ${SH.HERO.wait} turnos con ${SH.HERO.loss} niveles menos.</p>`;
@@ -494,7 +533,7 @@ function unitSheet(u) {
     if (u.cart) h += `<p class="hint ok">🛒 Carreta: almacén móvil (${u.cap} de capacidad, movilidad ${u.e.mov}). No ataca ni sube de nivel. Llévala a una ciudad para cargar o descargar; si la matan, el enemigo se queda con parte de la carga.</p>`;
     if (u.sm) h += `<p class="hint ok">🔮 Invocación (${SH.CREATURES[u.sm].n}): su fuerza sube con el nivel de su invocador y desaparece si él cae.</p><button class="btn sm red" data-c='${jattr({ a: 'dismiss', u: u.id })}'>Despedir</button>`;
     if (u.sc) h += `<h3 class="hint" style="margin-top:12px">🔮 Invocar (${u.sc.n}/${u.sc.max} por jugador)</h3>` + (u.sc.near ? '' : '<p class="hint lack">Acércate a 2 casillas o menos de una ciudad tuya.</p>') + `<div class="row" style="flex-wrap:wrap;gap:6px">${u.sc.opts.map(o => `<button class="btn sm gold" ${u.sc.near && u.sc.n < u.sc.max && u.sc.bones >= o.cost.hueso ? '' : 'disabled'} data-c='${jattr({ a: 'summon', u: u.id, k: o.k })}'>${SH.CREATURES[o.k].e} ${SH.CREATURES[o.k].n} · ${SH.MATS.hueso.e}${o.cost.hueso}</button>`).join('')}</div><p class="hint">Huesos en el almacén cercano: ${u.sc.bones}.</p>`;
-    if (u.bn) h += `<p class="hint ok">👶 Cría: +${u.bn.hp} salud y +${u.bn.dmg} daño de nacimiento.</p>`;
+    if (u.bn) h += `<p class="hint ok">👶 Cría${u.gen ? ' de la generación ' + u.gen : ''}: +${u.bn.hp} salud y +${u.bn.dmg} daño de nacimiento.</p>`;
     if (u.pr) h += u.pr.w ? `<p class="hint ok">💞 Junto a <b>${esc(u.pr.w)}</b> cerca de la ciudad: ${u.pr.n}/${u.pr.need} turnos.</p>` : `<p class="hint">💞 ${u.pr.cd > 0 ? 'Podrá tener otra cría en ' + u.pr.cd + ' turnos.' : 'Para tener una cría: quédate 1 casilla de otra unidad tuya, a 2 casillas de una ciudad tuya, durante ' + u.pr.need + ' turnos.'}</p>`;
     if (e.aura) h += `<p class="hint">Aura de aliado cercano: +${Math.round(e.aura * 100)}% salud y defensa.</p>`;
     h += `<h3 class="hint" style="margin-top:12px">Órdenes (siguen solas los próximos turnos)</h3>`;
@@ -556,7 +595,7 @@ function citySheet() {
     h += `<button class="btn gold block" ${ok && left > 0 ? '' : 'disabled'} data-c='${jattr({ a: 'craft', c: c.id, k: forge.k, tr: forge.tr })}'>Forjar (${left} restantes este turno)</button>`;
     h += '<p class="hint">Los objetos forjados quedan en el almacén. Una unidad junto a la ciudad puede tomarlos y equiparlos.</p>';
   } else if (sheet.tab === 'build') {
-    h += `<p class="hint">Una construcción por ciudad y turno. Si un enemigo conquista la ciudad, sus edificios bajan un nivel.</p>`;
+    h += `<p class="hint">Una construcción por ciudad y turno. Los edificios se ven en el mapa y <b>no se pierden</b> si te conquistan la ciudad: pasan al nuevo dueño.</p><p class="hint">🛡️ Estar en la ciudad: +${SH.CITY_GUARD.pvp[0]} de defensa contra jugadores (+${SH.CITY_GUARD.pvp[1]} pegado a ella). Contra hordas que la asaltan: +${SH.CITY_GUARD.hordeDef[0]} de defensa y +${Math.round(SH.CITY_GUARD.hordeAtk[0] * 100)}% de ataque (+${SH.CITY_GUARD.hordeDef[1]} y +${Math.round(SH.CITY_GUARD.hordeAtk[1] * 100)}% pegado a ella).</p>`;
     h += SH.BUILD_ORDER.map(k => {
       const B = SH.BUILDINGS[k], lv = (c.b && c.b[k]) || 0, cost = lv < SH.BUILD_MAX ? B.cost[lv] : null;
       const ok = cost && SH.MAT_ORDER.every(m => !cost[m] || (c.st.m[m] || 0) >= cost[m]) && !c.built;
@@ -569,11 +608,16 @@ function citySheet() {
   } else if (sheet.tab === 'up') {
     const left = (c.cm || S.craftsMax) - c.crafts, soul = SH.MATS.alma;
     h += `<p class="hint">Trabajos restantes este turno: <b>${left}</b>. Mejorar sube la calidad del material (cuesta menos que forjar de nuevo) y conserva los efectos. Encantar añade un efecto: la rareza es el nº de efectos (${SH.RARITY.map((r, i) => `<span class="r${i}">${r.e} ${r.n}${i ? ' ' + i : ''}</span>`).join(', ')}) y cada efecto gana potencia con la rareza. Reforjar cambia un efecto por otro al azar (${SH.REFORGE_COST.alma} ${soul.e}).</p>`;
+    { const gs = SH.MAT_ORDER.filter(k => SH.gemOf(k) && c.st.m[k] > 0);
+      h += `<h3 class="hint">💎 Gemas del almacén</h3><p class="hint">Se engastan en objetos con engarces ◇ (los objetos raros traen 1-3; los demás se perforan aquí). Cada gema da un efecto distinto en armas y en armaduras. 3 gemas iguales se funden en 1 de la calidad siguiente.</p>` + (gs.length ? gs.map(k => { const m = SH.gemOf(k), up = m.lv < 3 && c.st.m[k] >= SH.GEM_UP; return `<div class="line" style="flex-wrap:wrap"><div class="g">${m.e} <b>${SH.MATS[k].n}</b> ×${c.st.m[k]}<div class="hint" style="margin:2px 0 0">⚔️ ${SH.gemText(k, true).split(': ')[1]}<br>🛡️ ${SH.gemText(k, false).split(': ')[1]}</div></div>${m.lv < 3 ? `<button class="btn sm ${up ? 'gold' : ''}" ${up ? '' : 'disabled'} data-c='${jattr({ a: 'gemup', c: c.id, k })}'>⬆ ${SH.GEM_UP}→1</button>` : '<span class="ok">Perfecta</span>'}</div>`; }).join('') : '<p class="dim">Aún no tienes gemas: las sueltan criaturas, élites y jefes, y se encuentran en cofres y ruinas.</p>') + `<h3 class="hint">Objetos</h3>`; }
     h += c.st.it.length ? c.st.it.map(it => {
       let b = '';
       if (it.t < SH.MAX_TIER) { const cost = SH.upgradeCost(it.k, it.t + 1), ok = SH.MAT_ORDER.every(m => !cost[m] || (c.st.m[m] || 0) >= cost[m]); b += `<button class="btn sm ${ok && left > 0 ? 'gold' : ''}" ${ok && left > 0 ? '' : 'disabled'} data-c='${jattr({ a: 'upgrade', c: c.id, i: it.id })}'>⬆ ${SH.tierName(it.k, it.t + 1)} · ${SH.MAT_ORDER.filter(m => cost[m]).map(m => SH.MATS[m].e + cost[m]).join(' ')}</button> `; }
       const nfx = (it.fx || []).length;
       if (nfx < SH.MAX_FX) { const st = SH.ENCHANT_STEPS[nfx], ec = st.cost, okS = SH.MAT_ORDER.every(m => !ec[m] || (c.st.m[m] || 0) >= ec[m]) && left > 0 && it.t >= st.tier; b += `<button class="btn sm" ${okS ? '' : 'disabled'} data-ui="en:${it.id}">${SH.RARITY[nfx + 1].e} ${nfx >= 3 ? SH.RARITY[nfx + 1].n : 'Encantar'} · ${SH.MAT_ORDER.filter(m => ec[m]).map(m => SH.MATS[m].e + ec[m]).join(' ')}${it.t < st.tier ? ' · ' + SH.tierName(it.k, st.tier) + '+' : ''}</button> `; }
+      { const so = it.so || 0, nGem = (it.gm || []).filter(Boolean).length;
+        if (so < SH.MAX_SOCKETS) { const st = SH.SOCKET_STEPS[so], okP = SH.MAT_ORDER.every(m => !st.cost[m] || (c.st.m[m] || 0) >= st.cost[m]) && left > 0 && it.t >= st.tier; b += `<button class="btn sm" ${okP ? '' : 'disabled'} data-c='${jattr({ a: 'socket', c: c.id, i: it.id })}'>◇ Perforar · ${SH.MAT_ORDER.filter(m => st.cost[m]).map(m => SH.MATS[m].e + st.cost[m]).join(' ')}${it.t < st.tier ? ' · ' + SH.tierName(it.k, st.tier) + '+' : ''}</button> `; }
+        if (so && SH.MAT_ORDER.some(k => SH.gemOf(k) && c.st.m[k] > 0)) b += `<button class="btn sm" ${left > 0 ? '' : 'disabled'} data-ui="gm:${it.id}">💎 Engastar (${nGem}/${so})</button> `; }
       if (nfx) { const okR = (c.st.m.alma || 0) >= SH.REFORGE_COST.alma && left > 0; b += `<button class="btn sm" ${okR ? '' : 'disabled'} data-ui="rf:${it.id}">🔄 Reforjar · ${soul.e}${SH.REFORGE_COST.alma}</button>`; }
       let ch = '';
       if (sheet.rf === it.id) {
@@ -583,20 +627,92 @@ function citySheet() {
         const pool = (SH.KINDS[it.k].w ? SH.WEAPON_FX : SH.ARMOR_FX).filter(f => !(it.fx || []).includes(f));
         ch = `<div class="offer"><div class="hint" style="margin:0 0 6px">Elige el efecto (o al azar):</div>` + pool.map(f => `<button class="chip btnlike" data-c='${jattr({ a: 'enchant', c: c.id, i: it.id, f })}'>${SH.AFFIX[f].e} ${SH.AFFIX[f].n}</button>`).join('') + `<button class="chip btnlike" data-c='${jattr({ a: 'enchant', c: c.id, i: it.id })}'>🎲 Al azar</button><div class="hint">${pool.map(f => SH.affixText(f, ((it.fx || []).length + 1))).join('<br>')}</div></div>`;
       }
+      if (sheet.gem === it.id) {
+        const free = (it.gm || []).filter(Boolean).length < (it.so || 0), W = !!SH.KINDS[it.k].w;
+        ch = `<div class="offer"><div class="hint" style="margin:0 0 6px">${free ? 'Elige la gema (va al primer engarce libre):' : 'Todos los engarces están ocupados. Al engastar se sustituye la gema elegida (la vieja se pierde):'}</div>` +
+          (free ? '' : `<div style="margin-bottom:6px">${Array.from({ length: it.so }, (_, x) => `<button class="chip btnlike ${(sheet.gx || 0) === x ? 'sel' : ''}" data-ui="gx:${x}">${it.gm[x] ? SH.MATS[it.gm[x]].e : '◇'} ${x + 1}</button>`).join('')}</div>`) +
+          SH.MAT_ORDER.filter(k => SH.gemOf(k) && c.st.m[k] > 0).map(k => `<button class="chip btnlike" data-c='${jattr(Object.assign({ a: 'gem', c: c.id, i: it.id, k }, free ? {} : { x: sheet.gx || 0 }))}'>${SH.gemText(k, W)} (×${c.st.m[k]})</button>`).join('<br>') + `</div>`;
+      }
       return `<div class="line" style="flex-wrap:wrap"><div class="g" style="flex-basis:100%">${itemHtml(it)}</div><div>${b || '<span class="dim">Ya está al máximo</span>'}</div>${ch}</div>`;
     }).join('') : '<p class="dim">No hay objetos en el almacén. Forja uno o lleva botín raro de criaturas élite, jefes, cofres y ruinas.</p>';
   } else {
     const cost = c.rc, n = S.mine.filter(x => !x.sm && !x.cart).length, ok = SH.MAT_ORDER.every(m => !cost[m] || (c.st.m[m] || 0) >= cost[m]) && n < S.maxUnits;
     h += `<p>Unidades: <b>${n}/${S.maxUnits}</b></p><div>Coste: ${SH.MAT_ORDER.filter(m => cost[m]).map(m => `<span class="chip ${(c.st.m[m] || 0) >= cost[m] ? 'ok' : 'lack'}">${SH.MATS[m].e} ${c.st.m[m] || 0}/${cost[m]}</span>`).join('')}</div>`;
     if (S.king === S.you && c.rcb) h += `<p class="hint ok">👑 Eres el Rey Demonio: solo puedes reclutar bestias.</p>` + Object.keys(SH.KING.beasts).map(k => { const bc = c.rcb[k], okb = SH.MAT_ORDER.every(m => !bc[m] || (c.st.m[m] || 0) >= bc[m]) && n < S.maxUnits, d = SH.CREATURES[k]; return `<div class="line"><div class="g">${d.e} <b>${d.n}</b> <span class="dim">❤️${d.hp} ⚔️${d.dmg} 🛡️${d.def} 👟${d.mov}</span><div>${SH.MAT_ORDER.filter(m => bc[m]).map(m => `<span class="chip ${(c.st.m[m] || 0) >= bc[m] ? 'ok' : 'lack'}">${SH.MATS[m].e} ${c.st.m[m] || 0}/${bc[m]}</span>`).join('')}</div></div><button class="btn sm ${okb ? 'gold' : ''}" ${okb ? '' : 'disabled'} data-c='${jattr({ a: 'recruit', c: c.id, k })}'>Reclutar</button></div>`; }).join('') + '<p class="hint">Las bestias empiezan en nivel 1 y descansan el turno en que llegan. Suben de nivel y gastan puntos de habilidad.</p>';
+    else if (S.cfg.mode === 'mundo') h += '<p class="hint lack">🌍 Mundo abierto: no se recluta. Las unidades nuevas nacen por reproducción: deja a dos unidades tuyas juntas, cerca de una ciudad tuya, durante varios turnos.</p>';
     else if (S.cfg.mode === 'uno') h += '<p class="hint lack">🎯 Reto de una unidad: aquí no se puede reclutar.</p>'; else h += `<button class="btn gold block" style="margin-top:10px" ${ok ? '' : 'disabled'} data-c='${jattr({ a: 'recruit', c: c.id })}'>Reclutar unidad</button><p class="hint">La nueva unidad empieza en nivel 1 y descansa el turno en que llega. Cada reclutamiento cuesta más.</p>`;
   }
   return h;
 }
 
+/* ---------- cómo se juega (tutorial) ---------- */
+const tutSeen = () => { try { return localStorage.getItem('ada_tut') === '1'; } catch (e) { return false; } };
+const tutMark = () => { try { localStorage.setItem('ada_tut', '1'); } catch (e) {} };
+let tutI = 0;
+function tutSteps() {
+  const c = S && S.cfg || {}, world = c.mode === 'mundo';
+  const st = [
+    { e: '🗺️', t: 'Tu aventura empieza aquí', p: 'En el mapa están tu ciudad 🏰 y tus unidades 🛡️. <b>Toca una unidad</b> para seleccionarla: se marcan las casillas a las que puede llegar. Toca una casilla para moverte o toca a un enemigo para atacarlo. Arrastra para recorrer el mapa y usa 🏠 para volver a tu ciudad.' },
+    { e: '⚔️', t: 'Criaturas y botín', p: 'Por el mundo hay criaturas 🐺 que dan <b>experiencia y botín</b>. Antes de atacar, toca una para ver su nivel, su vida y su daño. Las más peligrosas son los <b>jefes</b> 🐉: no vayas solo.' },
+    { e: '⭐', t: 'Sube de nivel', p: 'Al subir de nivel ganas puntos para mejorar <b>salud, daño, defensa, movilidad</b> y más (en «Habilidades»). En el nivel ' + SH.CLASS_LV + ' eliges una <b>clase</b> (arquero, mago, nigromante…) y en el ' + SH.SUB_LV + ' una especialización.' },
+    { e: '🏰', t: 'Tu ciudad', p: 'Lleva el botín a tu ciudad: allí se <b>guarda</b>, se <b>forja equipo</b> ⚒️ y se construyen edificios. Las unidades cerca de la ciudad se curan' + (world ? '.' : ' y allí puedes <b>reclutar</b> más.') + ' Dos unidades juntas junto a una ciudad pueden tener <b>crías</b> 👶.' },
+    { e: '🛡️', t: 'Equipo y rarezas', p: 'La rareza de un objeto es su número de efectos: ' + SH.RARITY.map(r => r.e).join(' ') + ' (común, poco común, raro, épico, legendario y mítico). En la forja puedes <b>mejorar</b>, <b>encantar</b> y <b>reforjar</b>. Con 3 piezas de armadura de la misma calidad activas un <b>set</b>.' },
+    { e: '🤝', t: 'Otros jugadores', p: 'En «Jugadores» ofreces <b>paz o alianzas</b>. Con 💬 chateas con todos (también con los bots, mencionando su nombre). Una alianza puede compartir la victoria.' },
+  ];
+  const m = c.mode;
+  if (m === 'mundo') st.push({ e: '🌍', t: 'Mundo abierto', p: 'Aquí no hay «Fin de turno»: el mundo avanza solo con el reloj y entras cuando quieras. No se recluta (solo crías). Si una ciudad pasa mucho tiempo sin unidades tuyas cerca, <b>vuelve a ser neutral</b>. Los monstruos pueden ser de cualquier nivel: ¡cuidado!' });
+  else if (m === 'historia') st.push({ e: '📖', t: 'Modo Historia', p: 'Todos están aliados contra el mundo. Toca 📖 para ver el capítulo y los objetivos. Al cumplirlos, cada capital recibe materiales y botín, y aparece el siguiente reto hasta el Dragón de Ceniza.' });
+  else if (m === 'rey') st.push({ e: '👑', t: 'Reto del Rey Demonio', p: S.king === S.you ? 'Eres el <b>Rey Demonio</b>: solo reclutas bestias y tu protagonista es un jefe. Todos los demás están aliados contra ti: ¡destrúyelos!' : 'El Rey Demonio es <b>' + esc(S.players[S.king] ? S.players[S.king].name : '?') + '</b>. Todos los demás están aliados contra él. ¡Derrótenlo entre todos!' });
+  else if (m === 'equipos') { const me = S.players[S.you]; st.push({ e: '🤝', t: 'Por equipos', p: 'Estás en el equipo ' + (me && me.team !== null && me.team !== undefined ? SH.TEAM_E[me.team] + ' ' + (me.team + 1) : '') + '. Tus compañeros son aliados y los otros equipos, enemigos. Gana el último equipo en pie.' }); }
+  else if (m === 'uno') st.push({ e: '🎯', t: 'Reto de una unidad', p: 'Solo tienes <b>una unidad</b>. Si cae, quedas eliminado. Cuídala mucho: no se puede reclutar.' });
+  st.push(world ? { e: '⏰', t: 'El reloj del mundo', p: 'Arriba ves cuánto falta para el próximo turno. En cada turno tus unidades recuperan su movimiento y acciones. Si activas los avisos, te llegará una notificación al celular.' }
+    : { e: '⏭️', t: 'Fin de turno', p: 'Cuando termines tus acciones toca <b>«Fin de turno»</b>. El turno avanza cuando todos están listos o se acaba el reloj de arriba. Si activas los avisos, te llegará una notificación al celular. ¡Suerte, aventurero!' });
+  return st;
+}
+function renderTut() {
+  const st = tutSteps(), x = st[Math.min(tutI, st.length - 1)];
+  $('tut').innerHTML = `<div class="card"><div class="big">${x.e}</div><h3>${x.t}</h3><p>${x.p}</p><div class="dots">${st.map((_, i) => `<i class="${i === tutI ? 'on' : ''}"></i>`).join('')}</div><div class="row">${tutI > 0 ? '<button class="btn" data-tut="prev">Atrás</button>' : '<button class="btn" data-tut="skip">Saltar</button>'}<button class="btn gold" data-tut="next">${tutI < st.length - 1 ? 'Siguiente' : '¡A jugar!'}</button></div></div>`;
+  $('tut').classList.remove('hidden');
+}
+const tutOpen = () => { tutI = 0; renderTut(); };
+const tutClose = () => { tutMark(); $('tut').classList.add('hidden'); $('tut').innerHTML = ''; };
+$('tut').addEventListener('click', e => {
+  const b = e.target.closest('[data-tut]'); if (!b) return;
+  const a = b.dataset.tut, n = tutSteps().length;
+  if (a === 'skip') tutClose();
+  else if (a === 'prev') { tutI = Math.max(0, tutI - 1); renderTut(); }
+  else if (tutI >= n - 1) tutClose(); else { tutI++; renderTut(); }
+});
+$('nHelp').onclick = tutOpen;
+
+/* ---------- resumen de fin de partida ---------- */
+function summarySheet() {
+  const m = S.sum; if (!m) return '';
+  const medal = i => ['🥇', '🥈', '🥉'][i] || (i + 1) + '.';
+  let h = `<p class="hint">${m.turns} turnos jugados · ${m.kills} criaturas derrotadas en total${m.story ? ' · ' + (m.story.fin ? 'campaña completada' : 'capítulo ' + m.story.ch) : ''}</p>`;
+  h += '<h3 class="hint" style="margin:8px 0 4px">Clasificación</h3>' + m.rows.map((r, i) => `<div class="line"><div class="g"><span class="sw" style="background:${r.color}"></span> ${medal(i)} <b>${esc(r.name)}</b>${r.id === S.you ? '<span class="tag">tú</span>' : ''}${r.team !== null && r.team !== undefined ? ' ' + SH.TEAM_E[r.team] : ''} <span class="dim">${r.score} pts</span><div class="dim">⚔️ ${r.kills} · 🐉 ${r.boss} · 🏰 ${r.cities} · 🗡️ ${r.pk}${r.best ? ' · ⭐ ' + esc(r.best.name) + ' niv. ' + r.best.lv : ''}</div></div></div>`).join('');
+  if (m.awards.length) h += '<h3 class="hint" style="margin:12px 0 4px">Premios</h3>' + m.awards.map(a => `<div class="line"><div class="g">${a.e} <b>${a.t}</b>: ${esc(a.name)} <span class="dim">(${esc(a.txt)})</span></div></div>`).join('');
+  h += '<p class="hint" style="margin-top:10px">Puntos = unidades, niveles, ciudades, criaturas derrotadas (×2), jefes (×50) y rivales derrotados (×20).</p>';
+  return h;
+}
+
+function storySheet() {
+  const st = S.story; if (!st) return hd('Historia') + '<p class="dim">Esta partida no tiene historia.</p>';
+  let h = hd('📖 ' + esc(SH.STORY.title));
+  h += `<p class="hint">${st.fin ? 'Campaña completada' : st.lost ? 'La historia terminó' : 'Capítulo ' + (st.ch + 1) + ' de ' + st.n}</p>`;
+  if (!st.fin) {
+    h += `<h3 style="margin:6px 0">${esc(st.title)}</h3><p>${esc(st.txt)}</p>`;
+    h += st.goals.map(g => `<div class="line"><div class="g">${g.ok ? '✅' : '🎯'} ${esc(g.txt)} <span class="dim">${g.have}/${g.need}</span>${bar(g.ok ? 'xp' : 'hp', g.have, g.need)}</div></div>`).join('');
+    h += '<p class="hint">Todos los jugadores están aliados: cada objetivo se cumple entre todos. Al completar un capítulo, cada capital recibe materiales y un objeto de botín.</p>';
+  }
+  if (st.done.length) h += '<h3 class="hint" style="margin-top:12px">Capítulos anteriores</h3>' + st.done.map(d => `<div class="line"><div class="g"><b>${esc(d.t)}</b><div class="dim">${esc(d.txt)}</div></div></div>`).join('');
+  h += `<h3 class="hint" style="margin-top:12px">Prólogo</h3><p class="dim">${esc(st.intro)}</p>`;
+  return h;
+}
 function playersSheet() {
   const list = S.players.slice().sort((a, b) => b.score - a.score);
-  let h = hd('Jugadores') + list.map(p => `<div class="line"><span class="sw" style="background:${p.color}"></span><div class="g"><b>${esc(p.name)}</b>${S.king === p.id ? '<span class="tag">👑 Rey Demonio</span>' : ''}${botTag(p)}${p.auto ? '<span class="tag">🤖 ausente</span>' : ''}${p.id === S.you ? '<span class="tag">tú</span>' : ''}${p.hero ? `<div class="hint" style="margin:0">${p.hero.emb} ${esc(p.hero.n)} · nivel ${p.hero.lv}${p.hero.w ? ' · ☠️ vuelve en ' + p.hero.w + ' turnos' : ''}</div>` : ''}<div class="hint" style="margin:0">${p.alive ? `${p.units} ${p.units === 1 ? 'unidad' : 'unidades'} · ${p.cities} ${p.cities === 1 ? 'ciudad' : 'ciudades'} · ${p.kills} criaturas · ${p.pk} jugadores` : '☠️ eliminado'}</div></div><div style="text-align:right"><b>${p.score}</b><div class="hint" style="margin:0">${p.alive && !p.bot && !p.auto ? (p.ready ? '✅ listo' : '⏳') : ''}${S.you === S.hostId && p.auto && S.status === 'playing' ? `<button class="btn sm red" style="margin-top:4px" data-ui="release:${p.id}">Liberar plaza</button>` : ''}</div></div></div>`).join('');
+  let h = hd('Jugadores') + list.map(p => `<div class="line"><span class="sw" style="background:${p.color}"></span><div class="g"><b>${esc(p.name)}</b>${p.team !== null && p.team !== undefined ? `<span class="tag">${SH.TEAM_E[p.team]} Equipo ${p.team + 1}</span>` : ''}${S.king === p.id ? '<span class="tag">👑 Rey Demonio</span>' : ''}${botTag(p)}${p.auto ? '<span class="tag">🤖 ausente</span>' : ''}${p.id === S.you ? '<span class="tag">tú</span>' : ''}${p.hero ? `<div class="hint" style="margin:0">${p.hero.emb} ${esc(p.hero.n)} · nivel ${p.hero.lv}${p.hero.w ? ' · ☠️ vuelve en ' + p.hero.w + ' turnos' : ''}</div>` : ''}<div class="hint" style="margin:0">${p.alive ? `${p.units} ${p.units === 1 ? 'unidad' : 'unidades'} · ${p.cities} ${p.cities === 1 ? 'ciudad' : 'ciudades'} · ${p.kills} criaturas · ${p.pk} jugadores` : '☠️ eliminado'}</div></div><div style="text-align:right"><b>${p.score}</b><div class="hint" style="margin:0">${p.alive && !p.bot && !p.auto ? (p.ready ? '✅ listo' : '⏳') : ''}${S.you === S.hostId && p.auto && S.status === 'playing' ? `<button class="btn sm red" style="margin-top:4px" data-ui="release:${p.id}">Liberar plaza</button>` : ''}</div></div></div>`).join('');
+  h += victoryHtml();
   h += diplomacyHtml();
   h += `<p class="hint">Puntos: nivel de unidades ×5, ciudades ×30, criaturas ×2, jefes ×50, jugadores abatidos ×20.</p>`;
   h += `<p class="hint">🤖 ausente: un bot dirige su ejército (de forma cauta) hasta que vuelva a entrar. El anfitrión puede liberar su plaza para que entre otra persona.</p>`;
@@ -606,12 +722,56 @@ function playersSheet() {
   h += `<button class="btn sm" data-ui="leave">Salir</button></div>`;
   return h;
 }
+function tradeSheet() {
+  const t = sheet.tr, to = S.players.find(p => p.id === t.to), mine = S.cities.filter(c => c.o === S.you);
+  if (!to || !mine.length) return hd('Comercio') + '<p class="dim">No disponible.</p>';
+  const c = mine.find(x => x.id === t.fc) || mine.find(x => x.cap) || mine[0]; t.fc = c.id;
+  const have = k => c.st.m[k] || 0, stp = (side, k, n, max) => `<span class="row" style="gap:6px;align-items:center"><button class="btn sm" data-ui="tq:${side},${k},-1">−</button><b style="min-width:22px;text-align:center">${n}</b><button class="btn sm" data-ui="tq:${side},${k},1" ${n >= max ? 'disabled' : ''}>＋</button></span>`;
+  let h = hd('🛒 Comerciar con ' + esc(to.name)) + '<p class="hint">Lo que ofreces sale de tu ciudad y queda en depósito hasta que acepte, rechace o caduque (5 turnos). Si acepta, lo que pides sale de una ciudad suya y llega a la tuya.</p>';
+  if (mine.length > 1) h += '<h3 class="hint">Tu ciudad de salida</h3><div>' + mine.map(x => `<button class="chip btnlike ${x.id === c.id ? 'on' : ''}" data-ui="trc:${x.id}">${esc(x.name)}</button>`).join('') + '</div>';
+  h += '<h3 class="hint">Das</h3>';
+  const mk = SH.MAT_ORDER.filter(k => have(k) > 0);
+  h += mk.length ? mk.map(k => `<div class="line"><div class="g">${SH.MATS[k].e} ${SH.MATS[k].n} <span class="dim">(tienes ${have(k)})</span></div>${stp('g', k, t.give[k] || 0, have(k))}</div>`).join('') : '<p class="dim">Esta ciudad no tiene materiales.</p>';
+  if (c.st.it.length) h += '<div class="hint" style="margin-top:6px">Objeto:</div><div>' + c.st.it.map(it => `<button class="chip btnlike ${t.gi === it.id ? 'on' : ''}" data-ui="tri:${it.id}">${SH.itemName(it)}</button>`).join('') + '</div>';
+  h += '<h3 class="hint">Pides</h3>' + SH.MAT_ORDER.map(k => `<div class="line"><div class="g">${SH.MATS[k].e} ${SH.MATS[k].n}</div>${stp('w', k, t.want[k] || 0, 60)}</div>`).join('');
+  const empty = !Object.keys(t.give).length && !t.gi && !Object.keys(t.want).length;
+  return h + `<div style="margin-top:12px"><button class="btn gold" data-ui="trs" ${empty ? 'disabled' : ''}>Enviar oferta</button></div>`;
+}
+function dgOf(u) { // qué puede hacer una unidad respecto a las mazmorras
+  const cb = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+  if (u.dg) { const d = (S.dungeons || []).find(x => x.id === u.dg); return d ? (cb(u, d.exit) <= 1 ? { leave: d } : { inside: d }) : null; }
+  const d = (S.dungeons || []).find(x => x.x >= 0 && cb(u, x) <= 1); return d ? { enter: d } : null;
+}
+function dgBtn(u, n) {
+  if (n.enter) return `<button class="btn gold sm" data-c='${jattr({ a: 'dungeon', d: 'enter', u: u.id, id: n.enter.id })}'>Entrar con ${esc(u.name)}</button>`;
+  if (n.leave) return `<button class="btn sm" data-c='${jattr({ a: 'dungeon', d: 'leave', u: u.id })}'>🚪 Salir con ${esc(u.name)}</button>`;
+  return '';
+}
+function dgUnitHtml(u) {
+  const n = dgOf(u); if (!n) return '';
+  if (n.enter) return `<div class="offer">🕳️ <b>${esc(n.enter.name)}</b> · nivel recomendado ${n.enter.rec}${n.enter.cleared ? ' · despejada' : ''}<div class="row" style="margin-top:8px">${dgBtn(u, n)}</div></div>`;
+  if (n.leave) return `<div class="offer">🚪 Estás junto a la salida de la mazmorra.<div class="row" style="margin-top:8px">${dgBtn(u, n)}</div></div>`;
+  return `<p class="hint">🕳️ Dentro de la ${esc(n.inside.name.toLowerCase())}: busca 💎 tesoros, cuidado con las ⚠️ trampas ocultas. El jefe espera en la última sala. La puerta 🚪 de salida está en (${n.inside.exit.x}, ${n.inside.exit.y}).</p>`;
+}
+function victoryHtml() {
+  const v = S.vic; if (!v) return '';
+  const nm = id => { const p = S.players.find(x => x.id === id); return p ? esc(p.name) : '?'; };
+  const T = { dominio: ['🏰 Final: Dominación', `Controla el ${v.goal}% de las ciudades durante ${v.need} turnos seguidos.`, '%'], jefes: ['🐉 Final: Cazajefes', `Gana quien derrote primero a ${v.goal} jefes.`, ' jefes'], campeon: ['🏅 Final: Campeón', `Gana quien lleve primero una unidad a nivel ${v.goal}.`, ' nivel'], puntos: ['⭐ Final: Carrera de puntos', `Gana quien llegue primero a ${v.goal} puntos.`, ' pts'], tiempo: ['⏳ Final: Por tiempo', `A los ${v.goal} turnos gana quien tenga más puntos (turno actual: ${S.turn}).`, ' pts'] }[v.k];
+  if (!T) return '';
+  return `<div class="card" style="margin:8px 0"><b>${T[0]}</b><div class="hint" style="margin:2px 0 6px">${T[1]}</div>` + v.rows.map(r => `<div class="dim">${nm(r.id)}: <b>${r.v}${T[2]}</b></div>`).join('') + (v.hold ? `<div class="lack" style="margin-top:6px">⏳ ${nm(v.hold.id)} domina el mapa: ${v.hold.n}/${v.need} turnos</div>` : '') + `</div>`;
+}
 function diplomacyHtml() {
   const me = S.you, props = S.props || [];
   let h = `<h3 class="hint" style="margin-top:12px">🕊️ Diplomacia</h3>`;
+  if (S.wx && SH.WEATHER[S.wx.k]) { const wd = SH.WEATHER[S.wx.k]; h = `<p class="hint">${wd.e} <b>${wd.n}</b> (unos ${S.wx.left} turno(s) más). ${wd.d}</p>` + h; }
+  if (S.tourn) h = `<p class="hint">🏟️ <b>Torneo</b> en (${S.tourn.x}, ${S.tourn.y}): quedan ${S.tourn.left} turno(s). Gana la mejor unidad que esté en la arena o pegada a ella.</p>` + h;
   if (S.season) { const se = SH.SEASONS[S.season.i]; h = `<p class="hint">${se.e} <b>${se.n}</b> (quedan ${S.season.left} ${S.season.left === 1 ? 'turno' : 'turnos'}). ${se.d}</p>` + h; }
   const incoming = props.filter(q => q.to === me);
   h += incoming.map(q => `<div class="offer"><b>${esc(S.players[q.from].name)}</b> te propone ${q.k === 'paz' ? '🕊️ la paz' : '🤝 una alianza'}.<div class="row" style="margin-top:8px"><button class="btn sm gold" data-c='${jattr({ a: 'dip', d: 'accept', id: q.id })}'>Aceptar</button><button class="btn sm" data-c='${jattr({ a: 'dip', d: 'reject', id: q.id })}'>Rechazar</button></div></div>`).join('');
+  { const tr = S.trades || [], pn = id => { const q = S.players.find(x => x.id === id); return q ? esc(q.name) : '?'; };
+    h += tr.map(q => q.to === me
+      ? `<div class="offer">🛒 <b>${pn(q.from)}</b> te ofrece: ${esc(q.txt)}.<div class="hint" style="margin:2px 0 0">Caduca en ${q.left} turno(s)</div><div class="row" style="margin-top:8px"><button class="btn sm gold" data-ui="tra:${q.id}">Aceptar</button><button class="btn sm" data-ui="trr:${q.id}">Rechazar</button></div></div>`
+      : `<div class="offer">🛒 Tu oferta a <b>${pn(q.to)}</b>: ${esc(q.txt)}.<div class="hint" style="margin:2px 0 0">Esperando respuesta (${q.left} turno(s))</div><div class="row" style="margin-top:8px"><button class="btn sm" data-ui="trx:${q.id}">Retirar</button></div></div>`).join(''); }
   const others = S.players.filter(p => p.id !== me && p.alive);
   if (!others.length) return h + '<p class="dim">Nadie más sigue en la partida.</p>';
   h += others.map(p => {
@@ -621,6 +781,7 @@ function diplomacyHtml() {
     if (pk === 'guerra') b = sent.some(q => q.k === 'paz') ? '<span class="dim">Propuesta enviada…</span>' : `<button class="btn sm" data-c='${jattr({ a: 'dip', d: 'offer', to: p.id, k: 'paz' })}'>🕊️ Proponer paz</button>`;
     else if (pk === 'paz') b = (sent.some(q => q.k === 'alianza') ? '<span class="dim">Alianza propuesta…</span>' : `<button class="btn sm" data-c='${jattr({ a: 'dip', d: 'offer', to: p.id, k: 'alianza' })}'>🤝 Proponer alianza</button>`) + (brk !== undefined ? '' : ` <button class="btn sm red" data-ui="brk:${p.id}">Romper</button>`);
     else b = `<button class="btn sm red" data-ui="brk:${p.id}">Romper alianza</button>`;
+    if (pk && S.cfg.mode !== 'uno') b += ` <button class="btn sm" data-ui="tr:${p.id}">🛒 Comerciar</button>`;
     return `<div class="line"><span class="sw" style="background:${p.color}"></span><div class="g"><b>${esc(p.name)}</b><span class="pact ${pk}">${SH.PACTS[pk].e} ${SH.PACTS[pk].n}</span>${brk !== undefined ? `<div class="hint lack" style="margin:2px 0 0">La guerra empieza en ${Math.max(0, brk - S.turn)} turno(s)</div>` : ''}</div><div style="text-align:right">${b}</div></div>`;
   }).join('');
   h += `<p class="hint">Con <b>paz</b> no pueden atacarse ni pisar sus ciudades. Con <b>alianza</b> comparten visión y pueden cruzar sus unidades; si todos los que quedan son aliados, ganan juntos. Romper la paz avisa y la guerra empieza 2 turnos después.</p>`;
@@ -637,6 +798,23 @@ function infoSheet() {
     const o = S.others.find(x => x.id === i.id); if (!o) return hd('Unidad') + '<p class="dim">Ya no está a la vista.</p>';
     const p = S.players[o.o];
     return hd(`<span class="sw" style="background:${p.color}"></span>${esc(o.name)} <span class="dim">de ${esc(p.name)}</span>`) + `<div style="display:flex;justify-content:space-between"><span>Nivel ${o.lv}</span><span>${o.hp}/${o.mhp}</span></div>${bar('hp', o.hp, o.mhp)}<div class="grid" style="margin-top:10px"><div class="stat"><small>Daño</small>${o.dmg}</div><div class="stat"><small>Defensa</small>${o.def}</div></div><p class="hint">Arma: ${o.w ? SH.KINDS[o.w].n : 'puños'}${pactWith(o.o) ? ' · ' + SH.PACTS[pactWith(o.o)].e + ' ' + SH.PACTS[pactWith(o.o)].n + ' con su dueño: no puedes atacarla' : ''}</p>`;
+  }
+  if (i.t === 'dg') {
+    const d = (S.dungeons || []).find(x => x.id === i.id); if (!d) return hd('Mazmorra') + '<p class="dim">Ya no está a la vista.</p>';
+    const TT = SH.DUNGEON.tiers[d.tier - 1], cb = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+    let h = hd(`${TT.e} ${esc(d.name)}`) + `<p>Otro mundo bajo tierra: criaturas de nivel ${TT.lv[0]}–${TT.lv[1]}, un jefe al final, muchos 💎 tesoros y ⚠️ trampas ocultas. Nivel recomendado: <b>${d.rec}</b>.${d.cleared ? ' <b class="ok">Despejada: se reabastecerá pronto.</b>' : ''}</p><p class="hint">Entras con una unidad pegada a la entrada (🕳️) y sales por la puerta 🚪 de la primera sala. Si tu unidad cae dentro, se pierde como en cualquier combate.</p>`;
+    const near = S.mine.filter(u => (u.dg ? u.dg === d.id && cb(u, d.exit) <= 1 : d.x >= 0 && cb(u, d) <= 1));
+    h += near.length ? near.map(u => `<div class="line"><div class="g">${esc(u.name)} <span class="dim">nivel ${u.lv}</span></div>${dgBtn(u, u.dg ? { leave: d } : { enter: d })}</div>`).join('') : '<p class="hint"><b>Acerca una de tus unidades</b> (a una casilla o menos) para entrar o salir.</p>';
+    return h;
+  }
+  if (i.t === 't') { if (!S.tourn) return hd('Torneo') + '<p class="dim">El torneo ya terminó.</p>'; return hd('🏟️ Torneo') + `<p>Arena en (${S.tourn.x}, ${S.tourn.y}). Quedan <b>${S.tourn.left}</b> turno(s). Al terminar gana la mejor unidad (nivel, daño, defensa y salud) que esté en la arena o en las casillas pegadas. Premio: 2 gemas, un objeto raro y experiencia. ¡Ojo: los rivales también pueden ir!</p>`; }
+  if (i.t === 'm') {
+    const m = (S.merch || []).find(x => x.id === i.id); if (!m) return hd('Mercader') + '<p class="dim">Ya no está a la vista.</p>';
+    const near = S.mine.filter(u => Math.max(Math.abs(u.x - m.x), Math.abs(u.y - m.y)) <= 1), u0 = near.find(u => u.id === selId) || near[0];
+    let h = hd('🛒 ' + esc(m.name)) + `<p class="hint">Mercader ambulante: se marcha en ${m.left} turno(s) y deambula. ${u0 ? 'Pagas con lo que lleva <b>' + esc(u0.name) + '</b> en la mochila.' : '<b class="lack">Pon una de tus unidades a su lado para comprar.</b>'}</p>`;
+    h += m.offers.map((o, n) => { const ok = !!u0 && !o.sold && SH.MAT_ORDER.every(k => !o.cost[k] || (u0.inv.m[k] || 0) >= o.cost[k]);
+      return `<div class="line" style="flex-wrap:wrap"><div class="g"><b>${esc(o.txt)}</b><div>${SH.MAT_ORDER.filter(k => o.cost[k]).map(k => `<span class="chip ${u0 && (u0.inv.m[k] || 0) >= o.cost[k] ? 'ok' : 'lack'}">${SH.MATS[k].e} ${u0 ? (u0.inv.m[k] || 0) : 0}/${o.cost[k]}</span>`).join('')}</div></div>${o.sold ? '<span class="dim">Vendido</span>' : `<button class="btn sm ${ok ? 'gold' : ''}" ${ok ? '' : 'disabled'} data-ui="mb:${m.id},${n},${u0 ? u0.id : 0}">Comprar</button>`}</div>`; }).join('');
+    return h;
   }
   if (i.t === 's') { const q = (S.sites || []).find(x => x.id === i.id); if (!q) return hd('Sitio') + '<p class="dim">Ya no está.</p>'; const d = SH.SITES[q.k]; return hd(d.e + ' ' + d.n) + `<p>${q.k === 'cofre' ? 'Un cofre con materiales y, a veces, un objeto raro.' : 'Ruinas antiguas: guardan un objeto raro y almas, pero suelen estar vigiladas.'} Mueve una unidad encima para abrirlo (necesita espacio en la mochila).</p>`; }
   const c = S.cities.find(x => x.id === i.id); if (!c) return '';
@@ -657,13 +835,24 @@ $('sheet').addEventListener('click', e => {
   else if (k === 'tab') { sheet.tab = v; renderSheet(); }
   else if (k === 'pick') { selectUnit(+v, true); }
   else if (k === 'city') { openSheet('city', { cityId: +v }); const c = S.cities.find(c => c.id === +v); if (c) centerOn(c.x, c.y); }
-  else if (k === 'en') { sheet.ench = sheet.ench === +v ? null : +v; sheet.rf = null; renderSheet(); }
-  else if (k === 'rf') { sheet.rf = sheet.rf === +v ? null : +v; sheet.ench = null; renderSheet(); }
+  else if (k === 'en') { sheet.ench = sheet.ench === +v ? null : +v; sheet.rf = null; sheet.gem = null; renderSheet(); }
+  else if (k === 'rf') { sheet.rf = sheet.rf === +v ? null : +v; sheet.ench = null; sheet.gem = null; renderSheet(); }
+  else if (k === 'gm') { sheet.gem = sheet.gem === +v ? null : +v; sheet.gx = 0; sheet.ench = null; sheet.rf = null; renderSheet(); }
+  else if (k === 'gx') { sheet.gx = +v; renderSheet(); }
   else if (k === 'fk') { forge.k = v; renderSheet(); }
   else if (k === 'ft') { forge.tr = +v; renderSheet(); }
   else if (k === 'invite') { navigator.clipboard && navigator.clipboard.writeText(S.code).then(() => toast('Código copiado')).catch(() => {}); }
   else if (k === 'force') { if (confirm('¿Terminar el turno ahora para todos?')) send({ t: 'cmd', a: 'force' }); }
   else if (k === 'brk') { const pp = S.players[+v]; if (confirm('¿Romper el pacto con ' + pp.name + '?')) act({ a: 'dip', d: 'break', to: +v }); }
+  else if (k === 'tr') { sheet = { mode: 'trade', tab: 'x', tr: { to: +v, fc: 0, give: {}, want: {}, gi: 0 } }; renderSheet(); }
+  else if (k === 'trc') { sheet.tr.fc = +v; sheet.tr.give = {}; sheet.tr.gi = 0; renderSheet(); }
+  else if (k === 'tri') { sheet.tr.gi = sheet.tr.gi === +v ? 0 : +v; renderSheet(); }
+  else if (k === 'tq') { const [sd, mk, dl] = v.split(','), o = sd === 'g' ? sheet.tr.give : sheet.tr.want; const n = Math.max(0, (o[mk] || 0) + +dl); if (n) o[mk] = n; else delete o[mk]; renderSheet(); }
+  else if (k === 'trs') { const t = sheet.tr; act({ a: 'trade', d: 'offer', to: t.to, fc: t.fc, give: t.give, want: t.want, gi: t.gi || undefined }); openSheet('players'); }
+  else if (k === 'tra') act({ a: 'trade', d: 'accept', id: +v });
+  else if (k === 'trr') act({ a: 'trade', d: 'reject', id: +v });
+  else if (k === 'trx') act({ a: 'trade', d: 'cancel', id: +v });
+  else if (k === 'mb') { const [mid, oi, uid] = v.split(',').map(Number); act({ a: 'merch', id: mid, i: oi, u: uid }); }
   else if (k === 'leave') { leave(); }
   else if (k === 'release') { if (confirm('¿Liberar esta plaza? Quedará como bot permanente y otra persona podrá ocuparla.')) act({ a: 'release', id: +v }); }
   else if (k === 'pushon') { enablePush(); }
@@ -700,7 +889,7 @@ cv.addEventListener('pointermove', e => {
   const dx = e.offsetX - p.x, dy = e.offsetY - p.y; p.x = e.offsetX; p.y = e.offsetY;
   if (pointers.size === 2 && pinch) {
     const [a, b] = [...pointers.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y);
-    cam.z = Math.max(18, Math.min(90, pinch.z * d / pinch.d)); dirty = true;
+    cam.z = Math.max(S && S.w > 80 ? 8 : 18, Math.min(90, pinch.z * d / pinch.d)); dirty = true;
   } else if (pointers.size === 1) {
     moved += Math.abs(dx) + Math.abs(dy);
     if (moved > 8) { cam.x -= dx / cam.z; cam.y -= dy / cam.z; clampCam(); dirty = true; }
@@ -712,7 +901,7 @@ const endPtr = e => {
   if (had && pointers.size === 0 && moved <= 8 && downAt && S && S.status !== 'lobby') { const t = toTile(downAt.x, downAt.y); tapTile(t.x, t.y); }
 };
 cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', e => { pointers.delete(e.pointerId); pinch = null; });
-cv.addEventListener('wheel', e => { e.preventDefault(); cam.z = Math.max(18, Math.min(90, cam.z * (e.deltaY < 0 ? 1.12 : 0.89))); dirty = true; }, { passive: false });
+cv.addEventListener('wheel', e => { e.preventDefault(); cam.z = Math.max(S && S.w > 80 ? 8 : 18, Math.min(90, cam.z * (e.deltaY < 0 ? 1.12 : 0.89))); dirty = true; }, { passive: false });
 function clampCam() { if (!S) return; cam.x = Math.max(0, Math.min(S.w, cam.x)); cam.y = Math.max(0, Math.min(S.h, cam.y)); }
 
 function tapTile(x, y) {
@@ -730,6 +919,9 @@ function tapTile(x, y) {
   if (mine) return selectUnit(mine.id);
   if (cre) return openSheet('info', { info: { t: 'c', id: cre.id } });
   if (oth) return openSheet('info', { info: { t: 'u', id: oth.id } });
+  { const dg = (S.dungeons || []).find(d => (d.x === x && d.y === y) || (d.inside && d.exit.x === x && d.exit.y === y)); if (dg) return openSheet('info', { info: { t: 'dg', id: dg.id } }); }
+  const mer = (S.merch || []).find(q => q.x === x && q.y === y); if (mer) return openSheet('info', { info: { t: 'm', id: mer.id } });
+  if (S.tourn && S.tourn.x === x && S.tourn.y === y) return openSheet('info', { info: { t: 't' } });
   const site = (S.sites || []).find(q => q.x === x && q.y === y);
   if (site && !city) return openSheet('info', { info: { t: 's', id: site.id } });
   if (city) { if (city.o === S.you) return openSheet('city', { cityId: city.id }); return openSheet('info', { info: { t: 'city', id: city.id } }); }
@@ -737,45 +929,184 @@ function tapTile(x, y) {
 }
 
 /* ---------- mapa: dibujo ---------- */
-const TCOL = { g: '#4d7a3b', f: '#2f5a33', h: '#8a7b4c', m: '#69707c', d: '#c2a45a', w: '#2a5b8c', '?': '#0a0c11' };
+const TCOL = { r: '#5b5560', k: '#15121a', g: '#4d7a3b', f: '#2f5a33', h: '#8a7b4c', m: '#69707c', d: '#c2a45a', w: '#2a5b8c', '?': '#0a0c11' };
 const EMO = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 const WEAPON_E = new Proxy({}, { get: (_, k) => SH.KINDS[k] ? SH.KINDS[k].e : '⚔️' });
 function emoji(ch, cx, cy, size) { ctx.font = Math.floor(size) + 'px ' + EMO; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(ch, cx, cy + size * 0.06); }
+/* ---------- mazmorras: muros de ladrillo, suelo de losas, antorchas y temas por nivel ---------- */
+const DGTHEME = [
+  { fl: '#6a5f52', fl2: '#74685a', wl: '#3a2f26', wl2: '#4a3d31', ac: '#5fd36b' },   // 1 cueva
+  { fl: '#59616d', fl2: '#626b78', wl: '#262c36', wl2: '#323a47', ac: '#5aa7ff' },   // 2 catacumba
+  { fl: '#5a4a64', fl2: '#645270', wl: '#2e2238', wl2: '#3b2d48', ac: '#b07cff' },   // 3 cripta
+  { fl: '#6b4437', fl2: '#76503f', wl: '#3a1c15', wl2: '#4c261c', ac: '#ff9d3c' },   // 4 fuego
+  { fl: '#3d3550', fl2: '#463d5c', wl: '#150f22', wl2: '#201733', ac: '#ff5252' }    // 5 abismo
+];
+function dgTier(x, y) { for (const d of S.dungeons || []) if (x >= d.exit.x - 8 && x <= d.exit.x + 14 && y >= d.exit.y - 8 && y <= d.exit.y + 7) return d.tier; return 1; }
+function drawDgTile(t, k, x, y, px, py, z, bossNear) {
+  const th = DGTHEME[dgTier(x, y) - 1], W = S.w, T = S.terr, isF = i => T[i] === 'r';
+  if (t === 'r') {
+    ctx.fillStyle = (x + y) & 1 ? th.fl : th.fl2; ctx.fillRect(px, py, z + .5, z + .5);
+    if (z >= 18) { ctx.strokeStyle = 'rgba(0,0,0,.28)'; ctx.lineWidth = 1; ctx.strokeRect(px + .5, py + .5, z - 1, z - 1);
+      if ((x * 5 + y * 11) % 7 === 0) { ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.moveTo(px + z * .2, py + z * .3); ctx.lineTo(px + z * .45, py + z * .5); ctx.lineTo(px + z * .4, py + z * .75); ctx.stroke(); } }
+    if (y > 0 && T[k - W] === 'k') { const gr = ctx.createLinearGradient(0, py, 0, py + z * .45); gr.addColorStop(0, 'rgba(0,0,0,.5)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = gr; ctx.fillRect(px, py, z + .5, z * .45); }
+    if (bossNear) { ctx.fillStyle = 'rgba(200,20,30,.2)'; ctx.fillRect(px, py, z + .5, z + .5); }
+    return;
+  }
+  let near = false; for (let dy = -1; dy <= 1 && !near; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy; if (xx >= 0 && xx < W && yy >= 0 && yy * W + xx < T.length && isF(yy * W + xx)) { near = true; break; } }
+  if (!near) { ctx.fillStyle = '#06050a'; ctx.fillRect(px, py, z + .5, z + .5); return; }
+  ctx.fillStyle = th.wl; ctx.fillRect(px, py, z + .5, z + .5);
+  if (z >= 16) { ctx.strokeStyle = th.wl2; ctx.lineWidth = 1.2; const r = z / 3; ctx.beginPath();
+    for (let j = 0; j < 3; j++) { const yy = py + j * r; ctx.moveTo(px, yy); ctx.lineTo(px + z, yy); const off = ((x + j) & 1) ? z * .5 : z * .25; ctx.moveTo(px + off, yy); ctx.lineTo(px + off, yy + r); if (off < z * .5) { ctx.moveTo(px + off + z * .5, yy); ctx.lineTo(px + off + z * .5, yy + r); } }
+    ctx.stroke(); }
+  if (y + 1 < S.h && isF(k + W)) { ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.fillRect(px, py + z * .86, z + .5, z * .14);
+    if (z >= 20 && (x * 7 + y * 3) % 9 === 0) { const g1 = ctx.createRadialGradient(px + z / 2, py + z * .8, 1, px + z / 2, py + z * .8, z * 1.3); g1.addColorStop(0, 'rgba(255,170,60,.38)'); g1.addColorStop(1, 'rgba(255,170,60,0)'); ctx.fillStyle = g1; ctx.fillRect(px - z, py - z * .5, z * 3, z * 3); emoji('🔥', px + z / 2, py + z * .45, z * .4); } }
+}
+/* ---------- ciudades: solar de 3×3 y edificios visibles ---------- */
+function bldBox(x, y, w, h, wall, roof) { ctx.fillStyle = wall; ctx.fillRect(x, y, w, h); ctx.fillStyle = roof; ctx.beginPath(); ctx.moveTo(x - w * .1, y); ctx.lineTo(x + w / 2, y - h * .55); ctx.lineTo(x + w * 1.1, y); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.lineWidth = 1; ctx.strokeRect(x, y, w, h); }
+function drawTower(x, y, z, lv) { // atalaya: torre de piedra con tejado; nivel 2 más alta, tejado dorado y bandera
+  const w = z * (lv > 1 ? .26 : .22), h = z * (lv > 1 ? .62 : .46);
+  ctx.fillStyle = '#8d93a0'; ctx.fillRect(x - w / 2, y - h / 2, w, h); ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 1; ctx.strokeRect(x - w / 2, y - h / 2, w, h);
+  ctx.fillStyle = lv > 1 ? '#e6b450' : '#b5483a'; ctx.beginPath(); ctx.moveTo(x - w * .7, y - h / 2); ctx.lineTo(x, y - h / 2 - w * 1.1); ctx.lineTo(x + w * .7, y - h / 2); ctx.fill();
+  ctx.fillStyle = '#2b2f38'; ctx.fillRect(x - w * .12, y - h * .15, w * .24, h * .22);
+  if (lv > 1) { ctx.fillStyle = '#fff'; ctx.fillRect(x, y - h / 2 - w * 1.9, 1.5, w * .8); ctx.fillRect(x + 1.5, y - h / 2 - w * 1.9, w * .5, w * .35); }
+}
+function drawHouse(x, y, w, h, seed, ruined) { // casa de aldea: paredes, tejado a dos aguas, puerta y ventana
+  const walls = ['#d9c7a0', '#cdb58c', '#e0d2b4', '#c4ad86'], roofs = ['#a8453a', '#8a5a32', '#9c4f3a', '#7a3f2c'];
+  const wc = ruined ? '#8d8576' : walls[seed % 4], rc = ruined ? '#5a5248' : roofs[(seed >> 2) % 4];
+  ctx.fillStyle = wc; ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = rc; ctx.beginPath(); ctx.moveTo(x - w * .12, y + h * .04); ctx.lineTo(x + w / 2, y - h * .62); ctx.lineTo(x + w * 1.12, y + h * .04); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.lineWidth = 1; ctx.strokeRect(x, y, w, h);
+  ctx.fillStyle = '#4a2e1a'; ctx.fillRect(x + w * .38, y + h * .45, w * .26, h * .55);
+  ctx.fillStyle = '#ffe9a8'; ctx.fillRect(x + w * .08, y + h * .22, w * .2, h * .22); if (w > 8) ctx.fillRect(x + w * .72, y + h * .22, w * .2, h * .22);
+}
+function merlons(x, y, len, horiz, t) { // almenas a lo largo de un lienzo de muralla
+  const n = Math.max(2, Math.floor(len / (t * 2.2))), step = len / n; ctx.fillStyle = ctx.fillStyle;
+  for (let i = 0; i < n; i++) { const o = i * step + step * .15; if (horiz) ctx.fillRect(x + o, y - t * .9, step * .55, t * .9); else ctx.fillRect(x - t * .9, y + o, t * .9, step * .55); }
+}
+function drawCity(c, ox, oy, z) {
+  const col = c.o === null ? '#9aa0aa' : S.players[c.o].color, b = c.b || {}, own = c.o !== null;
+  const X = ox + (c.x - 1) * z, Y = oy + (c.y - 1) * z, cx = ox + (c.x + .5) * z, cy = oy + (c.y + .5) * z;
+  const dark = own && S.king != null && S.king === c.o; // fortaleza del Rey Demonio
+  const tot = (b.herreria || 0) + (b.cuartel || 0) + (b.muralla || 0) + (b.atalaya || 0) + (c.cart ? 1 : 0), det = z >= 20;
+  // suelo del solar
+  if (dark) { ctx.fillStyle = '#1a0f1f'; ctx.fillRect(X, Y, 3 * z, 3 * z); ctx.fillStyle = 'rgba(160,20,30,.28)'; ctx.fillRect(X, Y, 3 * z, 3 * z); }
+  else { ctx.fillStyle = own ? 'rgba(160,190,120,.55)' : 'rgba(190,175,140,.35)'; ctx.fillRect(X, Y, 3 * z, 3 * z);
+    ctx.fillStyle = own ? col + '26' : 'rgba(0,0,0,.25)'; ctx.fillRect(X, Y, 3 * z, 3 * z); }
+  // calles y plaza: la aldea crece con las mejoras
+  if (own && !dark && det) {
+    ctx.fillStyle = 'rgba(176,146,98,.75)';
+    ctx.fillRect(cx - z * .15, cy, z * .3, 1.5 * z);                              // camino sur (a la puerta)
+    if (tot >= 2) ctx.fillRect(X, cy - z * .11, 3 * z, z * .22);                     // calle este–oeste
+    if (tot >= 4) ctx.fillRect(cx - z * .11, Y, z * .22, z * 1.5);                   // calle norte
+    if (tot >= 3) { ctx.beginPath(); ctx.arc(cx, cy, z * .6, 0, 7); ctx.fill(); ctx.strokeStyle = 'rgba(90,65,35,.5)'; ctx.lineWidth = 1; ctx.stroke(); } // plaza
+  }
+  ctx.strokeStyle = col; ctx.lineWidth = own ? 2.5 : 1.5; if (!own) ctx.setLineDash([5, 4]); ctx.strokeRect(X + 1, Y + 1, 3 * z - 2, 3 * z - 2); ctx.setLineDash([]);
+  if (det) {
+    const cell = (i, j) => [X + (i + .5) * z, Y + (j + .5) * z];
+    // casas: aldea → pueblo → ciudad según las mejoras
+    if (!dark) {
+      const nh = !own ? 1 : tot === 0 ? 1 : tot <= 2 ? 2 : tot <= 4 ? 3 : 4, seed = (c.id || c.x * 7 + c.y * 13), order = [[0, 0], [2, 2], [2, 0], [0, 2]];
+      for (let i = 0; i < nh; i++) { const [gx, gy] = cell(order[i][0], order[i][1]), hw = z * .38, hh = z * .3, ix = order[i][0] === 0 ? 1 : -1, iy = order[i][1] === 0 ? 1 : -1;
+        drawHouse(gx - hw / 2 + ix * z * .08, gy - hh / 2 + iy * z * .12, hw, hh, seed + i * 5, !own);
+        if (own && tot >= 6) drawHouse(gx - hw * .2 - ix * z * .14, gy - hh * .1 - iy * z * .02, hw * .55, hh * .55, seed + i * 3 + 1, false); }
+    }
+    // herrería (oeste): taller con chimenea humeando y yunque
+    if (b.herreria) { const bx = cx - z, by = cy, L = b.herreria, w = z * (L > 1 ? .66 : .56), h = z * .42, x = bx - w / 2, y = by - h * .1;
+      bldBox(x, y, w, h, L > 1 ? '#6d4f3a' : '#8a6a4c', L > 1 ? '#4a4f5c' : '#7a3f2c');
+      ctx.fillStyle = '#555'; ctx.fillRect(x + w * .68, y - h * .75, w * .16, h * .7); ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.strokeRect(x + w * .68, y - h * .75, w * .16, h * .7);
+      for (let i = 0; i < 3; i++) { ctx.fillStyle = 'rgba(210,210,215,' + (.55 - i * .15) + ')'; ctx.beginPath(); ctx.arc(x + w * .76 + i * z * .05, y - h * .95 - i * z * .12, z * (.06 + i * .03), 0, 7); ctx.fill(); }
+      ctx.fillStyle = '#1b1b1b'; ctx.fillRect(x + w * .14, y + h * .38, w * .3, h * .62); emoji('🔥', x + w * .29, y + h * .62, z * .2);
+      emoji('⚒️', x + w * .3, y + h + z * .12, z * .2); }
+    // cuartel (este): sala larga con almenas, bandera y puerta
+    if (b.cuartel) { const bx = cx + z, by = cy, L = b.cuartel, w = z * (L > 1 ? .8 : .66), h = z * .44, x = bx - w / 2, y = by - h * .1;
+      ctx.fillStyle = L > 1 ? '#8f8a82' : '#a6805a'; ctx.fillRect(x, y, w, h); ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 1; ctx.strokeRect(x, y, w, h);
+      ctx.fillStyle = L > 1 ? '#6f6a63' : '#8a3b3b'; ctx.fillRect(x - w * .04, y - h * .16, w * 1.08, h * .2); merlons(x, y - h * .16, w, true, z * .09);
+      ctx.fillStyle = '#2b1a12'; ctx.fillRect(x + w * .4, y + h * .4, w * .2, h * .6);
+      ctx.fillStyle = '#d9d0b4'; for (const f of [.15, .75]) ctx.fillRect(x + w * f, y + h * .3, w * .1, h * .22);
+      ctx.fillStyle = '#5a3a1e'; ctx.fillRect(x + w * .86, y - h * .95, 2, h * .8); ctx.fillStyle = col; ctx.fillRect(x + w * .86 + 2, y - h * .95, z * .2, z * .13);
+      if (L > 1) { ctx.fillStyle = col; ctx.fillRect(x + w * .1, y - h * .8, 2, h * .62); ctx.fillRect(x + w * .1 + 2, y - h * .8, z * .16, z * .1); } }
+    // establo (norte, con carreta): techo bajo, valla y heno
+    if (c.cart) { const bx = cx, by = cy - z, w = z * .62, h = z * .36, x = bx - w / 2, y = by - h * .25;
+      bldBox(x, y, w, h, '#8a5a32', '#6b3f22'); ctx.fillStyle = '#2b1a12'; ctx.fillRect(x + w * .38, y + h * .3, w * .24, h * .7);
+      ctx.strokeStyle = '#6b4a2a'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x - z * .1, y + h + z * .08); ctx.lineTo(x + w + z * .1, y + h + z * .08); ctx.moveTo(x - z * .1, y + h + z * .2); ctx.lineTo(x + w + z * .1, y + h + z * .2);
+      for (let i = 0; i < 5; i++) { const fx = x - z * .1 + i * (w + z * .2) / 4; ctx.moveTo(fx, y + h + z * .04); ctx.lineTo(fx, y + h + z * .24); } ctx.stroke();
+      emoji('🐴', x + w + z * .12, y + h * .7, z * .26); emoji('🌾', x - z * .12, y + h * .8, z * .2); }
+    // muralla con almenas y puerta con torreones
+    if (b.muralla) {
+      const L = b.muralla, t = z * (L > 1 ? .13 : .09), g0 = X + 1.5 * z - z * .28, g1 = X + 1.5 * z + z * .28;
+      ctx.fillStyle = L > 1 ? '#b3b9c6' : '#8d93a0'; ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.lineWidth = 1;
+      const seg = (a, bb, w, h) => { ctx.fillRect(a, bb, w, h); ctx.strokeRect(a, bb, w, h); };
+      seg(X, Y, 3 * z, t); seg(X, Y, t, 3 * z); seg(X + 3 * z - t, Y, t, 3 * z); seg(X, Y + 3 * z - t, g0 - X, t); seg(g1, Y + 3 * z - t, X + 3 * z - g1, t);
+      merlons(X, Y, 3 * z, true, t); merlons(X, Y, 3 * z, false, t); merlons(X + 3 * z + t * .9, Y, 3 * z, false, t);
+      merlons(X, Y + 3 * z - t, g0 - X, true, t); merlons(g1, Y + 3 * z - t, X + 3 * z - g1, true, t);
+      ctx.fillStyle = '#5a3a1e'; ctx.fillRect(g0, Y + 3 * z - t * 1.6, z * .1, t * 1.6); ctx.fillRect(g1 - z * .1, Y + 3 * z - t * 1.6, z * .1, t * 1.6); // jambas de la puerta
+      ctx.fillStyle = '#3a2412'; ctx.fillRect(g0 + z * .1, Y + 3 * z - t, g1 - g0 - z * .2, t); // portón
+      if (L > 1) { const q = z * .2; ctx.fillStyle = '#c9cfdb'; for (const [qx, qy] of [[X, Y], [X + 3 * z - q, Y], [X, Y + 3 * z - q], [X + 3 * z - q, Y + 3 * z - q]]) { ctx.fillRect(qx, qy, q, q); ctx.strokeRect(qx, qy, q, q); } }
+    }
+    if (b.atalaya) { drawTower(X + 3 * z - z * .12, Y + z * .12, z, b.atalaya); if (b.atalaya > 1) drawTower(X + z * .12, Y + 3 * z - z * .12, z, b.atalaya); }
+  }
+  // torre del homenaje: crece con las mejoras
+  const ks = z * Math.min(.82, .56 + .04 * tot);
+  if (dark) {
+    const g1 = ctx.createRadialGradient(cx, cy, z * .2, cx, cy, z * 1.6); g1.addColorStop(0, 'rgba(220,30,40,.35)'); g1.addColorStop(1, 'rgba(220,30,40,0)');
+    ctx.fillStyle = g1; ctx.fillRect(X - z * .5, Y - z * .5, 4 * z, 4 * z);
+    ctx.fillStyle = '#0d0710'; ctx.strokeStyle = '#c0222e'; ctx.lineWidth = 1.5;
+    for (const [qx, qy] of [[X + .12 * z, Y + .5 * z], [X + 2.88 * z, Y + .5 * z], [X + .12 * z, Y + 2.9 * z], [X + 2.88 * z, Y + 2.9 * z]]) {
+      ctx.beginPath(); ctx.moveTo(qx - z * .17, qy); ctx.lineTo(qx, qy - z * .55); ctx.lineTo(qx + z * .17, qy); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    emoji('🏰', cx, cy, ks); emoji('🌋', cx, cy + z * .1, ks * .55);
+    if (det) { emoji('🔥', X + .45 * z, Y + 2.6 * z, z * .28); emoji('🔥', X + 2.55 * z, Y + 2.6 * z, z * .28); emoji('😈', cx, cy - z * .5, z * .3); }
+    return;
+  }
+  emoji(c.o === null ? '🏚️' : '🏰', cx, cy, ks);
+  if (det && c.o !== null && c.cap) emoji('👑', cx, cy - z * .42, z * .24);
+}
 function draw() {
   if (!S || S.status === 'lobby') return;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = '#0a0c11'; ctx.fillRect(0, 0, W, H);
   const z = cam.z, ox = W / 2 - cam.x * z, oy = H / 2 - cam.y * z;
   const x0 = Math.max(0, Math.floor((0 - ox) / z)), x1 = Math.min(S.w - 1, Math.floor((W - ox) / z));
   const y0 = Math.max(0, Math.floor((0 - oy) / z)), y1 = Math.min(S.h - 1, Math.floor((H - oy) / z));
+  const bossTiles = y1 >= (S.h0 || S.h) ? S.cre.filter(c => c.boss && c.y >= (S.h0 || S.h)) : null;
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
     const k = y * S.w + x, t = S.terr[k], px = ox + x * z, py = oy + y * z;
-    ctx.fillStyle = TCOL[t] || TCOL['?']; ctx.fillRect(px, py, z + 0.5, z + 0.5);
+    const inDg = y >= (S.h0 || S.h) && t !== '?';
+    if (inDg) drawDgTile(t, k, x, y, px, py, z, bossTiles && bossTiles.some(b => Math.max(Math.abs(b.x - x), Math.abs(b.y - y)) <= 3));
+    else { ctx.fillStyle = TCOL[t] || TCOL['?']; ctx.fillRect(px, py, z + 0.5, z + 0.5); }
     if (t === 'f' && z > 22) { ctx.fillStyle = '#1f4524'; for (const [ax, ay] of [[.3, .35], [.68, .6], [.35, .72]]) { ctx.beginPath(); ctx.moveTo(px + ax * z, py + (ay - .2) * z); ctx.lineTo(px + (ax + .14) * z, py + (ay + .12) * z); ctx.lineTo(px + (ax - .14) * z, py + (ay + .12) * z); ctx.fill(); } }
     else if (t === 'h' && z > 22) { ctx.fillStyle = '#a69663'; ctx.beginPath(); ctx.arc(px + .35 * z, py + .62 * z, z * .2, Math.PI, 0); ctx.arc(px + .68 * z, py + .66 * z, z * .16, Math.PI, 0); ctx.fill(); }
     else if (t === 'm' && z > 22) { ctx.fillStyle = '#8b93a1'; ctx.beginPath(); ctx.moveTo(px + .5 * z, py + .15 * z); ctx.lineTo(px + .9 * z, py + .85 * z); ctx.lineTo(px + .1 * z, py + .85 * z); ctx.fill(); ctx.fillStyle = '#e9edf3'; ctx.beginPath(); ctx.moveTo(px + .5 * z, py + .15 * z); ctx.lineTo(px + .62 * z, py + .38 * z); ctx.lineTo(px + .38 * z, py + .38 * z); ctx.fill(); }
     else if (t === 'w' && z > 22) { ctx.strokeStyle = '#4a86bb55'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(px + .2 * z, py + .4 * z); ctx.quadraticCurveTo(px + .35 * z, py + .3 * z, px + .5 * z, py + .4 * z); ctx.quadraticCurveTo(px + .65 * z, py + .5 * z, px + .8 * z, py + .4 * z); ctx.stroke(); }
     if (z > 28 && t !== '?') { ctx.strokeStyle = 'rgba(0,0,0,.12)'; ctx.lineWidth = 1; ctx.strokeRect(px + .5, py + .5, z - 1, z - 1); }
-    if (t !== '?' && S.vis[k] === '0') { ctx.fillStyle = 'rgba(5,7,12,.5)'; ctx.fillRect(px, py, z + 0.5, z + 0.5); }
+    if (t !== '?' && S.vis[k] === '0') { ctx.fillStyle = inDg ? 'rgba(2,2,6,.72)' : 'rgba(5,7,12,.5)'; ctx.fillRect(px, py, z + 0.5, z + 0.5); }
   }
   const u = selUnit();
   if (reachMap && u) {
     for (const [k, v] of reachMap) { if (!v.end) continue; const x = k % S.w, y = Math.floor(k / S.w); if (x < x0 - 1 || x > x1 + 1 || y < y0 - 1 || y > y1 + 1) continue; ctx.fillStyle = 'rgba(75,141,255,.38)'; ctx.fillRect(ox + x * z + 1, oy + y * z + 1, z - 2, z - 2); }
   }
-  // ciudades
+  // ciudades (solar de 3×3 con sus edificios)
   for (const c of S.cities) {
-    if (c.x < x0 - 1 || c.x > x1 + 1 || c.y < y0 - 1 || c.y > y1 + 1) continue;
-    const cx = ox + (c.x + .5) * z, cy = oy + (c.y + .5) * z;
-    ctx.fillStyle = c.o === null ? '#00000055' : S.players[c.o].color + '99'; ctx.fillRect(ox + c.x * z + 2, oy + c.y * z + 2, z - 4, z - 4);
-    ctx.strokeStyle = c.o === null ? '#bbb' : S.players[c.o].color; ctx.lineWidth = 2; ctx.strokeRect(ox + c.x * z + 2, oy + c.y * z + 2, z - 4, z - 4);
-    emoji(c.o === null ? '🏚️' : '🏰', cx, cy, z * .62);
+    if (c.x < x0 - 2 || c.x > x1 + 2 || c.y < y0 - 2 || c.y > y1 + 2) continue;
+    drawCity(c, ox, oy, z);
   }
   // sitios (cofres y ruinas)
   for (const q of S.sites || []) {
     if (q.x < x0 - 1 || q.x > x1 + 1 || q.y < y0 - 1 || q.y > y1 + 1) continue;
     const cx = ox + (q.x + .5) * z, cy = oy + (q.y + .5) * z;
-    ctx.fillStyle = '#e6b45033'; ctx.beginPath(); ctx.arc(cx, cy, z * .4, 0, 7); ctx.fill();
-    emoji(SH.SITES[q.k].e, cx, cy, z * .6);
+    if (q.k === 'tesoro') { const g1 = ctx.createRadialGradient(cx, cy, 1, cx, cy, z * .75); g1.addColorStop(0, 'rgba(255,215,90,.75)'); g1.addColorStop(1, 'rgba(255,215,90,0)'); ctx.fillStyle = g1; ctx.fillRect(cx - z, cy - z, 2 * z, 2 * z); emoji('💎', cx, cy, z * .72); }
+    else if (q.k === 'trampa') { ctx.fillStyle = 'rgba(210,30,40,.35)'; ctx.beginPath(); ctx.arc(cx, cy, z * .42, 0, 7); ctx.fill(); ctx.strokeStyle = '#ff4d52'; ctx.lineWidth = 2; ctx.stroke(); emoji('⚠️', cx, cy, z * .6); }
+    else { ctx.fillStyle = '#e6b45033'; ctx.beginPath(); ctx.arc(cx, cy, z * .4, 0, 7); ctx.fill(); emoji(SH.SITES[q.k].e, cx, cy, z * .6); }
   }
+  // mazmorras: entradas en el mapa y puerta de salida
+  { const DTC = ['#5fd36b', '#5aa7ff', '#b07cff', '#ff9d3c', '#ff5252'];
+    for (const d of S.dungeons || []) {
+      if (d.x >= 0 && d.x >= x0 - 1 && d.x <= x1 + 1 && d.y >= y0 - 1 && d.y <= y1 + 1) { const cx = ox + (d.x + .5) * z, cy = oy + (d.y + .5) * z;
+        ctx.fillStyle = '#000a'; ctx.beginPath(); ctx.arc(cx, cy, z * .46, 0, 7); ctx.fill(); ctx.strokeStyle = DTC[d.tier - 1]; ctx.lineWidth = 2.5; ctx.stroke();
+        emoji('🕳️', cx, cy, z * .6); if (z >= 18) { ctx.fillStyle = DTC[d.tier - 1]; ctx.font = 'bold ' + Math.round(z * .3) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(d.cleared ? '✓' : d.tier, cx + z * .36, cy - z * .3); } }
+      if (d.inside && d.exit.x >= x0 - 1 && d.exit.x <= x1 + 1 && d.exit.y >= y0 - 1 && d.exit.y <= y1 + 1) { const cx = ox + (d.exit.x + .5) * z, cy = oy + (d.exit.y + .5) * z; ctx.fillStyle = '#e6b45055'; ctx.beginPath(); ctx.arc(cx, cy, z * .45, 0, 7); ctx.fill(); emoji('🚪', cx, cy, z * .65); }
+    } }
+  // arena del torneo y mercaderes
+  if (S.tourn && S.tourn.x >= x0 - 1 && S.tourn.x <= x1 + 1 && S.tourn.y >= y0 - 1 && S.tourn.y <= y1 + 1) { const cx = ox + (S.tourn.x + .5) * z, cy = oy + (S.tourn.y + .5) * z; ctx.fillStyle = '#c9a0ff44'; ctx.beginPath(); ctx.arc(cx, cy, z * 1.45, 0, 7); ctx.fill(); emoji('🏟️', cx, cy, z * .8); }
+  for (const q of S.merch || []) { if (q.x < x0 - 1 || q.x > x1 + 1 || q.y < y0 - 1 || q.y > y1 + 1) continue; const cx = ox + (q.x + .5) * z, cy = oy + (q.y + .5) * z; ctx.fillStyle = '#6bd6ff33'; ctx.beginPath(); ctx.arc(cx, cy, z * .45, 0, 7); ctx.fill(); emoji('🛒', cx, cy, z * .65); }
   // criaturas
   for (const c of S.cre) {
     if (c.x < x0 - 1 || c.x > x1 + 1 || c.y < y0 - 1 || c.y > y1 + 1) continue;
@@ -791,9 +1122,21 @@ function draw() {
     if (atkSet.has('c' + c.id)) { ctx.strokeStyle = '#ff4d52'; ctx.lineWidth = 3; ctx.strokeRect(ox + c.x * z + 2, oy + c.y * z + 2, z - 4, z - 4); }
   }
   // otras unidades y las propias
+  const badges = new Map(), cityOfTile = (x, y) => S.cities.find(c => Math.abs(c.x - x) <= 1 && Math.abs(c.y - y) <= 1);
   const drawUnit = (m, own) => {
     if (m.x < x0 - 1 || m.x > x1 + 1 || m.y < y0 - 1 || m.y > y1 + 1) return;
     const cx = ox + (m.x + .5) * z, cy = oy + (m.y + .5) * z, col = S.players[m.o].color;
+    const hc = z >= 20 && cityOfTile(m.x, m.y);
+    if (hc) { // dentro de una ciudad: ficha pequeña en la esquina de su casilla, y un solo contador en el borde del solar
+      const tx = cx + z * .2, ty = cy + z * .22, sel = own && u && u.id === m.id, w2 = own ? (m.eq.arma && m.eq.arma.k) : m.w;
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(tx, ty, z * .17, 0, 7); ctx.fill(); ctx.strokeStyle = sel ? '#fff' : '#000a'; ctx.lineWidth = sel ? 2.5 : 1.5; ctx.stroke();
+      emoji((m.cart || m.ct) ? SH.CART.e : m.sm ? SH.CREATURES[m.sm].e : m.bs ? SH.CREATURES[m.bs].e : (w2 ? WEAPON_E[w2] : '✊'), tx, ty, z * .22);
+      if (own && (m.mp > 0 || m.at > 0) && S.status === 'playing') { ctx.fillStyle = '#3fbf7f'; ctx.beginPath(); ctx.arc(tx - z * .15, ty - z * .15, z * .05, 0, 7); ctx.fill(); }
+      if (own && (m.pts > 0 || classAvail(m))) emoji('⭐', tx + z * .12, ty - z * .15, z * .16);
+      const bk = hc.id + ':' + m.o; badges.set(bk, (badges.get(bk) || { c: hc, col, n: 0 })); badges.get(bk).n++;
+      if (!own && atkSet.has('u' + m.id)) { ctx.strokeStyle = '#ff4d52'; ctx.lineWidth = 3; ctx.strokeRect(ox + m.x * z + 2, oy + m.y * z + 2, z - 4, z - 4); }
+      return;
+    }
     ctx.fillStyle = col; ctx.beginPath(); ctx.arc(cx, cy, z * .36, 0, 7); ctx.fill();
     ctx.strokeStyle = own && u && u.id === m.id ? '#fff' : '#000a'; ctx.lineWidth = own && u && u.id === m.id ? 3 : 2; ctx.stroke();
     const w = own ? (m.eq.arma && m.eq.arma.k) : m.w;
@@ -814,18 +1157,26 @@ function draw() {
     ctx.strokeStyle = '#e6b450cc'; ctx.lineWidth = 2; ctx.setLineDash([6, 5]); ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke(); ctx.setLineDash([]);
     emoji('📍', bx, by - z * .1, z * .5);
   }
+  for (const m of S.mine) if (m.dg && m.y >= (S.h0 || S.h)) { const lx = ox + (m.x + .5) * z, ly = oy + (m.y + .5) * z, g1 = ctx.createRadialGradient(lx, ly, z * .3, lx, ly, z * 3.2); g1.addColorStop(0, 'rgba(255,190,110,.22)'); g1.addColorStop(1, 'rgba(255,190,110,0)'); ctx.fillStyle = g1; ctx.fillRect(lx - z * 3.2, ly - z * 3.2, z * 6.4, z * 6.4); }
   for (const m of S.mine) drawUnit(m, true);
+  { const perCity = new Map(); // contadores de unidades por ciudad y dueño, sobre el borde del solar
+    for (const bd of badges.values()) { const i = perCity.get(bd.c.id) || 0; perCity.set(bd.c.id, i + 1);
+      const bw = z * .62, bh = z * .3, bx = ox + (bd.c.x + 2) * z - bw - 2 - i * (bw + 3), by = oy + (bd.c.y - 1) * z - bh * .55;
+      ctx.fillStyle = bd.col; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(bx, by, bw, bh, bh / 2) : ctx.rect(bx, by, bw, bh); ctx.fill(); ctx.strokeStyle = '#000b'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.font = 'bold ' + Math.floor(bh * .75) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 2.5;
+      const tx = '⚔ ' + bd.n; ctx.strokeText(tx, bx + bw / 2, by + bh / 2 + 1); ctx.fillText(tx, bx + bw / 2, by + bh / 2 + 1); } }
   ctx.textAlign = 'start';
   drawMini();
 }
 
 /* ---------- minimapa y navegación ---------- */
 const mm = $('mm'), mctx = mm.getContext('2d');
-let mmBase = null, mmKey = '';
+let mmBase = null, mmKey = '', mmS = null, mmSig = '';
 function drawMini() {
   const n = S.w, sz = 104, sc = sz / n, mdpr = Math.min(2, window.devicePixelRatio || 1);
   if (mm.width !== sz * mdpr) { mm.width = sz * mdpr; mm.height = sz * mdpr; mmKey = ''; }
-  const key = S.turn + ':' + S.terr.length + ':' + S.vis.length + ':' + (S.terr.split('?').length) + ':' + (S.vis.split('1').length);
+  if (mmS !== S) { mmS = S; mmSig = S.turn + ':' + S.terr.length + ':' + S.vis.length + ':' + (S.terr.split('?').length) + ':' + (S.vis.split('1').length); } // se calcula solo cuando llega un estado nuevo (mapas grandes)
+  const key = mmSig;
   if (key !== mmKey || !mmBase) {
     mmKey = key; mmBase = document.createElement('canvas'); mmBase.width = mm.width; mmBase.height = mm.height;
     const b = mmBase.getContext('2d'); b.scale(mdpr, mdpr); b.fillStyle = '#05070b'; b.fillRect(0, 0, sz, sz);
@@ -884,6 +1235,8 @@ function chatOnState(prev) {
   }
   chatFirst = false; chatBadge();
 }
+$('nStory').onclick = () => { openSheet('story'); };
+$('nSum').onclick = () => { openSheet('summary'); };
 $('nChat').onclick = () => { openSheet('chat'); chatMark(); chatBadge(); };
 $('sheet').addEventListener('keydown', e => { if (e.target && e.target.id === 'chIn' && e.key === 'Enter') { e.preventDefault(); chatSend(); } });
 $('nHome').onclick = () => {

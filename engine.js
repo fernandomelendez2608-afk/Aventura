@@ -2682,7 +2682,7 @@ function snapshot(g, pid, now) {
     const e = g.events[i];
     if (!e.to || e.to.includes(pid)) log.push({ id: e.id, turn: e.turn, text: e.text, k: e.k });
   }
-  return Object.assign(base, { chat: chatFor(g, pid), recap: me ? recapFor(g, me) : null, w, h, terr, vis: vs, mine, others, cre, cities, sites, dip, props, trades, brk, merch, dungeons, wx: wxs, tourn, season: { i: S.seasonIdx(g.turn), left: S.SEASON_LEN - ((g.turn - 1) % S.SEASON_LEN) }, log, craftsMax: CRAFTS_PER_TURN, invCap: INV_CAP, maxUnits: MAX_UNITS });
+  return Object.assign(base, { chat: chatFor(g, pid), recap: me ? recapFor(g, me) : null, w, h, h0: mapH0(g), terr, vis: vs, mine, others, cre, cities, sites, dip, props, trades, brk, merch, dungeons, wx: wxs, tourn, season: { i: S.seasonIdx(g.turn), left: S.SEASON_LEN - ((g.turn - 1) % S.SEASON_LEN) }, log, craftsMax: CRAFTS_PER_TURN, invCap: INV_CAP, maxUnits: MAX_UNITS });
 }
 
 /* ---------- persistencia ---------- */

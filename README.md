@@ -424,3 +424,15 @@ Ajuste «Eventos del mundo»: Clima + torneos + mercaderes (por defecto) / Solo 
 
 ### Fortaleza del Rey Demonio (v1.30.1)
 En el modo «Reto del Rey Demonio», la ciudad del rey se dibuja como fortaleza oscura: suelo carmesí, torres de pinchos, antorchas 🔥, volcán y 😈 sobre el torreón. Los edificios (muralla, herrería, cuartel, atalayas) se siguen viendo.
+
+## Ciudades rediseñadas (v1.31)
+- Las unidades dentro de una ciudad son fichas pequeñas en la esquina de su casilla; un solo contador ⚔ n por dueño aparece en el borde del solar.
+- Edificios con más detalle: herrería con chimenea humeando, cuartel con almenas y bandera, establo con valla y heno, casas con tejado.
+- La ciudad crece con las mejoras: aldea (1 casa) → pueblo → ciudad (4 casas, más casitas, calles y plaza).
+- Muralla con almenas, puerta con portón y torreones en el nivel 2.
+
+## Mazmorras con otra cara (v1.32)
+- Muros de ladrillo con grosor, suelo de losas con grietas, sombra bajo los muros y vacío negro fuera de las salas.
+- Antorchas en las paredes con brillo cálido, y un halo de luz alrededor de tus unidades dentro de la mazmorra.
+- Cinco temas por nivel: cueva, catacumba, cripta, fuego y abismo. La sala del jefe se tiñe de rojo.
+- Tesoros 💎 con brillo dorado y trampas ⚠️ con aro rojo; lo no explorado queda mucho más oscuro.
