@@ -108,7 +108,7 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:0}
 <section id="home" class="screen hidden">
   <div class="wrap">
     <h1 style="margin-top:22px">Aventura de almas</h1>
-    <p class="sub">Estrategia por turnos · hasta 10 jugadores</p>
+    <p class="sub">Estrategia por turnos · hasta 10 jugadores <span id="hVer" class="dim" style="opacity:.7"></span></p>
     <div class="card">
       <h3>Tu nombre</h3>
       <input id="hName" maxlength="14" placeholder="Ej: Fercho" autocomplete="off">
@@ -131,7 +131,7 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:0}
 
 <section id="lobby" class="screen hidden">
   <div class="wrap">
-    <h1 style="margin-top:10px">Sala de espera</h1>
+    <h1 style="margin-top:10px">Sala de espera <small id="lVer" class="dim" style="font-size:12px;opacity:.7"></small></h1>
     <p class="sub">Comparte este código con tus amigos</p>
     <div class="code" id="lCode">-----</div>
     <div class="row" style="margin-bottom:6px"><button class="btn sm" id="lCopy">Copiar código</button><button class="btn sm" id="lShare">Compartir</button></div>
@@ -181,7 +181,7 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:0}
 
 <section id="game" class="screen hidden">
   <div id="top"><span><button class="menub" id="gMenu" title="Menú principal">☰</button><span class="conn" id="gConn"></span><b id="gTurn">Turno 1</b></span><span class="mid" id="gTimer">--:--:--</span><span id="gReady" class="dim">0/0</span></div>
-  <div id="cvwrap"><canvas id="cv"></canvas><canvas id="mm" width="104" height="104"></canvas><div id="nav"><button id="nHome" title="Ir a mi ciudad">🏠</button><button id="nStory" class="hidden" title="Historia">📖</button><button id="nSum" class="hidden" title="Resumen de la partida">📊</button><button id="nHelp" title="Cómo se juega">❓</button><button id="nChat" title="Chat">💬<small id="chCnt" class="hidden">0</small></button><button id="nNext" title="Siguiente unidad con acciones">🛡️<small id="nCnt">0</small></button></div><div id="toast"></div><div id="pushBar" class="hidden"></div></div>
+  <div id="cvwrap"><canvas id="cv"></canvas><canvas id="mm" width="104" height="104"></canvas><div id="nav"><button id="nHome" title="Ir a mi ciudad">🏠</button><button id="nStory" class="hidden" title="Historia">📖</button><button id="nWorld" class="hidden" title="Mundo: gremio, ranking y jefe mundial">🌍<small id="wCnt" class="hidden">0</small></button><button id="nHist" class="hidden" title="Historial por turnos">📈</button><button id="nSum" class="hidden" title="Resumen de la partida">📊</button><button id="nSnd" title="Sonido">🔊</button><button id="nHelp" title="Cómo se juega">❓</button><button id="nMan" title="Manual y avisos">📚</button><button id="nChat" title="Chat">💬<small id="chCnt" class="hidden">0</small></button><button id="nNext" title="Siguiente unidad con acciones">🛡️<small id="nCnt">0</small></button></div><div id="toast"></div><div id="pushBar" class="hidden"></div></div>
   <div id="tut" class="hidden"></div>
   <div id="sheet" class="hidden"></div>
   <div id="bar">
@@ -204,7 +204,7 @@ const jattr = o => esc(JSON.stringify(o));
 let ws = null, wsOpen = false, retry = 0, cur = null, S = null, skew = 0, vapidKey = null, lastSeenTurn = -1, pendingJoin = null;
 let selId = null, sheet = null, forge = { k: 'espada', tr: 1 };
 let reachMap = null, atkSet = new Set(), lastLog = 0, firstState = true;
-let maps = { mine: new Map(), cre: new Map(), oth: new Map(), city: new Map() };
+let maps = { mine: new Map(), cre: new Map(), oth: new Map(), city: new Map(), road: new Map() };
 const cam = { x: 10, y: 10, z: 44 };
 let saved = [], resumed = false, gInfo = {}, gSkew = 0;
 try { saved = JSON.parse(localStorage.getItem('ada_games') || '[]'); } catch (e) { saved = []; }
@@ -357,21 +357,70 @@ $('lShare').onclick = async () => {
   try { if (navigator.share) await navigator.share({ title: 'Aventura de almas', text }); else { await navigator.clipboard.writeText(text); toast('Invitación copiada'); } } catch (e) {}
 };
 
+
+/* ---------- efectos y sonido de combate ---------- */
+let fx = [], fxPrev = null, audio = null, sndOn = (() => { try { return localStorage.getItem('ada_snd') !== '0'; } catch (e) { return true; } })();
+function sfx(n) {
+  if (!sndOn) return;
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === 'suspended') audio.resume();
+    const t = audio.currentTime, tone = (f, d, type, v, t0, f2) => { const o = audio.createOscillator(), g = audio.createGain(); o.type = type; o.frequency.setValueAtTime(f, t + (t0 || 0)); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + (t0 || 0) + d); g.gain.setValueAtTime(v, t + (t0 || 0)); g.gain.exponentialRampToValueAtTime(0.0001, t + (t0 || 0) + d); o.connect(g); g.connect(audio.destination); o.start(t + (t0 || 0)); o.stop(t + (t0 || 0) + d + 0.03); };
+    if (n === 'hit') tone(190, .12, 'square', .09, 0, 70); else if (n === 'hurt') tone(130, .18, 'sawtooth', .09, 0, 55);
+    else if (n === 'death') tone(320, .4, 'sawtooth', .1, 0, 40); else if (n === 'lvl') [523, 659, 784, 1047].forEach((f, i) => tone(f, .18, 'triangle', .1, i * .08));
+    else if (n === 'turn') { tone(660, .12, 'sine', .07, 0); tone(880, .16, 'sine', .07, .1); } else if (n === 'dg') tone(200, .3, 'triangle', .1, 0, 90);
+  } catch (e) {}
+}
+addEventListener('pointerdown', () => { try { if (sndOn) { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === 'suspended') audio.resume(); } } catch (e) {} });
+function fxDiff() {
+  const cur = new Map(), add = (arr, k) => { for (const m of arr || []) cur.set(k + m.id, { x: m.x, y: m.y, hp: m.hp, lv: m.lv, k, dg: m.dg || 0 }); };
+  add(S.mine, 'u'); add(S.others, 'o'); add(S.cre, 'c');
+  const prev = fxPrev; fxPrev = cur;
+  const turnUp = window._fxTurn !== undefined && S.turn > window._fxTurn; window._fxTurn = S.turn;
+  if (!prev || window._fxCode !== S.code) { window._fxCode = S.code; return; }
+  if (document.hidden) return;
+  const now = performance.now(), snd = {}; let n = 0; const push = (x, y, t, col, big) => { if (n++ < 16) fx.push({ x, y, t, col, big, t0: now }); };
+  for (const [id, c] of cur) {
+    const p = prev.get(id); if (!p) continue;
+    if (c.hp < p.hp) { push(c.x, c.y, '−' + Math.round(p.hp - c.hp), '#ff5a5f'); if (c.k === 'u') snd.hurt = 1; else snd.hit = 1; }
+    else if (c.hp - p.hp >= 4 && c.k !== 'c') push(c.x, c.y, '+' + Math.round(c.hp - p.hp), '#5fe08a');
+    if (c.k === 'u' && c.lv > p.lv) { push(c.x, c.y, '⬆ Nv.' + c.lv, '#ffd34d', true); snd.lvl = 1; }
+    if (c.k === 'u' && c.dg && !p.dg) snd.dg = 1;
+  }
+  for (const [id, p] of prev) if (!cur.has(id) && S.vis[p.y * S.w + p.x] === '2') { push(p.x, p.y, '✖', '#e8e8f0', true); snd.death = 1; }
+  for (const k of ['death', 'lvl', 'hurt', 'hit', 'dg']) if (snd[k]) { sfx(k); break; }
+  if (turnUp && !snd.death) setTimeout(() => sfx('turn'), 350);
+  if (fx.length) dirty = true;
+}
+function drawFx(ox, oy, z) {
+  if (!fx.length) return; const now = performance.now(); fx = fx.filter(f => now - f.t0 < 1200);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const f of fx) {
+    const a = (now - f.t0) / 1200, x = ox + (f.x + .5) * z, y = oy + (f.y + .35) * z - a * z * (f.big ? 1.1 : .8);
+    ctx.globalAlpha = Math.max(0, 1 - a * a); ctx.font = 'bold ' + Math.round(z * (f.big ? .42 : .38)) + 'px sans-serif'; ctx.lineWidth = 3; ctx.strokeStyle = '#000'; ctx.strokeText(f.t, x, y); ctx.fillStyle = f.col; ctx.fillText(f.t, x, y);
+    if (a < .3) { ctx.globalAlpha = .5 * (1 - a / .3); ctx.fillStyle = f.col; const q = Math.max(2, Math.round(z * .09)), r = z * (.2 + a * 1.1); for (let i = 0; i < 8; i++) { const an = i * Math.PI / 4 + .4; ctx.fillRect(Math.round(ox + (f.x + .5) * z + Math.cos(an) * r - q / 2), Math.round(oy + (f.y + .5) * z + Math.sin(an) * r - q / 2), q, q); } }
+  }
+  ctx.globalAlpha = 1; ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+}
+
 /* ---------- estado del juego ---------- */
 let chatPrev = 0;
 function onState() {
   if (!S) return;
+  if (S.status === 'playing' || S.status === 'over') try { fxDiff(); } catch (e) { console.error(e); }
   if (S.status === 'lobby') { show('lobby'); renderLobby(); return; }
   const wasHidden = $('game').classList.contains('hidden');
   show('game');
   { const dm = {}; for (const u of S.mine) dm[u.id] = u.dg || 0; const pv = window._dgMap || {}; for (const id in dm) if (id in pv && pv[id] !== dm[id]) { const u = S.mine.find(x => x.id == id); if (u) { selId = u.id; centerOn(u.x, u.y); } } window._dgMap = dm; }
   $('nStory').classList.toggle('hidden', !S.story);
+  $('nHist').classList.toggle('hidden', !(S.hist && S.status !== 'lobby'));
+  { const wd = S.cfg && S.cfg.mode === 'mundo' && S.status === 'playing'; $('nWorld').classList.toggle('hidden', !wd); const wc = $('wCnt'); if (wd) { const n = (S.ginv ? S.ginv.length : 0) + (S.wb && S.wb.id ? 1 : 0); wc.textContent = S.prot ? '🛡️' : n; wc.classList.toggle('hidden', !(S.prot || n)); } }
   $('nSum').classList.toggle('hidden', !(S.status === 'over' && S.sum));
   if (S.status === 'over' && S.sum && window._sumShown !== S.code) { window._sumShown = S.code; openSheet('summary'); }
   if (S.status === 'playing' && !window._tutAsked) { window._tutAsked = true; if (!tutSeen()) tutOpen(); }
   { const sg = S.story ? S.story.ch + ':' + S.story.done.length : null; if (sg !== window._storySig) { const first = window._storySig === undefined; window._storySig = sg; if (S.story && sheet == null && S.status === 'playing' && (!first || S.turn <= 1)) openSheet('story'); } }
   const prevChat = chatPrev; chatPrev = S.chat && S.chat.length ? S.chat[S.chat.length - 1].id : 0;
-  maps = { mine: new Map(), cre: new Map(), oth: new Map(), city: new Map() };
+  maps = { mine: new Map(), cre: new Map(), oth: new Map(), city: new Map(), road: new Map() };
+  for (const r of S.roads || []) maps.road.set(r[0], r[1]);
   for (const u of S.mine) maps.mine.set(u.y * S.w + u.x, u);
   for (const c of S.cre) maps.cre.set(c.y * S.w + c.x, c);
   for (const o of S.others) maps.oth.set(o.y * S.w + o.x, o);
@@ -400,7 +449,7 @@ function onState() {
 }
 const classAvail = u => !u.sm && !u.bs && ((!u.cls && u.lv >= SH.CLASS_LV) || (u.cls && !u.sub && u.lv >= SH.SUB_LV));
 const clsTag = u => u.cls ? SH.CLASSES[u.cls].e + (u.sub ? SH.CLASSES[u.cls].sub[u.sub].e : '') : '';
-const bldHtml = b => SH.BUILD_ORDER.filter(k => b && b[k]).map(k => `<span class="chip">${SH.BUILDINGS[k].e}${b[k] > 1 ? ' ' + 'II' : ''}</span>`).join('');
+const bldHtml = b => SH.BUILD_ORDER.filter(k => b && b[k]).map(k => `<span class="chip">${SH.BUILDINGS[k].e}${b[k] > 1 ? ' ' + b[k] : ''}</span>`).join('');
 let gotoMode = null, recapKey = null, lastTurnClient = null;
 const ORD_E = { goto: '📍', home: '🏠', guard: '🛡️' };
 const pactWith = o => (S && S.dip && S.dip[o]) || null;
@@ -411,7 +460,7 @@ function computeReach() {
   reachMap = null; atkSet = new Set();
   const u = selUnit(); if (!u) return;
   const env = {
-    w: S.w, h: S.h, terr: (x, y) => S.terr[y * S.w + x],
+    w: S.w, h: S.h, terr: (x, y) => S.terr[y * S.w + x], road: (x, y) => maps.road.has(y * S.w + x),
     occ: (x, y) => {
       const k = y * S.w + x; if (maps.cre.has(k)) return 2;
       const ct = maps.city.get(k); if (ct && ct.o !== null && ct.o !== S.you && pactWith(ct.o)) return 2;
@@ -462,7 +511,7 @@ function openSheet(mode, extra) { ackRecap(); gotoMode = null; sheet = Object.as
 function closeSheet() { ackRecap(); gotoMode = null; sheet = null; selId = null; computeReach(); renderSheet(); resize(); dirty = true; }
 $('bar').addEventListener('click', e => { const b = e.target.closest('[data-ui]'); if (!b) return; const m = b.dataset.ui; selId = null; computeReach(); if (sheet && sheet.mode === m) { sheet = null; renderSheet(); resize(); dirty = true; } else openSheet(m); dirty = true; });
 const matsHtml = m => { const ks = SH.MAT_ORDER.filter(k => m[k] > 0); return ks.length ? ks.map(k => `<span class="chip">${SH.MATS[k].e} ${m[k]} <span class="dim">${SH.MATS[k].n}</span></span>`).join('') : '<span class="dim">vacío</span>'; };
-const itemHtml = it => { const K = SH.KINDS[it.k]; return `${K.e} <b class="r${it.r || 0}">${SH.itemName(it)}</b> <span class="dim">(${K.w ? 'daño' : 'def'} ${SH.itemValue(it)})</span>` + (it.fx && it.fx.length ? it.fx.map(f => `<span class="fxl">${SH.affixText(f, it.r)}</span>`).join('') : '') + (it.so ? Array.from({ length: it.so }, (_, i) => it.gm && it.gm[i] ? `<span class="fxl">${SH.gemText(it.gm[i], !!K.w)}</span>` : `<span class="fxl dim">◇ Engarce vacío</span>`).join('') : ''); };
+const itemHtml = it => { const K = SH.KINDS[it.k]; return `${K.e} <b class="r${it.r || 0}">${SH.itemName(it)}</b> <span class="dim">(${K.pack ? '+' + SH.PACK[it.t] + ' espacios' : (K.w ? 'daño' : 'def') + ' ' + SH.itemValue(it)})</span>` + (it.fx && it.fx.length ? it.fx.map(f => `<span class="fxl">${SH.affixText(f, it.r)}</span>`).join('') : '') + (it.so ? Array.from({ length: it.so }, (_, i) => it.gm && it.gm[i] ? `<span class="fxl">${SH.gemText(it.gm[i], !!K.w)}</span>` : `<span class="fxl dim">◇ Engarce vacío</span>`).join('') : ''); };
 const pct = (a, b) => Math.max(0, Math.min(100, Math.round(a / b * 100)));
 const bar = (cls, a, b) => `<div class="bar ${cls}"><i style="width:${pct(a, b)}%"></i></div>`;
 
@@ -483,9 +532,12 @@ function renderSheet() {
     case 'summary': html += summarySheet(); break;
     case 'cities': html += hd('Tus ciudades') + (S.cities.filter(c => c.o === S.you).map(c => `<div class="line" data-ui="city:${c.id}"><div class="g"><b>${esc(c.name)}</b> ${bldHtml(c.b)}<div>${matsHtml(c.st.m)}</div></div><span class="dim">${c.st.it.length} 🎒</span></div>`).join('') || '<p class="dim">No controlas ciudades.</p>'); break;
     case 'city': html += citySheet(); break;
-    case 'log': html += hd('Registro') + (S.log.map(l => `<div class="line"><span class="dim fix" style="min-width:38px">T${l.turn}</span><div class="g">${esc(l.text)}</div></div>`).join('') || '<p class="dim">Sin novedades.</p>'); break;
+    case 'log': html += logSheet(); break;
+    case 'manual': html += manualSheet(); break;
     case 'chat': html += chatSheet(); break;
     case 'players': html += playersSheet(); break;
+    case 'hist': html += histSheet(); break;
+    case 'world': html += worldSheet(); break;
     case 'trade': html += sheet.tr ? tradeSheet() : ''; break;
     case 'info': html += infoSheet(); break;
   }
@@ -511,7 +563,7 @@ function recapSheet() {
 }
 function unitSheet(u) {
   if (u.sm) sheet.tab = 'state';
-  const e = u.e, tabs = u.sm ? [['state', 'Estado']] : u.bs ? [['state', 'Estado'], ['skills', 'Habilidades' + (u.pts ? ' ⭐' + u.pts : '')], ['bag', 'Mochila']] : u.cart ? [['state', 'Estado'], ['bag', 'Carga']] : [['state', 'Estado'], ['skills', 'Habilidades' + (u.pts ? ' ⭐' + u.pts : '')], ['class', 'Clase' + (classAvail(u) ? ' ⭐' : '')], ['gear', 'Equipo'], ['bag', 'Mochila']];
+  const e = u.e, tabs = u.sm ? [['state', 'Estado']] : u.bs ? [['state', 'Estado'], ['skills', 'Habilidades' + (u.pts ? ' ⭐' + u.pts : '')], ['bag', 'Mochila']] : u.bld || u.sg ? [['state', 'Estado']] : u.cart ? [['state', 'Estado'], ['bag', 'Carga']] : [['state', 'Estado'], ['skills', 'Habilidades' + (u.pts ? ' ⭐' + u.pts : '')], ['class', 'Clase' + (classAvail(u) ? ' ⭐' : '')], ['gear', 'Equipo'], ['bag', 'Mochila']];
   let h = `<div class="hd"><span class="sw" style="background:${S.players[S.you].color}"></span><b>${esc(u.name)} <span class="dim">niv. ${u.lv}</span> ${clsTag(u)}</b><button class="btn sm fix" data-ui="rename" title="Cambiar nombre" style="margin-left:auto">✏️</button><button class="x" data-ui="close">✕</button></div>`;
   h += `<div class="tabs">${tabs.map(t => `<button class="tab ${sheet.tab === t[0] ? 'on' : ''}" data-ui="tab:${t[0]}">${t[1]}</button>`).join('')}</div>`;
   if (sheet.tab === 'state') {
@@ -520,9 +572,10 @@ function unitSheet(u) {
     h += `<div style="display:flex;justify-content:space-between;margin-top:8px"><span>✨ Experiencia</span><span>${u.xp}/${u.xpn}</span></div>${bar('xp', u.xp, u.xpn)}`;
     h += `<div class="grid" style="margin-top:10px">
       <div class="stat"><small>Daño</small>${e.dmg}${e.attacks > 1 ? ' ×2' : ''}</div><div class="stat"><small>Defensa</small>${e.def}</div>
-      <div class="stat"><small>Alcance</small>${e.min === e.range ? e.range : e.min + '–' + e.range}</div><div class="stat"><small>Movimiento</small>${u.mp}/${e.mov}</div>
+      <div class="stat"><small>Alcance</small>${e.min === e.range ? e.range : e.min + '–' + e.range}</div><div class="stat"><small>Movimiento</small>${Math.round(u.mp * 10) / 10}/${e.mov}</div>
       <div class="stat"><small>Ataques</small>${u.at}/${e.attacks}</div><div class="stat"><small>Arma</small>${w ? SH.KINDS[w.k].e + ' ' + SH.itemName(w) : u.bs ? '🐾 Garras' : '✊ Puños'}</div></div>`;
     h += dgUnitHtml(u);
+    if (S.cfg && S.cfg.mode === 'mundo' && !u.dg) { const R = SH.WORLD.regions[regionAt(u.x, u.y)]; h += `<p class="hint">${R.e} <b>${R.n}</b>: monstruos hasta ~${Math.round(R.lv * 100)}% de su nivel máximo y botín ×${R.loot}.</p>`; }
     if (u.bs) h += `<p class="hint ok">${SH.CREATURES[u.bs].e} Bestia del Rey Demonio: su fuerza viene de su especie y su nivel; no usa equipo ni clases, pero sí gasta puntos de habilidad y carga botín.</p>`;
     if (S.cfg && S.cfg.hero !== 'no' && !u.sm && !u.bs) {
       if (u.hr) h += `<p class="hint ok">${u.hr} <b>Protagonista</b>: +50% de experiencia y +${Math.round(SH.HERO.aura * 100)}% de daño y defensa a tus unidades a ${SH.HERO.range} casillas. Si cae, vuelve a tu ciudad en ${SH.HERO.wait} turnos con ${SH.HERO.loss} niveles menos.</p>`;
@@ -530,7 +583,21 @@ function unitSheet(u) {
     }
     if (u.bs && u.hr) h += `<p class="hint ok">${u.hr} <b>Protagonista del Rey Demonio</b>: +50% de experiencia y +${Math.round(SH.HERO.aura * 100)}% de daño y defensa a tus bestias a ${SH.HERO.range} casillas. Si cae, vuelve a tu ciudad en ${SH.HERO.wait} turnos con ${SH.HERO.loss} niveles menos.</p>`;
     if (u.e && u.e.ha) h += `<p class="hint ok">👑 Cerca de tu protagonista: +${Math.round(u.e.ha * 100)}% de daño y defensa.</p>`;
-    if (u.cart) h += `<p class="hint ok">🛒 Carreta: almacén móvil (${u.cap} de capacidad, movilidad ${u.e.mov}). No ataca ni sube de nivel. Llévala a una ciudad para cargar o descargar; si la matan, el enemigo se queda con parte de la carga.</p>`;
+    if (u.bld) {
+      const hc = S.cities.find(c => c.id === u.bld.c), L = hc && hc.b ? hc.b.taller || 0 : 0, rd = S.roads.find(r => r[0] === u.y * S.w + u.x), here = rd ? rd[1] : 0;
+      const can = (cost) => hc && hc.st && SH.MAT_ORDER.every(m => !cost[m] || (hc.st.m[m] || 0) >= cost[m]);
+      const costH = cost => SH.MAT_ORDER.filter(m => cost[m]).map(m => `<span class="chip ${hc && hc.st && (hc.st.m[m] || 0) >= cost[m] ? 'ok' : 'lack'}">${SH.MATS[m].e} ${hc && hc.st ? hc.st.m[m] || 0 : 0}/${cost[m]}</span>`).join('');
+      h += `<p class="hint ok">👷 Constructor de <b>${hc ? esc(hc.name) : '—'}</b> (taller nivel ${L}). Traza <b>carreteras</b> (cada casilla de carretera cuesta solo ${SH.ROAD_COST} de movimiento) ${L >= 2 ? 'y levanta <b>estaciones de suministros</b>' : '(con el taller nivel 2 también estaciones de suministros)'}. Los materiales salen del almacén de su ciudad. No ataca ni sube de nivel; una obra por turno.</p>`;
+      h += `<div class="line" style="flex-wrap:wrap"><div class="g" style="flex-basis:100%"><b>🛤️ Carretera</b> en esta casilla${here ? ' <span class="ok">(ya hay ' + (here === 2 ? 'una estación' : 'carretera') + ')</span>' : ''}</div><div>${costH(SH.BUILDER.road)}</div><button class="btn sm ${!here && !u.bld.bt && can(SH.BUILDER.road) ? 'gold' : ''}" ${!here && !u.bld.bt && can(SH.BUILDER.road) ? '' : 'disabled'} data-c='${jattr({ a: 'road', u: u.id })}'>Trazar</button></div>`;
+      if (L >= 2) h += `<div class="line" style="flex-wrap:wrap"><div class="g" style="flex-basis:100%"><b>📦 Estación de suministros</b> <span class="hint">sobre una carretera a ${SH.BUILDER.near} casillas o menos de una ciudad tuya. Las ciudades con estación comparten el inventario.</span></div><div>${costH(SH.BUILDER.station)}</div><button class="btn sm ${here === 1 && !u.bld.bt && can(SH.BUILDER.station) ? 'gold' : ''}" ${here === 1 && !u.bld.bt && can(SH.BUILDER.station) ? '' : 'disabled'} data-c='${jattr({ a: 'station', u: u.id })}'>Levantar</button></div>`;
+      if (u.bld.bt) h += '<p class="hint">Ya construiste algo este turno.</p>';
+    }
+    if (u.sg) {
+      const D = SH.SIEGE[u.sg.k], foes = S.cities.filter(c => c.o !== null && c.o !== S.you && c.wm && Math.max(Math.abs(c.x - u.x), Math.abs(c.y - u.y)) <= 12 && !(S.dip && S.dip[c.o])).sort((a, b) => Math.max(Math.abs(a.x - u.x), Math.abs(a.y - u.y)) - Math.max(Math.abs(b.x - u.x), Math.abs(b.y - u.y)));
+      h += `<p class="hint ok">${D.e} <b>${D.n}</b>: rompe murallas (−${D.wall} por golpe, 1 golpe por turno) y apenas pega a unidades. ${u.sg.k === 'ram' ? 'Debe estar pegada a la muralla.' : 'Dispara desde 3–4 casillas del centro de la ciudad.'} Es frágil: escóltala. Las atalayas enemigas le disparan. Si se mueve sola hasta la posición, gasta el ataque de ese turno.</p>`;
+      h += foes.length ? foes.map(c => `<div class="line"><div class="g"><b>🧱 ${esc(c.name)}</b> <span class="dim">(${esc(S.players[c.o].name)})</span> ${c.wh > 0 ? c.wh + '/' + c.wm : '<span class="ok">BRECHA</span>'}</div><button class="btn sm ${c.wh > 0 && u.at > 0 ? 'gold' : ''}" ${c.wh > 0 && u.at > 0 ? '' : 'disabled'} data-c='${jattr({ a: 'siegewall', u: u.id, cid: c.id })}'>Atacar muralla</button></div>`).join('') : '<p class="hint">No ves ninguna ciudad enemiga con muralla a 12 casillas o menos.</p>';
+    }
+    if (u.cart) h += `<p class="hint ok">🛒 Carreta: almacén móvil (${u.cap} de capacidad, movilidad ${u.e.mov}). No ataca ni sube de nivel. Es una <b>estación de suministros andante</b>: las unidades pegadas a ella pueden dejar y tomar botín, cambiar de equipo, ganan +${SH.CART.aura} de defensa y se curan un ${Math.round(SH.CART.heal * 100)}% por turno. Llévala a una ciudad para cargar o descargar; si la matan, el enemigo se queda con parte de la carga.</p>`;
     if (u.sm) h += `<p class="hint ok">🔮 Invocación (${SH.CREATURES[u.sm].n}): su fuerza sube con el nivel de su invocador y desaparece si él cae.</p><button class="btn sm red" data-c='${jattr({ a: 'dismiss', u: u.id })}'>Despedir</button>`;
     if (u.sc) h += `<h3 class="hint" style="margin-top:12px">🔮 Invocar (${u.sc.n}/${u.sc.max} por jugador)</h3>` + (u.sc.near ? '' : '<p class="hint lack">Acércate a 2 casillas o menos de una ciudad tuya.</p>') + `<div class="row" style="flex-wrap:wrap;gap:6px">${u.sc.opts.map(o => `<button class="btn sm gold" ${u.sc.near && u.sc.n < u.sc.max && u.sc.bones >= o.cost.hueso ? '' : 'disabled'} data-c='${jattr({ a: 'summon', u: u.id, k: o.k })}'>${SH.CREATURES[o.k].e} ${SH.CREATURES[o.k].n} · ${SH.MATS.hueso.e}${o.cost.hueso}</button>`).join('')}</div><p class="hint">Huesos en el almacén cercano: ${u.sc.bones}.</p>`;
     if (u.bn) h += `<p class="hint ok">👶 Cría${u.gen ? ' de la generación ' + u.gen : ''}: +${u.bn.hp} salud y +${u.bn.dmg} daño de nacimiento.</p>`;
@@ -540,7 +607,7 @@ function unitSheet(u) {
     if (u.ord) h += `<p class="hint ok">${ORD_E[u.ord.t]} Orden actual: <b>${SH.ORDERS[u.ord.t].n}</b>${u.ord.t === 'goto' ? ` (${u.ord.x},${u.ord.y})` : ''}</p>`;
     h += `<div class="row" style="flex-wrap:wrap;gap:6px"><button class="btn sm ${gotoMode === u.id ? 'gold' : ''}" data-ui="goto">📍 Ir a…</button><button class="btn sm" data-c='${jattr({ a: 'ord', u: u.id, o: 'home' })}'>🏠 Volver y depositar</button><button class="btn sm" data-c='${jattr({ a: 'ord', u: u.id, o: 'guard' })}'>🛡️ Vigilar</button>${u.ord ? `<button class="btn sm red" data-c='${jattr({ a: 'ord', u: u.id, o: 'clear' })}'>✖ Cancelar</button>` : ''}</div>`;
     if (gotoMode === u.id) h += '<p class="hint lack">Toca en el mapa la casilla de destino.</p>';
-    h += u.nearCity ? '<p class="hint ok">🏰 Junto a una ciudad tuya: puedes equipar, guardar y retirar objetos, y recuperas salud.</p>' : '<p class="hint">Toca una casilla azul para moverte o un enemigo marcado en rojo para atacar. Si el enemigo está lejos, la unidad se acerca sola.</p>';
+    h += u.nearCity ? '<p class="hint ok">🏰 Junto a una ciudad tuya: puedes equipar, guardar y retirar objetos, y recuperas salud.</p>' : u.nearCart ? `<p class="hint ok">🛒 Junto a una carreta tuya: estación de suministros. Puedes equipar, guardar y retirar objetos; +${SH.CART.aura} de defensa y recuperas ${Math.round(SH.CART.heal * 100)}% de salud por turno.</p>` : '<p class="hint">Toca una casilla azul para moverte o un enemigo marcado en rojo para atacar. Si el enemigo está lejos, la unidad se acerca sola.</p>';
   } else if (sheet.tab === 'skills') {
     h += `<p class="hint">Puntos disponibles: <b class="pips">${u.pts}</b> (ganas 1 por nivel)</p>`;
     h += SH.SKILL_ORDER.map(s => { const d = SH.SKILLS[s], v = u.sk[s]; return `<div class="line"><div class="g"><b>${d.n}</b> <span class="pips">${'●'.repeat(v)}${'○'.repeat(d.cap - v)}</span><div class="hint" style="margin:2px 0 0">${d.d}</div></div><button class="btn sm gold fix" ${u.pts > 0 && v < d.cap ? '' : 'disabled'} data-c='${jattr({ a: 'skill', u: u.id, s })}'>+</button></div>`; }).join('');
@@ -548,19 +615,20 @@ function unitSheet(u) {
     h += classTab(u);
   } else if (sheet.tab === 'gear') {
     { const st = SH.armorSet(u.eq); if (st) h += `<div class="hint ok" style="margin:6px 0">🧩 <b>${st.name}</b> (${st.n} piezas): ${st.txt.join(' · ')}</div>`; else h += '<div class="hint" style="margin:6px 0">🧩 Sets: 3 piezas de armadura de la misma calidad (hierro o mejor) dan bonos; 6 dan más.</div>'; }
-    h += SH.SLOTS.map(s => { const it = u.eq[s]; return `<div class="line"><div class="g"><span class="dim">${SH.SLOT_NAMES[s]}</span><div>${it ? itemHtml(it) : '<span class="dim">—</span>'}</div></div>${it && u.nearCity ? `<button class="btn sm fix" data-c='${jattr({ a: 'unequip', u: u.id, s })}'>Quitar</button>` : ''}</div>`; }).join('');
+    h += SH.SLOTS.map(s => { const it = u.eq[s]; return `<div class="line"><div class="g"><span class="dim">${SH.SLOT_NAMES[s]}</span><div>${it ? itemHtml(it) : '<span class="dim">—</span>'}</div></div>${it && (u.nearCity || u.nearCart) ? `<button class="btn sm fix" data-c='${jattr({ a: 'unequip', u: u.id, s })}'>Quitar</button>` : ''}</div>`; }).join('');
     h += `<h3 class="hint" style="margin-top:12px">En la mochila</h3>`;
-    h += u.inv.it.length ? u.inv.it.map(it => `<div class="line"><div class="g">${itemHtml(it)}</div>${u.nearCity ? `<button class="btn sm gold fix" data-c='${jattr({ a: 'equip', u: u.id, i: it.id })}'>Equipar</button>` : ''}</div>`).join('') : '<p class="dim">Sin objetos.</p>';
-    if (!u.nearCity) h += '<p class="hint">Acércate a una ciudad tuya para cambiar el equipo.</p>';
+    h += u.inv.it.length ? u.inv.it.map(it => `<div class="line"><div class="g">${itemHtml(it)}</div>${(u.nearCity || u.nearCart) ? `<button class="btn sm gold fix" data-c='${jattr({ a: 'equip', u: u.id, i: it.id })}'>Equipar</button>` : ''}</div>`).join('') : '<p class="dim">Sin objetos.</p>';
+    if (!u.nearCity && !u.nearCart) h += '<p class="hint">Acércate a una ciudad tuya (o a una carreta) para cambiar el equipo.</p>';
   } else {
     let w = 0; for (const k in u.inv.m) w += u.inv.m[k]; w += u.inv.it.length * 2;
     h += `<p class="hint">${u.cart ? '🛒 Carga' : 'Mochila'}: ${w}/${u.cap || S.invCap}</p><div>${matsHtml(u.inv.m)}</div>`;
-    if (u.nearCity) {
-      const c = S.cities.find(c => c.o === S.you && Math.max(Math.abs(c.x - u.x), Math.abs(c.y - u.y)) <= 1);
+    if (u.nearCity || u.nearCart) {
+      let c = S.cities.find(c => c.o === S.you && Math.max(Math.abs(c.x - u.x), Math.abs(c.y - u.y)) <= 1);
+      if (!c) { const ct = S.mine.find(v => v.cart && v.id !== u.id && Math.max(Math.abs(v.x - u.x), Math.abs(v.y - u.y)) <= 1); c = { name: ct.name, st: ct.inv, isCart: true }; }
       h += `<button class="btn gold block" style="margin:10px 0" data-c='${jattr({ a: 'dep', u: u.id, all: true })}' ${w ? '' : 'disabled'}>Depositar todo en ${esc(c.name)}</button>`;
       h += `<h3 class="hint">Almacén de la ciudad</h3>` + (SH.MAT_ORDER.filter(k => c.st.m[k] > 0).map(k => `<div class="line"><div class="g">${SH.MATS[k].e} ${SH.MATS[k].n} <b>${c.st.m[k]}</b></div><button class="btn sm fix" data-c='${jattr({ a: 'wd', u: u.id, m: k, n: 1 })}'>+1</button>${u.cart ? `<button class="btn sm fix" data-c='${jattr({ a: 'wd', u: u.id, m: k, n: 999 })}'>Todo</button>` : ''}<button class="btn sm fix" data-c='${jattr({ a: 'wd', u: u.id, m: k, n: 5 })}'>+5</button></div>`).join('') || '<p class="dim">Vacío</p>');
       h += c.st.it.map(it => `<div class="line"><div class="g">${itemHtml(it)}</div><button class="btn sm fix" data-c='${jattr({ a: 'wdi', u: u.id, i: it.id })}'>Tomar</button></div>`).join('');
-    } else h += '<p class="hint">Acércate a una ciudad tuya para depositar el botín o tomar materiales.</p>';
+    } else h += '<p class="hint">Acércate a una ciudad tuya (o a una carreta) para depositar el botín o tomar materiales.</p>';
   }
   return h;
 }
@@ -584,7 +652,7 @@ function citySheet() {
   const tabs = [['state', 'Almacén'], ['forge', 'Forjar'], ['up', 'Mejorar'], ['build', 'Construir'], ['recruit', 'Reclutar']];
   let h = `<div class="hd"><b>🏰 ${esc(c.name)}</b><button class="x" data-ui="close">✕</button></div><div class="tabs">${tabs.map(t => `<button class="tab ${sheet.tab === t[0] ? 'on' : ''}" data-ui="tab:${t[0]}">${t[1]}</button>`).join('')}</div>`;
   if (sheet.tab === 'state') {
-    h += `<div>${bldHtml(c.b)}</div><div>${matsHtml(c.st.m)}</div><h3 class="hint" style="margin-top:10px">Objetos guardados</h3>` + (c.st.it.map(it => `<div class="line"><div class="g">${itemHtml(it)}</div></div>`).join('') || '<p class="dim">Ninguno.</p>');
+    h += `<div>${bldHtml(c.b)}</div><div>${matsHtml(c.st.m)}</div>${c.inc && Object.keys(c.inc).length ? `<p class="hint">🏭 Produce por turno: ${Object.keys(c.inc).map(m => `${SH.MATS[m].e} ${c.inc[m]}`).join(' · ')}</p>` : ''}<h3 class="hint" style="margin-top:10px">Objetos guardados</h3>` + (c.st.it.map(it => `<div class="line"><div class="g">${itemHtml(it)}</div></div>`).join('') || '<p class="dim">Ninguno.</p>');
     h += '<p class="hint">Las unidades junto a la ciudad pueden depositar su botín y equiparse desde su ficha (pestañas Equipo y Mochila).</p>';
   } else if (sheet.tab === 'forge') {
     const K = SH.KINDS[forge.k], cost = SH.recipe(forge.k, forge.tr), left = (c.cm || S.craftsMax) - c.crafts;
@@ -596,15 +664,25 @@ function citySheet() {
     h += '<p class="hint">Los objetos forjados quedan en el almacén. Una unidad junto a la ciudad puede tomarlos y equiparlos.</p>';
   } else if (sheet.tab === 'build') {
     h += `<p class="hint">Una construcción por ciudad y turno. Los edificios se ven en el mapa y <b>no se pierden</b> si te conquistan la ciudad: pasan al nuevo dueño.</p><p class="hint">🛡️ Estar en la ciudad: +${SH.CITY_GUARD.pvp[0]} de defensa contra jugadores (+${SH.CITY_GUARD.pvp[1]} pegado a ella). Contra hordas que la asaltan: +${SH.CITY_GUARD.hordeDef[0]} de defensa y +${Math.round(SH.CITY_GUARD.hordeAtk[0] * 100)}% de ataque (+${SH.CITY_GUARD.hordeDef[1]} y +${Math.round(SH.CITY_GUARD.hordeAtk[1] * 100)}% pegado a ella).</p>`;
-    h += SH.BUILD_ORDER.map(k => {
-      const B = SH.BUILDINGS[k], lv = (c.b && c.b[k]) || 0, cost = lv < SH.BUILD_MAX ? B.cost[lv] : null;
+    h += SH.BUILD_ORDER.filter(k => k !== 'asedio' || S.cfg.siege === 'si').map(k => {
+      const B = SH.BUILDINGS[k], lv = (c.b && c.b[k]) || 0, cost = lv < SH.bMax(k) ? B.cost[lv] : null;
       const ok = cost && SH.MAT_ORDER.every(m => !cost[m] || (c.st.m[m] || 0) >= cost[m]) && !c.built;
-      return `<div class="line" style="flex-wrap:wrap"><div class="g" style="flex-basis:100%"><b>${B.e} ${B.n}</b> <span class="pips">${'●'.repeat(lv)}${'○'.repeat(SH.BUILD_MAX - lv)}</span><div class="hint" style="margin:2px 0 0">${B.d}</div></div>` +
+      return `<div class="line" style="flex-wrap:wrap"><div class="g" style="flex-basis:100%"><b>${B.e} ${B.n}</b> <span class="pips">${'●'.repeat(lv)}${'○'.repeat(SH.bMax(k) - lv)}</span><div class="hint" style="margin:2px 0 0">${B.d}</div></div>` +
         (cost ? `<div>${SH.MAT_ORDER.filter(m => cost[m]).map(m => `<span class="chip ${(c.st.m[m] || 0) >= cost[m] ? 'ok' : 'lack'}">${SH.MATS[m].e} ${c.st.m[m] || 0}/${cost[m]}</span>`).join('')}</div><button class="btn sm ${ok ? 'gold' : ''}" ${ok ? '' : 'disabled'} data-c='${jattr({ a: 'build', c: c.id, k })}'>${lv ? 'Mejorar' : 'Construir'}</button>` : '<span class="ok">Nivel máximo</span>') + `</div>`;
     }).join('');
     { const ct = SH.CART, cc = c.cart, okc = !cc && S.cfg.mode !== 'uno' && SH.MAT_ORDER.every(m => !ct.cost[m] || (c.st.m[m] || 0) >= ct.cost[m]);
-      h += `<div class="line" style="flex-wrap:wrap"><div class="g" style="flex-basis:100%"><b>${ct.e} Carreta</b> <span class="pips">${cc ? '●' : '○'}</span><div class="hint" style="margin:2px 0 0">Almacén móvil: carga hasta ${ct.cap} (una mochila normal lleva ${S.invCap}), movilidad ${ct.mov}, no ataca y no cuenta como unidad. Máximo una por ciudad.</div></div>` +
+      h += `<div class="line" style="flex-wrap:wrap"><div class="g" style="flex-basis:100%"><b>${ct.e} Carreta</b> <span class="pips">${cc ? '●' : '○'}</span><div class="hint" style="margin:2px 0 0">Estación de suministros andante: las unidades junto a ella guardan y toman objetos, cambian de equipo, ganan +${SH.CART.aura} defensa y se curan ${Math.round(SH.CART.heal * 100)}%/turno. Carga hasta ${ct.cap} (una mochila normal lleva ${S.invCap}), movilidad ${ct.mov}, no ataca y no cuenta como unidad. Máximo una por ciudad.</div></div>` +
         (S.cfg.mode === 'uno' ? '<div class="hint lack">No disponible en el reto de una unidad.</div>' : cc ? `<div class="hint ok">Activa en (${cc.x}, ${cc.y})</div><button class="btn sm" data-ui="gotocart" data-x="${cc.x}" data-y="${cc.y}">Ver</button>` : `<div>${SH.MAT_ORDER.filter(m => ct.cost[m]).map(m => `<span class="chip ${(c.st.m[m] || 0) >= ct.cost[m] ? 'ok' : 'lack'}">${SH.MATS[m].e} ${c.st.m[m] || 0}/${ct.cost[m]}</span>`).join('')}</div><button class="btn sm ${okc ? 'gold' : ''}" ${okc ? '' : 'disabled'} data-c='${jattr({ a: 'cart', c: c.id })}'>Construir</button>`) + '</div>'; }
+    if (S.cfg.siege === 'si') {
+      if (c.wm) { const okr = c.wh < c.wm, rc = {}; for (const k in SH.SIEGE.repair) rc[k] = SH.SIEGE.repair[k] * c.b.muralla, okR = okr && SH.MAT_ORDER.every(m => !rc[m] || (c.st.m[m] || 0) >= rc[m]);
+        h += `<div class="line" style="flex-wrap:wrap"><div class="g" style="flex-basis:100%"><b>🧱 Muralla</b> ${c.wh}/${c.wm}${c.wh <= 0 ? ' <span class="lack">¡BRECHA!</span>' : ''}<div class="hint" style="margin:2px 0 0">Con la muralla en pie, nadie puede entrar a la ciudad. Los arietes y catapultas la rompen. Reparar devuelve la mitad de su vida (1 vez por turno). Se regenera sola ${Math.round(SH.SIEGE.regen * 100)}% por turno si no hay cerco (pero no sale de una brecha sin reparar).</div></div><div>${SH.MAT_ORDER.filter(m => rc[m]).map(m => `<span class="chip ${(c.st.m[m] || 0) >= rc[m] ? 'ok' : 'lack'}">${SH.MATS[m].e} ${c.st.m[m] || 0}/${rc[m]}</span>`).join('')}</div><button class="btn sm ${okR ? 'gold' : ''}" ${okR ? '' : 'disabled'} data-c='${jattr({ a: 'repair', c: c.id })}'>Reparar</button></div>`; }
+      if (c.sg > 0) h += `<p class="hint lack">🔒 Ciudad en cerco (${c.sg} turnos): no produce ni recluta${c.sg >= SH.SIEGE.hunger ? ', y las unidades dentro pasan hambre. Una carreta tuya cerca frena el cerco' : '. Una carreta tuya cerca frena el cerco'}.</p>`;
+      if (c.b && c.b.asedio) for (const k of ['ram', 'cata']) { const D = SH.SIEGE[k], have = S.mine.filter(x => x.sg && x.sg.c === c.id), has = have.length, okm = c.b.asedio >= D.lv && has < SH.SIEGE.maxPerCity && !(c.sg > 0) && S.cfg.mode !== 'uno' && SH.MAT_ORDER.every(m => !D.cost[m] || (c.st.m[m] || 0) >= D.cost[m]);
+        h += `<div class="line" style="flex-wrap:wrap"><div class="g" style="flex-basis:100%"><b>${D.e} ${D.n}</b> <span class="dim">❤️${D.hp} 🛡️${D.def} 👟${D.mov} · 🧱 −${D.wall} a la muralla</span><div class="hint" style="margin:2px 0 0">${k === 'ram' ? 'Pegado a la muralla' : 'A 3–4 casillas del centro de la ciudad'}. Taller de asedio nivel ${D.lv}. Máx. ${SH.SIEGE.maxPerCity} máquinas por ciudad (${has} activas). No cuenta como unidad.</div></div><div>${SH.MAT_ORDER.filter(m => D.cost[m]).map(m => `<span class="chip ${(c.st.m[m] || 0) >= D.cost[m] ? 'ok' : 'lack'}">${SH.MATS[m].e} ${c.st.m[m] || 0}/${D.cost[m]}</span>`).join('')}</div><button class="btn sm ${okm ? 'gold' : ''}" ${okm ? '' : 'disabled'} data-c='${jattr({ a: 'siegeunit', c: c.id, k })}'>Construir</button></div>`; }
+    }
+    if (c.b && c.b.taller) { const bd = SH.BUILDER, bu = c.bu, okb = !bu && S.cfg.mode !== 'uno' && SH.MAT_ORDER.every(m => !bd.cost[m] || (c.st.m[m] || 0) >= bd.cost[m]);
+      h += `<div class="line" style="flex-wrap:wrap"><div class="g" style="flex-basis:100%"><b>${bd.e} Constructor</b> <span class="pips">${bu ? '●' : '○'}</span><div class="hint" style="margin:2px 0 0">Traza carreteras${c.b.taller >= 2 ? ' y estaciones de suministros' : ''} y no cuenta como unidad. Máximo uno por ciudad. ${c.net ? '🔗 Esta ciudad comparte inventario con otras (estación de suministros).' : c.st2 ? 'Tiene una estación de suministros cerca.' : ''}</div></div>` +
+        (S.cfg.mode === 'uno' ? '<div class="hint lack">No disponible en el reto de una unidad.</div>' : bu ? `<div class="hint ok">Activo en (${bu.x}, ${bu.y})</div><button class="btn sm" data-ui="gotocart" data-x="${bu.x}" data-y="${bu.y}">Ver</button>` : `<div>${SH.MAT_ORDER.filter(m => bd.cost[m]).map(m => `<span class="chip ${(c.st.m[m] || 0) >= bd.cost[m] ? 'ok' : 'lack'}">${SH.MATS[m].e} ${c.st.m[m] || 0}/${bd.cost[m]}</span>`).join('')}</div><button class="btn sm ${okb ? 'gold' : ''}" ${okb ? '' : 'disabled'} data-c='${jattr({ a: 'builder', c: c.id })}'>Contratar</button>`) + '</div>'; }
   } else if (sheet.tab === 'up') {
     const left = (c.cm || S.craftsMax) - c.crafts, soul = SH.MATS.alma;
     h += `<p class="hint">Trabajos restantes este turno: <b>${left}</b>. Mejorar sube la calidad del material (cuesta menos que forjar de nuevo) y conserva los efectos. Encantar añade un efecto: la rareza es el nº de efectos (${SH.RARITY.map((r, i) => `<span class="r${i}">${r.e} ${r.n}${i ? ' ' + i : ''}</span>`).join(', ')}) y cada efecto gana potencia con la rareza. Reforjar cambia un efecto por otro al azar (${SH.REFORGE_COST.alma} ${soul.e}).</p>`;
@@ -636,11 +714,18 @@ function citySheet() {
       return `<div class="line" style="flex-wrap:wrap"><div class="g" style="flex-basis:100%">${itemHtml(it)}</div><div>${b || '<span class="dim">Ya está al máximo</span>'}</div>${ch}</div>`;
     }).join('') : '<p class="dim">No hay objetos en el almacén. Forja uno o lleva botín raro de criaturas élite, jefes, cofres y ruinas.</p>';
   } else {
-    const cost = c.rc, n = S.mine.filter(x => !x.sm && !x.cart).length, ok = SH.MAT_ORDER.every(m => !cost[m] || (c.st.m[m] || 0) >= cost[m]) && n < S.maxUnits;
+    const cost = c.rc, n = S.mine.filter(x => !x.sm && !x.cart && !x.bld && !x.sg).length, ok = SH.MAT_ORDER.every(m => !cost[m] || (c.st.m[m] || 0) >= cost[m]) && n < S.maxUnits;
     h += `<p>Unidades: <b>${n}/${S.maxUnits}</b></p><div>Coste: ${SH.MAT_ORDER.filter(m => cost[m]).map(m => `<span class="chip ${(c.st.m[m] || 0) >= cost[m] ? 'ok' : 'lack'}">${SH.MATS[m].e} ${c.st.m[m] || 0}/${cost[m]}</span>`).join('')}</div>`;
     if (S.king === S.you && c.rcb) h += `<p class="hint ok">👑 Eres el Rey Demonio: solo puedes reclutar bestias.</p>` + Object.keys(SH.KING.beasts).map(k => { const bc = c.rcb[k], okb = SH.MAT_ORDER.every(m => !bc[m] || (c.st.m[m] || 0) >= bc[m]) && n < S.maxUnits, d = SH.CREATURES[k]; return `<div class="line"><div class="g">${d.e} <b>${d.n}</b> <span class="dim">❤️${d.hp} ⚔️${d.dmg} 🛡️${d.def} 👟${d.mov}</span><div>${SH.MAT_ORDER.filter(m => bc[m]).map(m => `<span class="chip ${(c.st.m[m] || 0) >= bc[m] ? 'ok' : 'lack'}">${SH.MATS[m].e} ${c.st.m[m] || 0}/${bc[m]}</span>`).join('')}</div></div><button class="btn sm ${okb ? 'gold' : ''}" ${okb ? '' : 'disabled'} data-c='${jattr({ a: 'recruit', c: c.id, k })}'>Reclutar</button></div>`; }).join('') + '<p class="hint">Las bestias empiezan en nivel 1 y descansan el turno en que llegan. Suben de nivel y gastan puntos de habilidad.</p>';
     else if (S.cfg.mode === 'mundo') h += '<p class="hint lack">🌍 Mundo abierto: no se recluta. Las unidades nuevas nacen por reproducción: deja a dos unidades tuyas juntas, cerca de una ciudad tuya, durante varios turnos.</p>';
     else if (S.cfg.mode === 'uno') h += '<p class="hint lack">🎯 Reto de una unidad: aquí no se puede reclutar.</p>'; else h += `<button class="btn gold block" style="margin-top:10px" ${ok ? '' : 'disabled'} data-c='${jattr({ a: 'recruit', c: c.id })}'>Reclutar unidad</button><p class="hint">La nueva unidad empieza en nivel 1 y descansa el turno en que llega. Cada reclutamiento cuesta más.</p>`;
+  }
+  if (S.graves && S.graves.length) {
+    h += `<h3 class="hint" style="margin-top:12px">🪦 Caídos</h3>` + S.graves.map(gr => {
+      const hl = (c.b && c.b.iglesia) || 0, gc = {}; for (const m in gr.cost) gc[m] = (m === 'hueso' || m === 'alma') && hl ? Math.max(1, Math.ceil(gr.cost[m] * (1 - SH.CHURCH.disc * hl))) : gr.cost[m];
+      const okr = SH.MAT_ORDER.every(m => !gc[m] || (c.st.m[m] || 0) >= gc[m]) && n < S.maxUnits;
+      return `<div class="line"><div class="g"><b>${esc(gr.name)}</b> <span class="dim">niv. ${gr.lv}</span><div>${SH.MAT_ORDER.filter(m => gc[m]).map(m => `<span class="chip ${(c.st.m[m] || 0) >= gc[m] ? 'ok' : 'lack'}">${SH.MATS[m].e} ${c.st.m[m] || 0}/${gc[m]}</span>`).join('')}</div></div><button class="btn sm ${okr ? 'gold' : ''}" ${okr ? '' : 'disabled'} data-c='${jattr({ a: 'revive', c: c.id, g: gr.id })}'>Resucitar</button></div>`;
+    }).join('') + '<p class="hint">Vuelve en 2 turnos con 1 nivel menos. Si cayó ante una criatura, su equipo está en una tumba 🪦 en el mapa durante 30 turnos.</p>';
   }
   return h;
 }
@@ -684,6 +769,7 @@ $('tut').addEventListener('click', e => {
   else if (tutI >= n - 1) tutClose(); else { tutI++; renderTut(); }
 });
 $('nHelp').onclick = tutOpen;
+$('nMan').onclick = () => openSheet('manual', { tab: 'm' });
 
 /* ---------- resumen de fin de partida ---------- */
 function summarySheet() {
@@ -711,15 +797,84 @@ function storySheet() {
 }
 function playersSheet() {
   const list = S.players.slice().sort((a, b) => b.score - a.score);
-  let h = hd('Jugadores') + list.map(p => `<div class="line"><span class="sw" style="background:${p.color}"></span><div class="g"><b>${esc(p.name)}</b>${p.team !== null && p.team !== undefined ? `<span class="tag">${SH.TEAM_E[p.team]} Equipo ${p.team + 1}</span>` : ''}${S.king === p.id ? '<span class="tag">👑 Rey Demonio</span>' : ''}${botTag(p)}${p.auto ? '<span class="tag">🤖 ausente</span>' : ''}${p.id === S.you ? '<span class="tag">tú</span>' : ''}${p.hero ? `<div class="hint" style="margin:0">${p.hero.emb} ${esc(p.hero.n)} · nivel ${p.hero.lv}${p.hero.w ? ' · ☠️ vuelve en ' + p.hero.w + ' turnos' : ''}</div>` : ''}<div class="hint" style="margin:0">${p.alive ? `${p.units} ${p.units === 1 ? 'unidad' : 'unidades'} · ${p.cities} ${p.cities === 1 ? 'ciudad' : 'ciudades'} · ${p.kills} criaturas · ${p.pk} jugadores` : '☠️ eliminado'}</div></div><div style="text-align:right"><b>${p.score}</b><div class="hint" style="margin:0">${p.alive && !p.bot && !p.auto ? (p.ready ? '✅ listo' : '⏳') : ''}${S.you === S.hostId && p.auto && S.status === 'playing' ? `<button class="btn sm red" style="margin-top:4px" data-ui="release:${p.id}">Liberar plaza</button>` : ''}</div></div></div>`).join('');
+  let h = hd('Jugadores') + list.map(p => `<div class="line"><span class="sw" style="background:${p.color}"></span><div class="g"><b>${p.gt ? '[' + esc(p.gt) + '] ' : ''}${esc(p.name)}</b>${p.pr ? `<span class="tag">🛡️ novato ${p.pr}</span>` : ''}${p.team !== null && p.team !== undefined ? `<span class="tag">${SH.TEAM_E[p.team]} Equipo ${p.team + 1}</span>` : ''}${S.king === p.id ? '<span class="tag">👑 Rey Demonio</span>' : ''}${botTag(p)}${p.auto ? '<span class="tag">🤖 ausente</span>' : ''}${p.id === S.you ? '<span class="tag">tú</span>' : ''}${p.hero ? `<div class="hint" style="margin:0">${p.hero.emb} ${esc(p.hero.n)} · nivel ${p.hero.lv}${p.hero.w ? ' · ☠️ vuelve en ' + p.hero.w + ' turnos' : ''}</div>` : ''}<div class="hint" style="margin:0">${p.alive ? `${p.units} ${p.units === 1 ? 'unidad' : 'unidades'} · ${p.cities} ${p.cities === 1 ? 'ciudad' : 'ciudades'} · ${p.kills} criaturas · ${p.pk} jugadores` : '☠️ eliminado'}</div></div><div style="text-align:right"><b>${p.score}</b><div class="hint" style="margin:0">${p.alive && !p.bot && !p.auto ? (p.ready ? '✅ listo' : '⏳') : ''}${S.you === S.hostId && p.auto && S.status === 'playing' ? `<button class="btn sm red" style="margin-top:4px" data-ui="release:${p.id}">Liberar plaza</button>` : ''}</div></div></div>`).join('');
   h += victoryHtml();
   h += diplomacyHtml();
   h += `<p class="hint">Puntos: nivel de unidades ×5, ciudades ×30, criaturas ×2, jefes ×50, jugadores abatidos ×20.</p>`;
   h += `<p class="hint">🤖 ausente: un bot dirige su ejército (de forma cauta) hasta que vuelva a entrar. El anfitrión puede liberar su plaza para que entre otra persona.</p>`;
   h += pushSection();
-  h += `<div class="row" style="margin-top:8px"><button class="btn sm" data-ui="invite">Código: ${esc(S.code)}</button>`;
+  h += `<div class="row" style="margin-top:8px"><button class="btn sm" data-ui="hist">📈 Historial</button><button class="btn sm" data-ui="invite">Código: ${esc(S.code)}</button>`;
   if (S.you === S.hostId && S.status === 'playing') h += `<button class="btn sm red" data-ui="force">Forzar fin de turno</button>`;
   h += `<button class="btn sm" data-ui="leave">Salir</button></div>`;
+  return h;
+}
+/* ---------- mundo abierto fase 2: gremio, ranking, jefe mundial y regiones ---------- */
+const regionAt = (x, y) => { const m = (S.w - 1) / 2, f = Math.max(Math.abs(x - m), Math.abs(y - m)) / m, R = SH.WORLD.regions; for (let i = 0; i < R.length; i++) if (f <= R[i].to) return i; return R.length - 1; };
+function worldSheet() {
+  const tabs = [['guild', '🏰 Gremio'], ['rank', '🏆 Ranking'], ['boss', '🌋 Jefe mundial']];
+  let h = hd('🌍 Mundo abierto') + `<div class="tabs">${tabs.map(t => `<button class="tab ${sheet.tab === t[0] ? 'on' : ''}" data-ui="tab:${t[0]}">${t[1]}</button>`).join('')}</div>`;
+  const pn = id => { const p = S.players[id]; return p ? (p.gt ? '[' + esc(p.gt) + '] ' : '') + esc(p.name) : '—'; };
+  if (S.prot) h += `<div class="card"><b>🛡️ Protección de novato: ${S.prot} turnos</b><div class="hint">Nadie puede atacarte ni conquistar tus ciudades, pero tú tampoco puedes atacar a otros jugadores.</div><button class="btn sm red" data-ui="endprot">Terminar protección</button></div>`;
+  if (sheet.tab === 'guild') {
+    const gd = S.gd;
+    if (gd) {
+      h += `<h3 class="hint">[${esc(gd.tag)}] ${esc(gd.n)}</h3><p class="hint">Los miembros son <b>aliados permanentes</b> (no se atacan y comparten visión). Si dos ciudades del gremio están a ${SH.WORLD.guild.dist} casillas o menos, las unidades de cada una ganan <b>+${SH.WORLD.guild.def} de defensa</b> cerca de ella (territorio del gremio). Máx. ${SH.WORLD.guild.max} miembros.</p>`;
+      h += gd.m.map(id => { const p = S.players[id]; return `<div class="line"><span class="sw" style="background:${p.color}"></span><div class="g"><b>${esc(p.name)}</b> ${id === gd.lead ? '👑' : ''}${id === S.you ? '<span class="tag">tú</span>' : ''}<div class="hint" style="margin:0">${p.units} unidades · ${p.cities} ciudades · ${p.score} pts</div></div>${gd.lead === S.you && id !== S.you ? `<button class="btn sm red" data-ui="gkick:${id}">Expulsar</button>` : ''}</div>`; }).join('');
+      if (gd.lead === S.you && gd.m.length < SH.WORLD.guild.max) { const cand = S.players.filter(p => p.id !== S.you && !p.bot && p.alive && !p.gt && !(gd.inv || []).includes(p.id));
+        h += `<h3 class="hint">Invitar</h3>` + (gd.inv && gd.inv.length ? `<p class="hint">Pendientes: ${gd.inv.map(pn).join(', ')}</p>` : '') + (cand.length ? cand.slice(0, 30).map(p => `<button class="chip btnlike" data-c='${jattr({ a: 'guild', d: 'invite', to: p.id })}'>${esc(p.name)}</button>`).join('') : '<p class="dim">No hay jugadores libres para invitar.</p>'); }
+      h += `<div style="margin-top:12px"><button class="btn sm red" data-ui="gleave">Dejar el gremio</button></div>`;
+    } else {
+      if (S.ginv && S.ginv.length) h += `<h3 class="hint">Invitaciones</h3>` + S.ginv.map(i => `<div class="line"><div class="g"><b>[${esc(i.tag)}] ${esc(i.n)}</b><div class="hint" style="margin:0">Líder: ${pn(i.by)}</div></div><button class="btn sm gold" data-c='${jattr({ a: 'guild', d: 'accept', id: i.id })}'>Aceptar</button><button class="btn sm" data-c='${jattr({ a: 'guild', d: 'decline', id: i.id })}'>Rechazar</button></div>`).join('');
+      h += `<p class="hint">Un gremio es una alianza permanente de hasta ${SH.WORLD.guild.max} jugadores: no se atacan, comparten visión y ganan defensa en su territorio.</p><button class="btn gold block" data-ui="gcreate">🏰 Fundar un gremio</button>`;
+    }
+    if (S.guilds && S.guilds.length) h += `<h3 class="hint" style="margin-top:14px">Gremios del mundo</h3>` + S.guilds.slice().sort((a, b) => b.pts - a.pts).map(x => `<div class="line"><div class="g"><b>[${esc(x.tag)}] ${esc(x.n)}</b></div><div class="hint" style="margin:0">${x.size} miembros · ${x.pts} pts</div></div>`).join('');
+  } else if (sheet.tab === 'rank') {
+    const list = S.players.filter(p => p.alive).slice().sort((a, b) => b.score - a.score), me = list.findIndex(p => p.id === S.you);
+    h += `<p class="hint">Tu puesto: <b>${me + 1}</b> de ${list.length}. Puntos: nivel de unidades ×5, ciudades ×30, criaturas ×2, jefes ×50, jugadores abatidos ×20.</p>`;
+    h += list.slice(0, 15).map((p, i) => `<div class="line"><b style="min-width:28px">${i + 1}.</b><span class="sw" style="background:${p.color}"></span><div class="g">${p.gt ? '[' + esc(p.gt) + '] ' : ''}<b>${esc(p.name)}</b>${p.id === S.you ? '<span class="tag">tú</span>' : ''}<div class="hint" style="margin:0">${p.units} unidades · ${p.cities} ciudades · ${p.boss} jefes</div></div><b>${p.score}</b></div>`).join('');
+    if (me >= 15) h += `<div class="line"><b style="min-width:28px">${me + 1}.</b><div class="g"><b>${esc(S.players[S.you].name)}</b> <span class="tag">tú</span></div><b>${list[me].score}</b></div>`;
+    const gs = (S.guilds || []).slice().sort((a, b) => b.pts - a.pts).slice(0, 5);
+    if (gs.length) h += `<h3 class="hint" style="margin-top:12px">🏰 Mejores gremios</h3>` + gs.map((x, i) => `<div class="line"><b style="min-width:28px">${i + 1}.</b><div class="g"><b>[${esc(x.tag)}] ${esc(x.n)}</b></div><b>${x.pts}</b></div>`).join('');
+  } else {
+    const wb = S.wb;
+    if (wb && wb.id) { const d = SH.CREATURES[wb.t];
+      h += `<div class="card"><b>${d.e} ${d.n} — JEFE MUNDIAL (nivel ${wb.lv})</b><div>${bar('hp', wb.hp, wb.mhp)}</div><div class="hint">❤️ ${wb.hp}/${wb.mhp} · en (${wb.x}, ${wb.y}) · se retira en ${wb.left} turnos</div><button class="btn sm gold" data-ui="wbgo">📍 Ir al jefe</button></div><p class="hint">Todos los jugadores que le hagan daño reciben materiales, una gema y experiencia en su ciudad, y quien más daño haga se lleva además un objeto raro. Tiene ${SH.WORLD.wb.hpMul}× de vida y +${Math.round((SH.WORLD.wb.dmgMul - 1) * 100)}% de daño: júntate con tu gremio.</p>`;
+    } else h += `<p class="hint">Cada ${SH.WORLD.wb.every} turnos aparece un jefe gigante en las tierras salvajes. ${wb && wb.next !== undefined ? 'Próximo en unos <b>' + wb.next + '</b> turnos.' : ''}</p>`;
+    h += `<h3 class="hint" style="margin-top:12px">Regiones del mundo</h3>` + SH.WORLD.regions.map((r, i) => `<div class="line"><div class="g"><b>${r.e} ${r.n}</b><div class="hint" style="margin:0">Monstruos hasta ~${Math.round(r.lv * 100)}% de su nivel máximo · botín ×${r.loot}</div></div></div>`).join('');
+  }
+  return h;
+}
+/* ---------- historial por turnos (v1.45): gráficas de evolución, clasificación y crónica de cada turno ---------- */
+function histChart(H, metric) {
+  const W = 320, T = 176, L = 34, R = 8, tp = 8, bt = 22, rows = H.rows, ids = H.ids;
+  const val = (r, i) => r[i + 1] ? r[i + 1][metric] : null;
+  let mx = 1; for (const r of rows) for (let i = 0; i < ids.length; i++) { const v = val(r, i); if (v !== null && v > mx) mx = v; }
+  const t0 = rows[0][0], t1 = rows[rows.length - 1][0], sx = t => L + (t1 === t0 ? 0 : (t - t0) / (t1 - t0)) * (W - L - R), sy = v => T - bt - v / mx * (T - bt - tp);
+  let svg = `<svg viewBox="0 0 ${W} ${T}" style="width:100%;height:auto;background:#0003;border-radius:8px">`;
+  for (let k = 0; k <= 4; k++) { const v = mx * k / 4, y = sy(v); svg += `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="#fff2"/><text x="${L - 4}" y="${y + 3}" fill="#aab" font-size="9" text-anchor="end">${Math.round(v)}</text>`; }
+  for (let k = 0; k <= 4; k++) { const t = Math.round(t0 + (t1 - t0) * k / 4); svg += `<text x="${sx(t)}" y="${T - 8}" fill="#aab" font-size="9" text-anchor="middle">${t}</text>`; }
+  ids.forEach((id, i) => { const pts = rows.map(r => ({ t: r[0], v: val(r, i) })).filter(q => q.v !== null); if (!pts.length) return; const col = S.players[id].color, me = id === S.you;
+    svg += `<polyline fill="none" stroke="${col}" stroke-width="${me ? 2.6 : 1.6}" stroke-linejoin="round" points="${pts.map(q => sx(q.t).toFixed(1) + ',' + sy(q.v).toFixed(1)).join(' ')}"/>`; });
+  const ht = sheet.ht; if (ht >= t0 && ht <= t1) svg += `<line x1="${sx(ht)}" x2="${sx(ht)}" y1="${tp}" y2="${T - bt}" stroke="#ffd45a" stroke-width="1.5" stroke-dasharray="3 3"/>`;
+  return svg + '</svg>';
+}
+function histSheet() {
+  const H = S.hist; if (!H || !H.rows.length) return hd('📈 Historial') + '<p class="dim">Todavía no hay datos.</p>';
+  const m = sheet.metric || 0, t0 = H.rows[0][0], t1 = S.turn; sheet.ht = Math.max(t0, Math.min(t1, sheet.ht === undefined ? t1 : sheet.ht));
+  const ht = sheet.ht, names = ['Puntos', 'Unidades', 'Ciudades'];
+  let h = hd('📈 Historial por turnos') + `<div style="margin-bottom:6px">${names.map((n, i) => `<button class="chip btnlike ${m === i ? 'on' : ''}" data-ui="hm:${i}">${n}</button>`).join('')}</div>` + histChart(H, m);
+  const last = H.rows[H.rows.length - 1];
+  h += `<div style="margin:6px 0">${H.ids.map((id, i) => `<span class="chip" style="border-color:${S.players[id].color}"><span class="sw" style="background:${S.players[id].color};display:inline-block;width:8px;height:8px"></span> ${S.players[id].gt ? '[' + esc(S.players[id].gt) + '] ' : ''}${esc(S.players[id].name)}${id === S.you ? ' (tú)' : ''}${last[i + 1] ? ' · ' + last[i + 1][m] : ''}</span>`).join(' ')}</div>`;
+  h += `<h3 class="hint">Turno a turno</h3><div class="row" style="align-items:center;gap:6px;margin-bottom:6px"><button class="btn sm" data-ui="ht:-10">◀◀</button><button class="btn sm" data-ui="ht:-1">◀</button><b style="flex:1;text-align:center">Turno ${ht}${ht === t1 ? ' (ahora)' : ''}</b><button class="btn sm" data-ui="ht:1">▶</button><button class="btn sm" data-ui="ht:10">▶▶</button></div>`;
+  // clasificación en ese turno (el punto guardado más cercano que no pase de él)
+  let row = H.rows[0]; for (const r of H.rows) if (r[0] <= ht) row = r;
+  const st = H.ids.map((id, i) => ({ id, d: row[i + 1] })).filter(x => x.d).sort((a, b) => b.d[0] - a.d[0]);
+  h += `<div class="hint" style="margin:0 0 4px">Clasificación${row[0] !== ht ? ' (dato más cercano: turno ' + row[0] + ')' : ''}</div>` + st.map((x, i) => `<div class="line"><b style="min-width:24px">${i + 1}.</b><span class="sw" style="background:${S.players[x.id].color}"></span><div class="g">${esc(S.players[x.id].name)}${x.id === S.you ? ' <span class="tag">tú</span>' : ''}</div><span class="dim">${x.d[1]} 🛡️ · ${x.d[2]} 🏰</span><b style="min-width:44px;text-align:right">${x.d[0]}</b></div>`).join('');
+  // sucesos de ese turno: el registro propio más la crónica pública (sin repetir)
+  const seen = new Set(), evs = [];
+  for (const l of (S.log || []).concat(S.chron || [])) if (l.turn === ht && !seen.has(l.id) && l.k !== 'turn') { seen.add(l.id); evs.push(l); }
+  evs.sort((a, b) => a.id - b.id);
+  h += `<h3 class="hint" style="margin-top:10px">Qué pasó en el turno ${ht}</h3>` + (evs.length ? evs.map(l => `<div class="line"><div class="g">${esc(l.text)}</div></div>`).join('') : '<p class="dim">Sin sucesos guardados de este turno (el registro personal guarda solo los más recientes; la crónica pública, los últimos ~150 sucesos del mundo).</p>');
   return h;
 }
 function tradeSheet() {
@@ -734,8 +889,44 @@ function tradeSheet() {
   h += mk.length ? mk.map(k => `<div class="line"><div class="g">${SH.MATS[k].e} ${SH.MATS[k].n} <span class="dim">(tienes ${have(k)})</span></div>${stp('g', k, t.give[k] || 0, have(k))}</div>`).join('') : '<p class="dim">Esta ciudad no tiene materiales.</p>';
   if (c.st.it.length) h += '<div class="hint" style="margin-top:6px">Objeto:</div><div>' + c.st.it.map(it => `<button class="chip btnlike ${t.gi === it.id ? 'on' : ''}" data-ui="tri:${it.id}">${SH.itemName(it)}</button>`).join('') + '</div>';
   h += '<h3 class="hint">Pides</h3>' + SH.MAT_ORDER.map(k => `<div class="line"><div class="g">${SH.MATS[k].e} ${SH.MATS[k].n}</div>${stp('w', k, t.want[k] || 0, 60)}</div>`).join('');
+  { const val = o => Object.keys(o).reduce((a, k) => a + (SH.MAT_VAL[k] || 1) * (o[k] || 0), 0), itg = t.gi ? SH.itemVal(c.st.it.find(x => x.id === t.gi)) : 0, vg = val(t.give) + itg, vw = val(t.want);
+    h += `<p class="hint">⚖️ Valor de referencia: das <b>${vg}</b>${t.gi ? ' (con objeto)' : ''} · pides <b>${vw}</b>. ${vw > vg * 1.1 ? 'Pides más de lo que das: los bots lo rechazarán.' : vg > vw * 1.5 + 2 ? 'Das bastante más de lo que pides.' : vg || vw ? 'Oferta equilibrada.' : ''} <span class="dim">(cuero y hueso 1 · hierro 1,5 · acero 3 · alma 4 · escama 8). Los bots aceptan si das al menos el 90% de lo que piden.</span></p>`; }
   const empty = !Object.keys(t.give).length && !t.gi && !Object.keys(t.want).length;
   return h + `<div style="margin-top:12px"><button class="btn gold" data-ui="trs" ${empty ? 'disabled' : ''}>Enviar oferta</button></div>`;
+}
+/* ---------- registro con filtros, manual y avisos (v1.38) ---------- */
+let logF = 'todo';
+const LOG_CATS = { combate: ['⚔️ Combate', ['hit', 'phit', 'dead', 'loot', 'boss']], ciudad: ['🏰 Ciudad', ['city', 'summon', 'site']], pactos: ['🤝 Pactos y comercio', ['dip', 'pact', 'trade']], mundo: ['🌍 Mundo', ['season', 'story', 'sys']] };
+function logSheet() {
+  const chips = ['todo'].concat(Object.keys(LOG_CATS)).map(k => `<button class="chip btnlike ${logF === k ? 'on' : ''}" data-ui="lgf:${k}">${k === 'todo' ? 'Todo' : LOG_CATS[k][0]}</button>`).join('');
+  const rows = S.log.filter(l => logF === 'todo' || (LOG_CATS[logF] && LOG_CATS[logF][1].includes(l.k)));
+  let h = hd('Registro') + `<div style="margin-bottom:6px">${chips}</div>`, last = null;
+  for (const l of rows) { if (l.turn !== last) { last = l.turn; h += `<h3 class="hint" style="margin:10px 0 2px">Turno ${l.turn}</h3>`; } h += `<div class="line"><div class="g">${esc(l.text)}</div></div>`; }
+  return h + (rows.length ? '' : '<p class="dim">Sin novedades.</p>');
+}
+const MANUAL = [
+  ['🎯 Objetivo y turnos', 'Cada jugador empieza con una ciudad y unas unidades. En tu turno mueves, atacas, forjas y construyes; al terminar pulsas «Fin de turno». El turno avanza cuando todos están listos o se acaba el reloj. Si faltas varios turnos, un bot dirige tu ejército hasta que vuelvas.'],
+  ['⚔️ Unidades y combate', 'Cada unidad tiene salud, defensa, daño, alcance y movimiento. Al atacar, el segundo golpe del turno pega al 60%. Las armas a distancia pegan menos a quemarropa; la lanza no. Sube de nivel para gastar puntos en habilidades; a nivel ' + SH.CLASS_LV + ' eliges clase y a nivel ' + SH.SUB_LV + ' especialización (permanentes).'],
+  ['🪦 Caer y resucitar', 'Si una criatura mata a una unidad, deja una tumba con su equipo y mochila (30 turnos): cualquiera puede recogerla. Además queda en «Caídos» de tu ciudad: puedes resucitarla pagando almas y huesos; vuelve en 2 turnos. El protagonista reaparece solo en la capital.'],
+  ['🏰 Ciudades y edificios', 'En tu ciudad guardas botín, forjas, mejoras y reclutas. Cada ciudad produce materiales por turno según el terreno que la rodea y sus edificios (se ve en su hoja). Edificios: 🔨 Herrería, 🏕️ Cuartel, 🧱 Muralla, 🔭 Atalaya (nivel máx. 2) y ⛪ Iglesia (nivel 5: más defensa, huesos y almas más baratos y, al nivel 5, un ángel guardián que solo daña criaturas). Una construcción por ciudad y turno; se conservan al conquistarla.'],
+  ['🏗️ Constructor y carreteras', 'El Taller del constructor (nivel 1) permite contratar un 👷 constructor por ciudad: traza carreteras (1 cuero + 1 hierro por casilla, una obra por turno, pagadas por su ciudad) y cada casilla de carretera cuesta solo ' + SH.ROAD_COST + ' de movimiento. Con el taller a nivel 2 levanta 📦 estaciones de suministros sobre una carretera a ' + SH.BUILDER.near + ' casillas de una ciudad: las ciudades tuyas que tengan una estación comparten el mismo inventario. Si pierdes una ciudad, deja de compartir.'],
+  ['🛒 Carreta', 'Estación de suministros andante: las unidades pegadas a ella dejan y toman objetos, cambian de equipo, ganan +' + SH.CART.aura + ' de defensa y se curan ' + Math.round(SH.CART.heal * 100) + '% por turno. No ataca y no cuenta como unidad. Máximo una por ciudad.'],
+  ['🐺 Criaturas y jefes', 'Dan experiencia y botín (cuero, hueso, hierro, acero, almas, escamas y gemas). Suben de nivel con el tiempo. Los jefes cambian de fase al perder salud (+25% de daño por fase): no vayas solo. Toca una criatura para ver su nivel, vida y daño.'],
+  ['🕳️ Mazmorras', 'Instancias aparte con trampas, mucho botín y un jefe. Acerca una unidad a la entrada y pulsa «Entrar»; tus invocaciones cercanas te acompañan. Se reabastecen unos turnos después de despejarlas.'],
+  ['⚒️ Equipo y forja', 'La rareza es el número de efectos: común, poco común, raro, épico, legendario y mítico. En la forja fabricas, mejoras, encantas, reforjas y engarzas gemas. Tres piezas de armadura de la misma calidad dan bonos de set.'],
+  ['🤝 Diplomacia y comercio', 'En «Jugadores» ofreces paz o alianza y comercias materiales y objetos: lo que ofreces queda en depósito hasta que respondan (5 turnos). La hoja de comercio muestra un valor de referencia; los bots aceptan si das al menos el 90% de lo que piden. Los mercaderes ambulantes venden por tiempo limitado.'],
+  ['🌦️ Eventos', 'El clima cambia el combate, los torneos premian a la mejor unidad que esté en la arena y las hordas asaltan ciudades. Se pueden reducir en los ajustes del mundo.'],
+  ['🎮 Modos', 'Normal, Reto de una unidad, Por equipos, Rey Demonio (el rey recluta bestias y produce el doble de huesos), Historia (campaña cooperativa de 8 capítulos) y Mundo abierto (persistente, sin bots).'],
+  ['💡 Consejos', 'Lleva a tus unidades heridas junto a una ciudad o carreta. Pon una iglesia si reclutas o resucitas mucho. Vigila el registro (📜) y filtra por tipo. Activa los avisos para enterarte de tu turno.'],
+];
+function manualSheet() {
+  const t = sheet.tab || 'm';
+  let h = hd('📚 Manual y avisos') + `<div style="margin-bottom:6px"><button class="chip btnlike ${t === 'm' ? 'on' : ''}" data-ui="mtab:m">Manual</button><button class="chip btnlike ${t === 'n' ? 'on' : ''}" data-ui="mtab:n">🔔 Avisos</button></div>`;
+  if (t === 'm') return h + MANUAL.map(([ti, tx], i) => `<details class="offer" ${i === 0 ? 'open' : ''}><summary><b>${ti}</b></summary><p class="hint" style="margin:6px 0 0">${tx}</p></details>`).join('');
+  const st = pushStatus(), pn = S.pn || {};
+  const opts = [['turn', 'Cuando empieza tu turno'], ['attack', 'Cuando te atacan otros jugadores'], ['chat', 'Mensajes del chat'], ['events', 'Propuestas, pactos y hordas'], ['remind', 'Recordatorio antes de que acabe el turno']];
+  h += st === 'on' ? '<p class="hint ok">🔔 Avisos activados en este dispositivo. Elige cuáles quieres recibir:</p>' : '<p class="hint lack">Los avisos no están activados en este dispositivo' + (st === 'ios-install' ? ': en iPhone instala el juego en la pantalla de inicio primero' : st === 'denied' ? ': el navegador los bloqueó' : '') + '. Estas preferencias se guardan igual y valen para todos tus dispositivos.</p>' + (st === 'off' ? '<button class="btn gold" data-ui="pushon">Activar avisos</button>' : '');
+  return h + opts.map(([k, tx]) => `<div class="line"><div class="g">${tx}</div><button class="btn sm ${pn[k] === false ? '' : 'gold'} fix" data-ui="pn:${k}">${pn[k] === false ? 'Apagado' : 'Activo'}</button></div>`).join('');
 }
 function dgOf(u) { // qué puede hacer una unidad respecto a las mazmorras
   const cb = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
@@ -803,8 +994,8 @@ function infoSheet() {
     const d = (S.dungeons || []).find(x => x.id === i.id); if (!d) return hd('Mazmorra') + '<p class="dim">Ya no está a la vista.</p>';
     const TT = SH.DUNGEON.tiers[d.tier - 1], cb = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
     let h = hd(`${TT.e} ${esc(d.name)}`) + `<p>Otro mundo bajo tierra: criaturas de nivel ${TT.lv[0]}–${TT.lv[1]}, un jefe al final, muchos 💎 tesoros y ⚠️ trampas ocultas. Nivel recomendado: <b>${d.rec}</b>.${d.cleared ? ' <b class="ok">Despejada: se reabastecerá pronto.</b>' : ''}</p><p class="hint">Entras con una unidad pegada a la entrada (🕳️) y sales por la puerta 🚪 de la primera sala. Si tu unidad cae dentro, se pierde como en cualquier combate.</p>`;
-    const near = S.mine.filter(u => (u.dg ? u.dg === d.id && cb(u, d.exit) <= 1 : d.x >= 0 && cb(u, d) <= 1));
-    h += near.length ? near.map(u => `<div class="line"><div class="g">${esc(u.name)} <span class="dim">nivel ${u.lv}</span></div>${dgBtn(u, u.dg ? { leave: d } : { enter: d })}</div>`).join('') : '<p class="hint"><b>Acerca una de tus unidades</b> (a una casilla o menos) para entrar o salir.</p>';
+    const near = S.mine.filter(u => !u.cart && !u.bld && !u.sg && (u.dg ? u.dg === d.id && cb(u, d.exit) <= 1 : d.x >= 0 && cb(u, d) <= 1));
+    h += near.length ? near.map(u => `<div class="line"><div class="g">${esc(u.name)} <span class="dim">nivel ${u.lv}</span></div>${dgBtn(u, u.dg ? { leave: d } : { enter: d })}</div>`).join('') : '<p class="hint"><b>Acerca una de tus unidades</b> (a una casilla o menos) para entrar o salir. <span class="dim">Tus invocaciones cercanas acompañan a su invocador; la carreta se queda fuera.</span></p>';
     return h;
   }
   if (i.t === 't') { if (!S.tourn) return hd('Torneo') + '<p class="dim">El torneo ya terminó.</p>'; return hd('🏟️ Torneo') + `<p>Arena en (${S.tourn.x}, ${S.tourn.y}). Quedan <b>${S.tourn.left}</b> turno(s). Al terminar gana la mejor unidad (nivel, daño, defensa y salud) que esté en la arena o en las casillas pegadas. Premio: 2 gemas, un objeto raro y experiencia. ¡Ojo: los rivales también pueden ir!</p>`; }
@@ -816,7 +1007,7 @@ function infoSheet() {
       return `<div class="line" style="flex-wrap:wrap"><div class="g"><b>${esc(o.txt)}</b><div>${SH.MAT_ORDER.filter(k => o.cost[k]).map(k => `<span class="chip ${u0 && (u0.inv.m[k] || 0) >= o.cost[k] ? 'ok' : 'lack'}">${SH.MATS[k].e} ${u0 ? (u0.inv.m[k] || 0) : 0}/${o.cost[k]}</span>`).join('')}</div></div>${o.sold ? '<span class="dim">Vendido</span>' : `<button class="btn sm ${ok ? 'gold' : ''}" ${ok ? '' : 'disabled'} data-ui="mb:${m.id},${n},${u0 ? u0.id : 0}">Comprar</button>`}</div>`; }).join('');
     return h;
   }
-  if (i.t === 's') { const q = (S.sites || []).find(x => x.id === i.id); if (!q) return hd('Sitio') + '<p class="dim">Ya no está.</p>'; const d = SH.SITES[q.k]; return hd(d.e + ' ' + d.n) + `<p>${q.k === 'cofre' ? 'Un cofre con materiales y, a veces, un objeto raro.' : 'Ruinas antiguas: guardan un objeto raro y almas, pero suelen estar vigiladas.'} Mueve una unidad encima para abrirlo (necesita espacio en la mochila).</p>`; }
+  if (i.t === 's') { const q = (S.sites || []).find(x => x.id === i.id); if (!q) return hd('Sitio') + '<p class="dim">Ya no está.</p>'; const d = SH.SITES[q.k]; return hd(d.e + ' ' + d.n) + `<p>${q.k === 'tumba' ? 'La tumba de ' + esc(q.nm || 'una unidad') + ': guarda su equipo y su mochila. ' + (q.mine ? 'Es tuya: recógela con otra unidad.' : 'Se puede saquear.') : q.k === 'cofre' ? 'Un cofre con materiales y, a veces, un objeto raro.' : 'Ruinas antiguas: guardan un objeto raro y almas, pero suelen estar vigiladas.'} Mueve una unidad encima para abrirlo (necesita espacio en la mochila).</p>`; }
   const c = S.cities.find(x => x.id === i.id); if (!c) return '';
   const owner = c.o === null ? null : S.players[c.o];
   return hd('🏚️ ' + esc(c.name)) + (bldHtml(c.b) ? `<div>${bldHtml(c.b)}</div>` : '') + `<p>${owner ? 'Controlada por <b>' + esc(owner.name) + '</b>' : 'Aldea sin dueño: mueve una unidad encima para conquistarla (puede tener botín en el almacén).'}</p>`;
@@ -830,6 +1021,14 @@ $('sheet').addEventListener('click', e => {
   if (k === 'close') closeSheet();
   else if (k === 'gotocart') { closeSheet(); centerOn(+b.dataset.x, +b.dataset.y); }
   else if (k === 'rename') { const u = S.mine.find(x => x.id === selId); if (!u) return; const nm = prompt('Nuevo nombre para esta unidad (máx. 16 letras):', u.name); if (nm !== null && nm.trim()) send({ t: 'cmd', a: 'rename', u: u.id, name: nm }); }
+  else if (k === 'gcreate') { const n = prompt('Nombre del gremio (3-16 letras):', ''); if (n === null || !n.trim()) return; const t = prompt('Etiqueta (2-4 letras o números):', n.trim().slice(0, 3).toUpperCase()); if (t === null || !t.trim()) return; act({ a: 'guild', d: 'create', n, t }); }
+  else if (k === 'gleave') { if (confirm('¿Dejar el gremio? Se acaba la alianza con sus miembros.')) act({ a: 'guild', d: 'leave' }); }
+  else if (k === 'gkick') { if (confirm('¿Expulsar a ' + (S.players[+v] ? S.players[+v].name : 'este jugador') + '?')) act({ a: 'guild', d: 'kick', to: +v }); }
+  else if (k === 'endprot') { if (confirm('¿Terminar tu protección de novato? Ya no podrás volver a tenerla.')) act({ a: 'endprot' }); }
+  else if (k === 'wbgo') { if (S.wb && S.wb.id) { closeSheet(); centerOn(S.wb.x, S.wb.y); } }
+  else if (k === 'hist') openSheet('hist', { metric: 0, ht: S.turn });
+  else if (k === 'hm') { sheet.metric = +v; renderSheet(); }
+  else if (k === 'ht') { sheet.ht = (sheet.ht === undefined ? S.turn : sheet.ht) + +v; renderSheet(); }
   else if (k === 'chsend') chatSend();
   else if (k === 'goto') { gotoMode = gotoMode === selId ? null : selId; if (gotoMode) toast('Toca la casilla de destino en el mapa'); renderSheet(); }
   else if (k === 'tab') { sheet.tab = v; renderSheet(); }
@@ -844,6 +1043,10 @@ $('sheet').addEventListener('click', e => {
   else if (k === 'invite') { navigator.clipboard && navigator.clipboard.writeText(S.code).then(() => toast('Código copiado')).catch(() => {}); }
   else if (k === 'force') { if (confirm('¿Terminar el turno ahora para todos?')) send({ t: 'cmd', a: 'force' }); }
   else if (k === 'brk') { const pp = S.players[+v]; if (confirm('¿Romper el pacto con ' + pp.name + '?')) act({ a: 'dip', d: 'break', to: +v }); }
+  else if (k === 'lgf') { logF = v; renderSheet(); }
+  else if (k === 'mtab') { sheet.tab = v; renderSheet(); }
+  else if (k === 'pushon') { enablePush(); }
+  else if (k === 'pn') { const pn = Object.assign({}, S.pn || {}); if (pn[v] === false) delete pn[v]; else pn[v] = false; S.pn = pn; send({ t: 'push', a: 'prefs', pn }); renderSheet(); }
   else if (k === 'tr') { sheet = { mode: 'trade', tab: 'x', tr: { to: +v, fc: 0, give: {}, want: {}, gi: 0 } }; renderSheet(); }
   else if (k === 'trc') { sheet.tr.fc = +v; sheet.tr.give = {}; sheet.tr.gi = 0; renderSheet(); }
   else if (k === 'tri') { sheet.tr.gi = sheet.tr.gi === +v ? 0 : +v; renderSheet(); }
@@ -942,6 +1145,79 @@ const DGTHEME = [
   { fl: '#3d3550', fl2: '#463d5c', wl: '#150f22', wl2: '#201733', ac: '#ff5252' }    // 5 abismo
 ];
 function dgTier(x, y) { for (const d of S.dungeons || []) if (x >= d.exit.x - 8 && x <= d.exit.x + 14 && y >= d.exit.y - 8 && y <= d.exit.y + 7) return d.tier; return 1; }
+/* ---------- pixel art fase 2: terreno. Losetas de 16×16 generadas con ruido determinista (variantes por casilla) ---------- */
+const TILE_STAMPS = {
+  tree: { rows: ['..kkkk..', '.kGGGgk.', 'kGGgGGGk', 'kGgGGGGk', 'kGGGGgGk', '.kGGGGk.', '..kkkk..', '...nn...', '...nn...'], pal: { k: '#173a1e', G: '#2f6b36', g: '#4a8f4a', n: '#5a3a1a' } },
+  pine: { rows: ['...kk...', '..kGGk..', '..kGgk..', '.kGGGGk.', '.kGgGGk.', 'kGGGGgGk', 'kGgGGGGk', '.kkknkk.', '...nn...'], pal: { k: '#173a1e', G: '#2a5e33', g: '#44854a', n: '#5a3a1a' } },
+  hill: { rows: ['....kkkk....', '..kkHHHHkk..', '.kHHHhHHHHk.', 'kHHhHHHHHhHk', 'kHHHHHhHHHHk', '.kkkkkkkkkk.'], pal: { k: '#5a4d28', H: '#a89a5c', h: '#c4b678' } },
+  peak: { rows: ['.......kk.......', '......kwwk......', '.....kwwWwk.....', '....kwWWMWwk....', '...kWWMMMMWWk...', '..kMMMmMMMMMMk..', '.kMMmMMMMmMMMMk.', 'kMMMMMMmMMMMmMMk', 'kMmMMMMMMMMMMMMk', 'kkkkkkkkkkkkkkkk'], pal: { k: '#2b2f38', w: '#f2f5fa', W: '#c9d2de', M: '#7d8594', m: '#5d6472' } },
+  cactus: { rows: ['..G..', 'G.G.G', 'G.G.G', 'GGGGG', '..G..', '..G..'], pal: { G: '#4f8a3d' } },
+};
+const tileCache = new Map();
+function tRng(seed) { let s = seed >>> 0 || 1; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; }
+function tStamp(x, st, ox, oy) { const S2 = TILE_STAMPS[st]; S2.rows.forEach((r, j) => { for (let i = 0; i < r.length; i++) { const c = S2.pal[r[i]]; if (!c || r[i] === '.') continue; const px = ox + i, py = oy + j; if (px < 0 || py < 0 || px > 15 || py > 15) continue; x.fillStyle = c; x.fillRect(px, py, 1, 1); } }); }
+function tileImg(t, v, fr) {
+  const key = t + v + (t === 'w' ? fr : ''); let cv = tileCache.get(key); if (cv) return cv;
+  cv = document.createElement('canvas'); cv.width = cv.height = 16; const x = cv.getContext('2d'); const R = tRng(t.charCodeAt(0) * 97 + v * 31 + 7);
+  const dots = (n, col) => { x.fillStyle = col; for (let i = 0; i < n; i++) x.fillRect((R() * 16) | 0, (R() * 16) | 0, 1, 1); };
+  const grass = () => { x.fillStyle = '#4d7a3b'; x.fillRect(0, 0, 16, 16); dots(16, '#5a8a45'); dots(9, '#3f6a31'); for (let i = 0; i < 2; i++) { const gx = 1 + ((R() * 13) | 0), gy = 2 + ((R() * 12) | 0); x.fillStyle = '#3a6a2d'; x.fillRect(gx, gy, 1, 2); x.fillRect(gx + 1, gy - 1, 1, 2); } };
+  if (t === 'g') { grass(); if (v === 1) { x.fillStyle = '#f4d24f'; x.fillRect(4, 10, 1, 1); x.fillStyle = '#e585b8'; x.fillRect(11, 5, 1, 1); } if (v === 2) { x.fillStyle = '#eceaf2'; x.fillRect(9, 11, 1, 1); } }
+  else if (t === 'f') { grass(); x.fillStyle = '#00000022'; x.fillRect(0, 0, 16, 16); const pine = v === 1; tStamp(x, pine ? 'pine' : 'tree', 0 + (v === 2 ? 1 : 0), 6); tStamp(x, pine ? 'tree' : 'pine', 8, 0 + v); }
+  else if (t === 'h') { grass(); tStamp(x, 'hill', 0, 1 + (v & 1)); tStamp(x, 'hill', 4, 9 - (v >> 1)); }
+  else if (t === 'm') { x.fillStyle = '#5d6472'; x.fillRect(0, 0, 16, 16); dots(14, '#6b7380'); dots(8, '#4f5560'); tStamp(x, 'peak', 0, 5 + (v & 1)); }
+  else if (t === 'd') { x.fillStyle = '#c2a45a'; x.fillRect(0, 0, 16, 16); dots(18, '#d0b36d'); dots(10, '#a98c45'); for (let i = 0; i < 2; i++) { const wx = (R() * 10) | 0, wy = 2 + ((R() * 12) | 0); x.fillStyle = '#b39448'; x.fillRect(wx, wy, 4, 1); x.fillRect(wx + 4, wy - 1, 2, 1); } if (v === 1) tStamp(x, 'cactus', 9, 8); if (v === 2) { x.fillStyle = '#8f7a42'; x.fillRect(4, 11, 2, 1); x.fillRect(5, 10, 1, 1); } }
+  else if (t === 'w') { x.fillStyle = '#2a5b8c'; x.fillRect(0, 0, 16, 16); dots(10, '#27557f'); const o = fr ? 3 : 0; for (const [wx, wy] of [[1, 3], [9, 7], [3, 12]]) { const xx = (wx + o + v * 2) % 13; x.fillStyle = '#3d78ad'; x.fillRect(xx, wy, 3, 1); x.fillStyle = '#5a97c9'; x.fillRect(xx + 1, wy - 1, 1, 1); } if (!fr) { x.fillStyle = '#9bd0ee'; x.fillRect((5 + v * 4) % 16, 5 + v, 1, 1); } }
+  else { x.fillStyle = TCOL[t] || '#000'; x.fillRect(0, 0, 16, 16); }
+  tileCache.set(key, cv); return cv;
+}
+const tileVar = (x, y) => ((x * 73856093) ^ (y * 19349663)) >>> 0;
+/* ---------- pixel art fase 3: edificios, ciudades, sitios del mapa y efectos ---------- */
+const PXS = { // sprites por letras (ancho y alto libres). V/v pared, Q/q tejado, T/t equipo (dinámicos)
+  house: ['.....kkkkkk.....', '...kkQQQQQQkk...', '..kQQQQqQQQQQk..', '.kQQqQQQQQQqQQk.', 'kQQQQQQqQQQQQQQk', 'kkkkkkkkkkkkkkkk', '.kVVVVVVVVVVVVk.', '.kVVyyVVVVVyyVk.', '.kVVyyVVVVVyyVk.', '.kVVVVVnnVVVVVk.', '.kVVVVVnnVVVVvk.', '.kvvvvvnnvvvvvk.', '.kkkkkkkkkkkkkk.'],
+  forge: ['..........mm....', '.........mm.....', '........kkkk....', '........kllk....', '..kkkkkkklmkkkk.', '.kQQQQQQQQQQQQk.', 'kQQqQQQQQQQqQQQk', 'kkkkkkkkkkkkkkkk', '.kVVVVVVVVVVVVk.', '.kVVkkkkVVVVVVk.', '.kVVkooFkVVyyVk.', '.kVVkoFFkVVyyVk.', '.kVVkkkkkVVVVVk.', '.kvvvvvvvvvvvvk.', '.kkkkkkkkkkkkkk.', '......kddk......'],
+  barracks: ['...........kTTT.', '...........kTTt.', '...........k....', '.kkk.kkk.kkk.kk.', 'kVVVVVVVVVVVVVVk', 'kVVkVVVVVVVVkVVk', 'kVVkVVVVVVVVkVVk', 'kVVVVVVnnnnVVVVk', 'kVVVVVVnnnnVVVVk', 'kvvvvvvnnnnvvvvk', 'kkkkkkkkkkkkkkkk'],
+  stable: ['....kkkkkkkk....', '..kkBBBBBBBBkk..', '.kBBbBBBBBBbBBk.', 'kBBBBBBBBBBBBBBk', 'kkkkkkkkkkkkkkkk', 'kbbbbbnnnnbbbbbk', 'kbbbbbnnnnbbbbbk', 'kbbbbbnnnnbbbbbk', 'kbbbbbnnnnbbzzzk', 'kkkkkkkkkkkkkkkk'],
+  tower: ['...kk...', '..kQQk..', '.kQQQQk.', 'kQQqQQQk', 'kkkkkkkk', '.kVVVVk.', '.kVkkVk.', '.kVkkVk.', '.kVVVVk.', '.kvVVVk.', '.kVVVVk.', '.kvvvvk.', '.kvnnvk.', '.kkkkkk.'],
+  church: ['.......kk.......', '......kxxk......', '.......kk.......', '......kQQk......', '.....kQQQQk.....', '....kQQqQQQk....', '...kQQQQQQQQk...', '..kQQqQQQQqQQk..', '.kkkkkkkkkkkkkk.', '.kVVVVVVVVVVVVk.', '.kVVuuVVVVuuVVk.', '.kVVuuVVVVuuVVk.', '.kVVVVVnnVVVVVk.', '.kVVVVVnnVVVVVk.', '.kvvvvvnnvvvvvk.', '.kkkkkkkkkkkkkk.'],
+  workshop: ['...kkkkkkkkkkk..', '..kQQQQQQQQQQQk.', '.kQQqQQQQQQqQQQk', 'kkkkkkkkkkkkkkkk', 'kVVVVVVVVVVVVVVk', 'kVVnnnnVVVVVVVVk', 'kVVnnnnVVVVddddk', 'kVVnnnnVVVVVddVk', 'kvvnnnnvvvvvddvk', 'kkkkkkkkkkkkkkkk'],
+  siegeshop: ['..kkkkkkkkkkkk..', '.kQQQQQQQQQQQQk.', 'kQQqQQQQQQqQQQQk', 'kkkkkkkkkkkkkkkk', 'kVVVVVVVVVVVVVVk', 'kVkkkkkkkkkkkVVk', 'kVkBBBBBBBBBkVVk', 'kVkbbbbbbbbbkVVk', 'kVkkkkkkkkkkkVVk', 'kvvvdvvvvdvvvvvk', 'kkkkkkkkkkkkkkkk'],
+  chest: ['..kkkkkkkkkk..', '.kBBBBBBBBBBk.', 'kBbbbbbbbbbbbk', 'kkkkkkkkkkkkkk', 'kBBBBYYYYBBBBk', 'kbbbbYkkYbbbbk', 'kbbbbYYYYbbbbk', 'kkkkkkkkkkkkkk'],
+  tomb: ['....kkkk....', '..kklllllkk.', '.klllllllllk', '.kllkkllllk.', '.kllkkllllk.', '.klkkkkkllk.', '.kllkkllllk.', '.kllkkllllk.', '.kllllllllk.', 'ekkkkkkkkkke'],
+  crate: ['kkkkkkkkkk', 'kBBBBBBBBk', 'kBkBBBBkBk', 'kBBkBBkBBk', 'kBBBkkBBBk', 'kBBkBBkBBk', 'kBkBBBBkBk', 'kBBBBBBBBk', 'kkkkkkkkkk'],
+  gem: ['...kkkk...', '..kaaaak..', '.kawaaaak.', 'kaaaaaaaak', 'kauuuuuuak', '.kuuuuuuk.', '..kuuuuk..', '...kuuk...', '....kk....'],
+  spikes: ['..k...k...k...', '.klk.klk.klk..', '.klk.klk.klk..', 'klllklllklllk.', 'kkkkkkkkkkkkk.', 'kddddddddddddk', 'kkkkkkkkkkkkkk'],
+  ruina: ['.kk.......kk...', '.klk.....klk...', '.klk..kk.klk...', '.klk.kllk.kk...', '.klk.kllk.kllk.', '.klk.kllk.kllk.', 'kkllkkllkkkllkk', 'klllllllllllllk', 'kkkkkkkkkkkkkkk'],
+  pit: ['...kkkkkkkk...', '..kmmmmmmmmk..', '.kmkkkkkkkkmk.', 'kmkkddddddkkmk', 'kmkddddddddkmk', 'kmkddddddddkmk', 'kmkkddddddkkmk', '.kmkkkkkkkkmk.', '..kmmmmmmmmk..', '...kkkkkkkk...'],
+  door: ['..kkkkkkkk..', '.kBBBBBBBBk.', 'kBbbbbbbbbBk', 'kBbnnnnnnbBk', 'kBbnnnnnnbBk', 'kBbnnnnnnbBk', 'kBbnnnnnnbBk', 'kBbnnnnnnbBk', 'kBbnnnnYnbBk', 'kBbnnnnnnbBk', 'kkkkkkkkkkkk'],
+  stall: ['..kkkkkkkkkkkk..', '.krxrxrxrxrxrk..', 'krxrxrxrxrxrxrk.', 'kkkkkkkkkkkkkkk.', 'kb...........bk.', 'kb..ooyyuu...bk.', 'kb..ooyyuu...bk.', 'kBBBBBBBBBBBBBk.', 'kbbbbbbbbbbbbbk.', 'kkkkkkkkkkkkkkk.'],
+  arena: ['.......kk.......', '......kTTk......', '.....kTTTTk.....', '....kTTtTTTk....', '...kTTTTTTTTk...', '..kTTtTTTTtTTk..', '.kTTTTTTTTTTTTk.', 'kTTTTTTTnnTTTTTk', 'kTTTTTTTnnTTTTTk', 'kkkkkkkkkkkkkkkk'],
+};
+const PXF = { // sprites dibujados con rectángulos (ancho, alto, función)
+  castle: [16, 16, (x, P) => { const R = (c, a, b, w, h) => { x.fillStyle = c; x.fillRect(a, b, w, h); };
+    R(P.k, 1, 6, 4, 10); R(P.m, 2, 7, 2, 8); R(P.k, 11, 6, 4, 10); R(P.m, 12, 7, 2, 8);
+    R(P.k, 4, 4, 8, 12); R(P.l, 5, 5, 6, 11); R(P.m, 5, 5, 1, 11); R(P.k, 5, 12, 6, 4); R(P.d, 6, 12, 4, 4); R(P.n, 7, 12, 2, 4);
+    for (const a of [1, 3, 11, 13]) R(P.k, a, 5, 1, 1); for (const a of [4, 6, 9, 11]) R(P.k, a, 3, 2, 1);
+    R(P.y, 7, 7, 2, 2); R(P.k, 7, 6, 2, 1); R(P.k, 2, 9, 1, 2); R(P.k, 13, 9, 1, 2);
+    R(P.k, 8, 0, 1, 4); R(P.T, 9, 0, 4, 2); R(P.t, 9, 2, 3, 1); }],
+  ruincity: [16, 16, (x, P) => { const R = (c, a, b, w, h) => { x.fillStyle = c; x.fillRect(a, b, w, h); };
+    R(P.k, 1, 9, 4, 7); R(P.m, 2, 10, 2, 6); R(P.k, 5, 12, 6, 4); R(P.d, 6, 13, 4, 3); R(P.k, 11, 7, 4, 9); R(P.m, 12, 8, 2, 8);
+    R(P.k, 1, 8, 1, 1); R(P.k, 3, 8, 1, 1); R(P.k, 12, 6, 1, 1); R(P.k, 14, 6, 1, 1); R(P.e, 5, 11, 2, 1); R(P.e, 9, 11, 1, 1); R(P.E, 12, 15, 2, 1); }],
+};
+const pxCache = new Map();
+function pxImg(name, dyn) {
+  const key = name + '|' + (dyn ? Object.keys(dyn).map(k => k + dyn[k]).join(',') : ''); let c = pxCache.get(key); if (c) return c;
+  const rows = PXS[name], P = Object.assign({}, SPR_PAL, { n: '#4a2e1b', B: '#a8713f', Y: '#c79a22' }, dyn || {});
+  if (rows) { c = document.createElement('canvas'); c.width = rows[0].length; c.height = rows.length; const x = c.getContext('2d'); rows.forEach((r, y) => { for (let i = 0; i < r.length; i++) { const col = P[r[i]]; if (!col || r[i] === '.') continue; x.fillStyle = col; x.fillRect(i, y, 1, 1); } }); }
+  else { const f = PXF[name]; c = document.createElement('canvas'); c.width = f[0]; c.height = f[1]; f[2](c.getContext('2d'), P); }
+  pxCache.set(key, c); return c;
+}
+// dibuja el sprite con el centro-inferior en (cx, by); k = píxeles de pantalla por píxel del sprite
+function drawPx(name, cx, by, k, dyn) {
+  const im = pxImg(name, dyn), prev = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(im, cx - im.width * k / 2, by - im.height * k, im.width * k, im.height * k); ctx.imageSmoothingEnabled = prev;
+}
+const ROOFS = [['#a8453a', '#7a2f27'], ['#8a5a32', '#5e3a1c'], ['#9c4f3a', '#6e2f20'], ['#6a7a9a', '#48566f']], WALLS = [['#d9c7a0', '#b59f78'], ['#cdb58c', '#a88f68'], ['#e0d2b4', '#bfae8c'], ['#c4ad86', '#a08a62']];
+const dynRoof = (a, b) => ({ Q: a, q: b }), dynWall = (a, b) => ({ V: a, v: b });
 function drawDgTile(t, k, x, y, px, py, z, bossNear) {
   const th = DGTHEME[dgTier(x, y) - 1], W = S.w, T = S.terr, isF = i => T[i] === 'r';
   if (t === 'r') {
@@ -963,21 +1239,24 @@ function drawDgTile(t, k, x, y, px, py, z, bossNear) {
 }
 /* ---------- ciudades: solar de 3×3 y edificios visibles ---------- */
 function bldBox(x, y, w, h, wall, roof) { ctx.fillStyle = wall; ctx.fillRect(x, y, w, h); ctx.fillStyle = roof; ctx.beginPath(); ctx.moveTo(x - w * .1, y); ctx.lineTo(x + w / 2, y - h * .55); ctx.lineTo(x + w * 1.1, y); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.lineWidth = 1; ctx.strokeRect(x, y, w, h); }
-function drawTower(x, y, z, lv) { // atalaya: torre de piedra con tejado; nivel 2 más alta, tejado dorado y bandera
-  const w = z * (lv > 1 ? .26 : .22), h = z * (lv > 1 ? .62 : .46);
-  ctx.fillStyle = '#8d93a0'; ctx.fillRect(x - w / 2, y - h / 2, w, h); ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 1; ctx.strokeRect(x - w / 2, y - h / 2, w, h);
-  ctx.fillStyle = lv > 1 ? '#e6b450' : '#b5483a'; ctx.beginPath(); ctx.moveTo(x - w * .7, y - h / 2); ctx.lineTo(x, y - h / 2 - w * 1.1); ctx.lineTo(x + w * .7, y - h / 2); ctx.fill();
-  ctx.fillStyle = '#2b2f38'; ctx.fillRect(x - w * .12, y - h * .15, w * .24, h * .22);
-  if (lv > 1) { ctx.fillStyle = '#fff'; ctx.fillRect(x, y - h / 2 - w * 1.9, 1.5, w * .8); ctx.fillRect(x + 1.5, y - h / 2 - w * 1.9, w * .5, w * .35); }
+function drawTower(x, y, z, lv) { // atalaya: torre de piedra; nivel 2 más alta, tejado dorado y bandera
+  const k = z * (lv > 1 ? .056 : .042);
+  drawPx('tower', x, y + 7 * k, k, Object.assign(lv > 1 ? dynRoof('#e6b450', '#b88a30') : dynRoof('#b5483a', '#7a2f27'), dynWall('#9096a3', '#666c7a')));
+  if (lv > 1) { ctx.fillStyle = '#fff'; ctx.fillRect(x, y - 7 * k - k * 3, Math.max(1, k * .6), k * 3); ctx.fillRect(x, y - 7 * k - k * 3, k * 2.4, k * 1.4); }
 }
-function drawHouse(x, y, w, h, seed, ruined) { // casa de aldea: paredes, tejado a dos aguas, puerta y ventana
-  const walls = ['#d9c7a0', '#cdb58c', '#e0d2b4', '#c4ad86'], roofs = ['#a8453a', '#8a5a32', '#9c4f3a', '#7a3f2c'];
-  const wc = ruined ? '#8d8576' : walls[seed % 4], rc = ruined ? '#5a5248' : roofs[(seed >> 2) % 4];
-  ctx.fillStyle = wc; ctx.fillRect(x, y, w, h);
-  ctx.fillStyle = rc; ctx.beginPath(); ctx.moveTo(x - w * .12, y + h * .04); ctx.lineTo(x + w / 2, y - h * .62); ctx.lineTo(x + w * 1.12, y + h * .04); ctx.closePath(); ctx.fill();
-  ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.lineWidth = 1; ctx.strokeRect(x, y, w, h);
-  ctx.fillStyle = '#4a2e1a'; ctx.fillRect(x + w * .38, y + h * .45, w * .26, h * .55);
-  ctx.fillStyle = '#ffe9a8'; ctx.fillRect(x + w * .08, y + h * .22, w * .2, h * .22); if (w > 8) ctx.fillRect(x + w * .72, y + h * .22, w * .2, h * .22);
+function drawWorkshop(x, y, z, lv) { // taller del constructor: cobertizo con yunque y (nivel 2) grúa
+  const k = z * .036;
+  drawPx('workshop', x, y + 5 * k, k, Object.assign(lv >= 2 ? dynRoof('#5b7aa0', '#3f5878') : dynRoof('#6b4a2a', '#4a3018'), dynWall('#a8865a', '#826440')));
+  if (lv >= 2) { ctx.strokeStyle = '#d9d2c0'; ctx.lineWidth = Math.max(1, k * 1.2); ctx.beginPath(); ctx.moveTo(x + k * 5, y - 5 * k); ctx.lineTo(x + k * 5, y - 10 * k); ctx.lineTo(x + k * 9, y - 10 * k); ctx.lineTo(x + k * 9, y - 7 * k); ctx.stroke(); }
+}
+function drawChurch(x, y, z, lv) { // iglesia: crece con el nivel; nivel 4 tejado dorado, nivel 5 vidrieras azules y aureola
+  const k = z * (.03 + .0045 * lv);
+  drawPx('church', x, y + 8 * k, k, Object.assign(lv >= 4 ? dynRoof('#e6b450', '#b88a30') : dynRoof('#7d5a3c', '#583b24'), lv >= 3 ? dynWall('#ece7d9', '#c9c3b0') : dynWall('#d6d0c0', '#b5af9c'), { u: lv >= 5 ? '#6ab7ff' : '#3a3744' }));
+  if (lv >= 5) { const g1 = ctx.createRadialGradient(x, y - k * 2, 1, x, y - k * 2, z * .9); g1.addColorStop(0, 'rgba(255,240,170,.45)'); g1.addColorStop(1, 'rgba(255,240,170,0)'); ctx.fillStyle = g1; ctx.fillRect(x - z, y - z, 2 * z, 2 * z); }
+}
+function drawHouse(x, y, w, h, seed, ruined) { // casa de aldea en pixel art; en ruinas, gris
+  const r = ROOFS[(seed >> 2) % 4], wl = WALLS[seed % 4], k = w * 1.35 / 16;
+  drawPx('house', x + w / 2, y + h * 1.08, k, ruined ? Object.assign(dynRoof('#5a5248', '#3e3832'), dynWall('#8d8576', '#6e675a')) : Object.assign(dynRoof(r[0], r[1]), dynWall(wl[0], wl[1])));
 }
 function merlons(x, y, len, horiz, t) { // almenas a lo largo de un lienzo de muralla
   const n = Math.max(2, Math.floor(len / (t * 2.2))), step = len / n; ctx.fillStyle = ctx.fillStyle;
@@ -987,7 +1266,7 @@ function drawCity(c, ox, oy, z) {
   const col = c.o === null ? '#9aa0aa' : S.players[c.o].color, b = c.b || {}, own = c.o !== null;
   const X = ox + (c.x - 1) * z, Y = oy + (c.y - 1) * z, cx = ox + (c.x + .5) * z, cy = oy + (c.y + .5) * z;
   const dark = own && S.king != null && S.king === c.o; // fortaleza del Rey Demonio
-  const tot = (b.herreria || 0) + (b.cuartel || 0) + (b.muralla || 0) + (b.atalaya || 0) + (c.cart ? 1 : 0), det = z >= 20;
+  const tot = (b.herreria || 0) + (b.cuartel || 0) + (b.muralla || 0) + (b.atalaya || 0) + (b.iglesia ? 1 : 0) + (b.taller ? 1 : 0) + (c.cart ? 1 : 0), det = z >= 20;
   // suelo del solar
   if (dark) { ctx.fillStyle = '#1a0f1f'; ctx.fillRect(X, Y, 3 * z, 3 * z); ctx.fillStyle = 'rgba(160,20,30,.28)'; ctx.fillRect(X, Y, 3 * z, 3 * z); }
   else { ctx.fillStyle = own ? 'rgba(160,190,120,.55)' : 'rgba(190,175,140,.35)'; ctx.fillRect(X, Y, 3 * z, 3 * z);
@@ -1011,26 +1290,15 @@ function drawCity(c, ox, oy, z) {
         if (own && tot >= 6) drawHouse(gx - hw * .2 - ix * z * .14, gy - hh * .1 - iy * z * .02, hw * .55, hh * .55, seed + i * 3 + 1, false); }
     }
     // herrería (oeste): taller con chimenea humeando y yunque
-    if (b.herreria) { const bx = cx - z, by = cy, L = b.herreria, w = z * (L > 1 ? .66 : .56), h = z * .42, x = bx - w / 2, y = by - h * .1;
-      bldBox(x, y, w, h, L > 1 ? '#6d4f3a' : '#8a6a4c', L > 1 ? '#4a4f5c' : '#7a3f2c');
-      ctx.fillStyle = '#555'; ctx.fillRect(x + w * .68, y - h * .75, w * .16, h * .7); ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.strokeRect(x + w * .68, y - h * .75, w * .16, h * .7);
-      for (let i = 0; i < 3; i++) { ctx.fillStyle = 'rgba(210,210,215,' + (.55 - i * .15) + ')'; ctx.beginPath(); ctx.arc(x + w * .76 + i * z * .05, y - h * .95 - i * z * .12, z * (.06 + i * .03), 0, 7); ctx.fill(); }
-      ctx.fillStyle = '#1b1b1b'; ctx.fillRect(x + w * .14, y + h * .38, w * .3, h * .62); emoji('🔥', x + w * .29, y + h * .62, z * .2);
-      emoji('⚒️', x + w * .3, y + h + z * .12, z * .2); }
+    if (b.herreria) { const L = b.herreria, k = z * (L > 1 ? .047 : .04);
+      drawPx('forge', cx - z, cy + z * .34, k, Object.assign(L > 1 ? dynRoof('#4a4f5c', '#30333c') : dynRoof('#7a3f2c', '#562a1c'), L > 1 ? dynWall('#7a5a42', '#5a4030') : dynWall('#9a7a58', '#7a5c3e')));
+      for (let i = 0; i < 2; i++) { ctx.fillStyle = 'rgba(210,210,215,' + (.55 - i * .2) + ')'; ctx.fillRect(cx - z + k * (2.5 + i * 1.5), cy - z * .5 - i * z * .12, k * 1.6, k * 1.6); } }
     // cuartel (este): sala larga con almenas, bandera y puerta
-    if (b.cuartel) { const bx = cx + z, by = cy, L = b.cuartel, w = z * (L > 1 ? .8 : .66), h = z * .44, x = bx - w / 2, y = by - h * .1;
-      ctx.fillStyle = L > 1 ? '#8f8a82' : '#a6805a'; ctx.fillRect(x, y, w, h); ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 1; ctx.strokeRect(x, y, w, h);
-      ctx.fillStyle = L > 1 ? '#6f6a63' : '#8a3b3b'; ctx.fillRect(x - w * .04, y - h * .16, w * 1.08, h * .2); merlons(x, y - h * .16, w, true, z * .09);
-      ctx.fillStyle = '#2b1a12'; ctx.fillRect(x + w * .4, y + h * .4, w * .2, h * .6);
-      ctx.fillStyle = '#d9d0b4'; for (const f of [.15, .75]) ctx.fillRect(x + w * f, y + h * .3, w * .1, h * .22);
-      ctx.fillStyle = '#5a3a1e'; ctx.fillRect(x + w * .86, y - h * .95, 2, h * .8); ctx.fillStyle = col; ctx.fillRect(x + w * .86 + 2, y - h * .95, z * .2, z * .13);
-      if (L > 1) { ctx.fillStyle = col; ctx.fillRect(x + w * .1, y - h * .8, 2, h * .62); ctx.fillRect(x + w * .1 + 2, y - h * .8, z * .16, z * .1); } }
+    if (b.cuartel) { const L = b.cuartel, k = z * (L > 1 ? .05 : .043);
+      drawPx('barracks', cx + z, cy + z * .34, k, { T: col, t: sprShade(col, .6), V: L > 1 ? '#9a958d' : '#b08a60', v: L > 1 ? '#74706a' : '#8a6a45' });
+      if (L > 1) { ctx.fillStyle = col; ctx.fillRect(cx + z - 7 * k, cy + z * .34 - 15 * k, Math.max(1, k * .8), k * 5); ctx.fillRect(cx + z - 7 * k, cy + z * .34 - 15 * k, k * 3, k * 2); } }
     // establo (norte, con carreta): techo bajo, valla y heno
-    if (c.cart) { const bx = cx, by = cy - z, w = z * .62, h = z * .36, x = bx - w / 2, y = by - h * .25;
-      bldBox(x, y, w, h, '#8a5a32', '#6b3f22'); ctx.fillStyle = '#2b1a12'; ctx.fillRect(x + w * .38, y + h * .3, w * .24, h * .7);
-      ctx.strokeStyle = '#6b4a2a'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x - z * .1, y + h + z * .08); ctx.lineTo(x + w + z * .1, y + h + z * .08); ctx.moveTo(x - z * .1, y + h + z * .2); ctx.lineTo(x + w + z * .1, y + h + z * .2);
-      for (let i = 0; i < 5; i++) { const fx = x - z * .1 + i * (w + z * .2) / 4; ctx.moveTo(fx, y + h + z * .04); ctx.lineTo(fx, y + h + z * .24); } ctx.stroke();
-      emoji('🐴', x + w + z * .12, y + h * .7, z * .26); emoji('🌾', x - z * .12, y + h * .8, z * .2); }
+    if (c.cart) drawPx('stable', cx, cy - z * .62, z * .042, null);
     // muralla con almenas y puerta con torreones
     if (b.muralla) {
       const L = b.muralla, t = z * (L > 1 ? .13 : .09), g0 = X + 1.5 * z - z * .28, g1 = X + 1.5 * z + z * .28;
@@ -1043,6 +1311,9 @@ function drawCity(c, ox, oy, z) {
       ctx.fillStyle = '#3a2412'; ctx.fillRect(g0 + z * .1, Y + 3 * z - t, g1 - g0 - z * .2, t); // portón
       if (L > 1) { const q = z * .2; ctx.fillStyle = '#c9cfdb'; for (const [qx, qy] of [[X, Y], [X + 3 * z - q, Y], [X, Y + 3 * z - q], [X + 3 * z - q, Y + 3 * z - q]]) { ctx.fillRect(qx, qy, q, q); ctx.strokeRect(qx, qy, q, q); } }
     }
+    if (b.iglesia) drawChurch(X + z * .5, Y + 2.35 * z, z, b.iglesia);
+    if (b.taller) drawWorkshop(X + 2.5 * z, Y + 2.3 * z, z, b.taller);
+    if (b.asedio) { const k = z * .036; drawPx('siegeshop', X + .5 * z, Y + 1.2 * z, k, Object.assign(b.asedio > 1 ? dynRoof('#4a4f5c', '#30333c') : dynRoof('#6b4a2a', '#4a3018'), dynWall('#a8865a', '#826440'))); }
     if (b.atalaya) { drawTower(X + 3 * z - z * .12, Y + z * .12, z, b.atalaya); if (b.atalaya > 1) drawTower(X + z * .12, Y + 3 * z - z * .12, z, b.atalaya); }
   }
   // torre del homenaje: crece con las mejoras
@@ -1057,7 +1328,12 @@ function drawCity(c, ox, oy, z) {
     if (det) { emoji('🔥', X + .45 * z, Y + 2.6 * z, z * .28); emoji('🔥', X + 2.55 * z, Y + 2.6 * z, z * .28); emoji('😈', cx, cy - z * .5, z * .3); }
     return;
   }
-  emoji(c.o === null ? '🏚️' : '🏰', cx, cy, ks);
+  if (c.wm) { // vida de la muralla (asedios): barra sobre la ciudad y brecha cuando cae
+    if (c.wh < c.wm && c.wh > 0) { ctx.fillStyle = '#000a'; ctx.fillRect(X, Y - 7, 3 * z, 5); ctx.fillStyle = c.wh / c.wm > .5 ? '#6fd06a' : c.wh / c.wm > .25 ? '#f0c040' : '#e05050'; ctx.fillRect(X + 1, Y - 6, (3 * z - 2) * c.wh / c.wm, 3); }
+    if (c.wh <= 0 && det) { ctx.fillStyle = '#2a2018'; ctx.fillRect(X + 3 * z - z * .14, cy - z * .4, z * .14, z * .8); ctx.fillStyle = '#8d93a0'; for (const [rx, ry] of [[.06, -.3], [.0, -.1], [.08, .1], [.02, .28]]) ctx.fillRect(X + 3 * z - z * .14 + rx * z, cy + ry * z, z * .07, z * .07); emoji('💥', X + 3 * z - z * .1, cy, z * .32); }
+  }
+  if (c.sg > 0 && det) { emoji('🔒', X + .22 * z, Y + .22 * z, z * .3); ctx.fillStyle = '#fff'; ctx.font = 'bold ' + Math.max(9, z * .2) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(c.sg, X + .55 * z, Y + .3 * z); }
+  drawPx(c.o === null ? 'ruincity' : 'castle', cx, cy + ks * .55, ks / 16 * 1.25, c.o === null ? null : { T: col, t: sprShade(col, .6) });
   if (det && c.o !== null && c.cap) emoji('👑', cx, cy - z * .42, z * .24);
 }
 function draw() {
@@ -1071,11 +1347,12 @@ function draw() {
     const k = y * S.w + x, t = S.terr[k], px = ox + x * z, py = oy + y * z;
     const inDg = y >= (S.h0 || S.h) && t !== '?';
     if (inDg) drawDgTile(t, k, x, y, px, py, z, bossTiles && bossTiles.some(b => Math.max(Math.abs(b.x - x), Math.abs(b.y - y)) <= 3));
+    else if ('gfhmdw'.includes(t)) { ctx.imageSmoothingEnabled = false; ctx.drawImage(tileImg(t, (tileVar(x, y) >> 4) % 3, ((Date.now() / 700 | 0) + x + y) & 1), px, py, z + 0.5, z + 0.5); }
     else { ctx.fillStyle = TCOL[t] || TCOL['?']; ctx.fillRect(px, py, z + 0.5, z + 0.5); }
-    if (t === 'f' && z > 22) { ctx.fillStyle = '#1f4524'; for (const [ax, ay] of [[.3, .35], [.68, .6], [.35, .72]]) { ctx.beginPath(); ctx.moveTo(px + ax * z, py + (ay - .2) * z); ctx.lineTo(px + (ax + .14) * z, py + (ay + .12) * z); ctx.lineTo(px + (ax - .14) * z, py + (ay + .12) * z); ctx.fill(); } }
-    else if (t === 'h' && z > 22) { ctx.fillStyle = '#a69663'; ctx.beginPath(); ctx.arc(px + .35 * z, py + .62 * z, z * .2, Math.PI, 0); ctx.arc(px + .68 * z, py + .66 * z, z * .16, Math.PI, 0); ctx.fill(); }
-    else if (t === 'm' && z > 22) { ctx.fillStyle = '#8b93a1'; ctx.beginPath(); ctx.moveTo(px + .5 * z, py + .15 * z); ctx.lineTo(px + .9 * z, py + .85 * z); ctx.lineTo(px + .1 * z, py + .85 * z); ctx.fill(); ctx.fillStyle = '#e9edf3'; ctx.beginPath(); ctx.moveTo(px + .5 * z, py + .15 * z); ctx.lineTo(px + .62 * z, py + .38 * z); ctx.lineTo(px + .38 * z, py + .38 * z); ctx.fill(); }
-    else if (t === 'w' && z > 22) { ctx.strokeStyle = '#4a86bb55'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(px + .2 * z, py + .4 * z); ctx.quadraticCurveTo(px + .35 * z, py + .3 * z, px + .5 * z, py + .4 * z); ctx.quadraticCurveTo(px + .65 * z, py + .5 * z, px + .8 * z, py + .4 * z); ctx.stroke(); }
+    if (false && t === 'f' && z > 22) { ctx.fillStyle = '#1f4524'; for (const [ax, ay] of [[.3, .35], [.68, .6], [.35, .72]]) { ctx.beginPath(); ctx.moveTo(px + ax * z, py + (ay - .2) * z); ctx.lineTo(px + (ax + .14) * z, py + (ay + .12) * z); ctx.lineTo(px + (ax - .14) * z, py + (ay + .12) * z); ctx.fill(); } }
+    else if (false && t === 'h' && z > 22) { ctx.fillStyle = '#a69663'; ctx.beginPath(); ctx.arc(px + .35 * z, py + .62 * z, z * .2, Math.PI, 0); ctx.arc(px + .68 * z, py + .66 * z, z * .16, Math.PI, 0); ctx.fill(); }
+    else if (false && t === 'm' && z > 22) { ctx.fillStyle = '#8b93a1'; ctx.beginPath(); ctx.moveTo(px + .5 * z, py + .15 * z); ctx.lineTo(px + .9 * z, py + .85 * z); ctx.lineTo(px + .1 * z, py + .85 * z); ctx.fill(); ctx.fillStyle = '#e9edf3'; ctx.beginPath(); ctx.moveTo(px + .5 * z, py + .15 * z); ctx.lineTo(px + .62 * z, py + .38 * z); ctx.lineTo(px + .38 * z, py + .38 * z); ctx.fill(); }
+    else if (false && t === 'w' && z > 22) { ctx.strokeStyle = '#4a86bb55'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(px + .2 * z, py + .4 * z); ctx.quadraticCurveTo(px + .35 * z, py + .3 * z, px + .5 * z, py + .4 * z); ctx.quadraticCurveTo(px + .65 * z, py + .5 * z, px + .8 * z, py + .4 * z); ctx.stroke(); }
     if (z > 28 && t !== '?') { ctx.strokeStyle = 'rgba(0,0,0,.12)'; ctx.lineWidth = 1; ctx.strokeRect(px + .5, py + .5, z - 1, z - 1); }
     if (t !== '?' && S.vis[k] === '0') { ctx.fillStyle = inDg ? 'rgba(2,2,6,.72)' : 'rgba(5,7,12,.5)'; ctx.fillRect(px, py, z + 0.5, z + 0.5); }
   }
@@ -1088,25 +1365,39 @@ function draw() {
     if (c.x < x0 - 2 || c.x > x1 + 2 || c.y < y0 - 2 || c.y > y1 + 2) continue;
     drawCity(c, ox, oy, z);
   }
+  // carreteras y estaciones de suministros
+  if (S.roads && S.roads.length) {
+    const W = S.w;
+    for (const [k, t] of S.roads) {
+      const rx = k % W, ry = (k / W) | 0; if (rx < x0 - 1 || rx > x1 + 1 || ry < y0 - 1 || ry > y1 + 1) continue;
+      const cx = ox + (rx + .5) * z, cy = oy + (ry + .5) * z;
+      ctx.strokeStyle = '#c9a66b'; ctx.lineWidth = Math.max(2, z * .26); ctx.lineCap = 'round';
+      ctx.beginPath(); let any = false;
+      for (const [dx, dy] of [[1, 0], [0, 1], [1, 1], [1, -1]]) if (maps.road.has((ry + dy) * W + rx + dx)) { ctx.moveTo(cx, cy); ctx.lineTo(cx + dx * z, cy + dy * z); any = true; }
+      if (!any) { ctx.moveTo(cx, cy); ctx.lineTo(cx + .01, cy); }
+      ctx.stroke(); ctx.lineCap = 'butt';
+      if (t === 2) { ctx.fillStyle = '#7a5a34'; ctx.fillRect(cx - z * .3, cy - z * .25, z * .6, z * .5); ctx.strokeStyle = '#2b1c10'; ctx.lineWidth = 1; ctx.strokeRect(cx - z * .3, cy - z * .25, z * .6, z * .5); drawPx('crate', cx, cy + z * .2, z * .025); }
+    }
+  }
   // sitios (cofres y ruinas)
   for (const q of S.sites || []) {
     if (q.x < x0 - 1 || q.x > x1 + 1 || q.y < y0 - 1 || q.y > y1 + 1) continue;
     const cx = ox + (q.x + .5) * z, cy = oy + (q.y + .5) * z;
-    if (q.k === 'tesoro') { const g1 = ctx.createRadialGradient(cx, cy, 1, cx, cy, z * .75); g1.addColorStop(0, 'rgba(255,215,90,.75)'); g1.addColorStop(1, 'rgba(255,215,90,0)'); ctx.fillStyle = g1; ctx.fillRect(cx - z, cy - z, 2 * z, 2 * z); emoji('💎', cx, cy, z * .72); }
-    else if (q.k === 'trampa') { ctx.fillStyle = 'rgba(210,30,40,.35)'; ctx.beginPath(); ctx.arc(cx, cy, z * .42, 0, 7); ctx.fill(); ctx.strokeStyle = '#ff4d52'; ctx.lineWidth = 2; ctx.stroke(); emoji('⚠️', cx, cy, z * .6); }
-    else { ctx.fillStyle = '#e6b45033'; ctx.beginPath(); ctx.arc(cx, cy, z * .4, 0, 7); ctx.fill(); emoji(SH.SITES[q.k].e, cx, cy, z * .6); }
+    if (q.k === 'tesoro') { const g1 = ctx.createRadialGradient(cx, cy, 1, cx, cy, z * .75); g1.addColorStop(0, 'rgba(255,215,90,.75)'); g1.addColorStop(1, 'rgba(255,215,90,0)'); ctx.fillStyle = g1; ctx.fillRect(cx - z, cy - z, 2 * z, 2 * z); drawPx('gem', cx, cy + z * .3, z * .05); }
+    else if (q.k === 'trampa') { ctx.fillStyle = 'rgba(210,30,40,.35)'; ctx.beginPath(); ctx.arc(cx, cy, z * .42, 0, 7); ctx.fill(); ctx.strokeStyle = '#ff4d52'; ctx.lineWidth = 2; ctx.stroke(); drawPx('spikes', cx, cy + z * .25, z * .04); }
+    else { ctx.fillStyle = '#e6b45033'; ctx.beginPath(); ctx.arc(cx, cy, z * .4, 0, 7); ctx.fill(); if (q.k === 'cofre') drawPx('chest', cx, cy + z * .27, z * .042); else if (q.k === 'ruina') drawPx('ruina', cx, cy + z * .3, z * .038); else if (q.k === 'tumba') drawPx('tomb', cx, cy + z * .32, z * .04); else emoji(SH.SITES[q.k].e, cx, cy, z * .6); }
   }
   // mazmorras: entradas en el mapa y puerta de salida
   { const DTC = ['#5fd36b', '#5aa7ff', '#b07cff', '#ff9d3c', '#ff5252'];
     for (const d of S.dungeons || []) {
       if (d.x >= 0 && d.x >= x0 - 1 && d.x <= x1 + 1 && d.y >= y0 - 1 && d.y <= y1 + 1) { const cx = ox + (d.x + .5) * z, cy = oy + (d.y + .5) * z;
         ctx.fillStyle = '#000a'; ctx.beginPath(); ctx.arc(cx, cy, z * .46, 0, 7); ctx.fill(); ctx.strokeStyle = DTC[d.tier - 1]; ctx.lineWidth = 2.5; ctx.stroke();
-        emoji('🕳️', cx, cy, z * .6); if (z >= 18) { ctx.fillStyle = DTC[d.tier - 1]; ctx.font = 'bold ' + Math.round(z * .3) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(d.cleared ? '✓' : d.tier, cx + z * .36, cy - z * .3); } }
-      if (d.inside && d.exit.x >= x0 - 1 && d.exit.x <= x1 + 1 && d.exit.y >= y0 - 1 && d.exit.y <= y1 + 1) { const cx = ox + (d.exit.x + .5) * z, cy = oy + (d.exit.y + .5) * z; ctx.fillStyle = '#e6b45055'; ctx.beginPath(); ctx.arc(cx, cy, z * .45, 0, 7); ctx.fill(); emoji('🚪', cx, cy, z * .65); }
+        drawPx('pit', cx, cy + z * .27, z * .036); if (z >= 18) { ctx.fillStyle = DTC[d.tier - 1]; ctx.font = 'bold ' + Math.round(z * .3) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(d.cleared ? '✓' : d.tier, cx + z * .36, cy - z * .3); } }
+      if (d.inside && d.exit.x >= x0 - 1 && d.exit.x <= x1 + 1 && d.exit.y >= y0 - 1 && d.exit.y <= y1 + 1) { const cx = ox + (d.exit.x + .5) * z, cy = oy + (d.exit.y + .5) * z; ctx.fillStyle = '#e6b45055'; ctx.beginPath(); ctx.arc(cx, cy, z * .45, 0, 7); ctx.fill(); drawPx('door', cx, cy + z * .36, z * .04); }
     } }
   // arena del torneo y mercaderes
-  if (S.tourn && S.tourn.x >= x0 - 1 && S.tourn.x <= x1 + 1 && S.tourn.y >= y0 - 1 && S.tourn.y <= y1 + 1) { const cx = ox + (S.tourn.x + .5) * z, cy = oy + (S.tourn.y + .5) * z; ctx.fillStyle = '#c9a0ff44'; ctx.beginPath(); ctx.arc(cx, cy, z * 1.45, 0, 7); ctx.fill(); emoji('🏟️', cx, cy, z * .8); }
-  for (const q of S.merch || []) { if (q.x < x0 - 1 || q.x > x1 + 1 || q.y < y0 - 1 || q.y > y1 + 1) continue; const cx = ox + (q.x + .5) * z, cy = oy + (q.y + .5) * z; ctx.fillStyle = '#6bd6ff33'; ctx.beginPath(); ctx.arc(cx, cy, z * .45, 0, 7); ctx.fill(); emoji('🛒', cx, cy, z * .65); }
+  if (S.tourn && S.tourn.x >= x0 - 1 && S.tourn.x <= x1 + 1 && S.tourn.y >= y0 - 1 && S.tourn.y <= y1 + 1) { const cx = ox + (S.tourn.x + .5) * z, cy = oy + (S.tourn.y + .5) * z; ctx.fillStyle = '#c9a0ff44'; ctx.beginPath(); ctx.arc(cx, cy, z * 1.45, 0, 7); ctx.fill(); drawPx('arena', cx, cy + z * .5, z * .06, { T: '#c9a0ff', t: '#8f68c4' }); }
+  for (const q of S.merch || []) { if (q.x < x0 - 1 || q.x > x1 + 1 || q.y < y0 - 1 || q.y > y1 + 1) continue; const cx = ox + (q.x + .5) * z, cy = oy + (q.y + .5) * z; ctx.fillStyle = '#6bd6ff33'; ctx.beginPath(); ctx.arc(cx, cy, z * .45, 0, 7); ctx.fill(); drawPx('stall', cx, cy + z * .38, z * .04); }
   // criaturas
   for (const c of S.cre) {
     if (c.x < x0 - 1 || c.x > x1 + 1 || c.y < y0 - 1 || c.y > y1 + 1) continue;
@@ -1114,12 +1405,19 @@ function draw() {
     if (c.boss) { ctx.strokeStyle = '#e6b450'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(cx, cy, z * .46, 0, 7); ctx.stroke(); }
     if (c.el) { ctx.strokeStyle = '#c58bff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(cx, cy, z * .46, 0, 7); ctx.stroke(); }
     if (c.hd) { ctx.strokeStyle = '#ff7a2f'; ctx.lineWidth = 2; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.arc(cx, cy, z * .47, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
-    emoji(d.e, cx, cy, z * (c.boss ? .8 : .62));
+    if (c.wb) { const pul = .5 + .5 * Math.sin(Date.now() / 300); ctx.strokeStyle = 'rgba(255,90,48,' + (.5 + pul * .4) + ')'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(cx, cy, z * (.62 + pul * .08), 0, 7); ctx.stroke(); }
+    if (SPR[c.t]) { ctx.fillStyle = '#0005'; ctx.beginPath(); ctx.ellipse(cx, cy + z * .36, z * (c.boss ? .4 : .3), z * .08, 0, 0, 7); ctx.fill(); drawSpr([c.t], cx, cy - z * .02, z * (c.boss ? 1 : .86) * (c.wb ? 1.3 : 1), null, true); if (c.wb) emoji('🌋', cx + z * .42, cy - z * .46, z * .3); } else emoji(d.e, cx, cy, z * (c.boss ? .8 : .62));
     if (c.el && z > 26) emoji('⭐', cx - z * .34, cy - z * .32, z * .26);
     if (c.pz && z > 26) emoji('☠️', cx + z * .3, cy + z * .12, z * .24);
     hpBar(cx, cy + z * .38, z * .7, c.hp / c.mhp);
     ctx.font = 'bold ' + Math.floor(z * .24) + 'px sans-serif'; ctx.textAlign = 'right'; ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.strokeText(c.lv, cx + z * .44, cy - z * .3); ctx.fillText(c.lv, cx + z * .44, cy - z * .3);
     if (atkSet.has('c' + c.id)) { ctx.strokeStyle = '#ff4d52'; ctx.lineWidth = 3; ctx.strokeRect(ox + c.x * z + 2, oy + c.y * z + 2, z - 4, z - 4); }
+  }
+  for (const c of S.cities) if (c.ang) { // ángel guardián de una iglesia nivel 5
+    const ax = ox + (c.ang.x + .5) * z, ay = oy + (c.ang.y + .5) * z + Math.sin(Date.now() / 400) * z * .04;
+    const g1 = ctx.createRadialGradient(ax, ay, 1, ax, ay, z * .7); g1.addColorStop(0, 'rgba(255,240,170,.6)'); g1.addColorStop(1, 'rgba(255,240,170,0)'); ctx.fillStyle = g1; ctx.fillRect(ax - z, ay - z, 2 * z, 2 * z);
+    drawSpr(['angel'], ax, ay, z * .95);
+    if (z >= 18 && c.ang.n) { ctx.font = 'bold ' + Math.floor(z * .22) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = '#000'; ctx.fillStyle = '#ffe9a8'; ctx.strokeText(c.ang.n, ax, ay + z * .52); ctx.fillText(c.ang.n, ax, ay + z * .52); }
   }
   // otras unidades y las propias
   const badges = new Map(), cityOfTile = (x, y) => S.cities.find(c => Math.abs(c.x - x) <= 1 && Math.abs(c.y - y) <= 1);
@@ -1130,17 +1428,17 @@ function draw() {
     if (hc) { // dentro de una ciudad: ficha pequeña en la esquina de su casilla, y un solo contador en el borde del solar
       const tx = cx + z * .2, ty = cy + z * .22, sel = own && u && u.id === m.id, w2 = own ? (m.eq.arma && m.eq.arma.k) : m.w;
       ctx.fillStyle = col; ctx.beginPath(); ctx.arc(tx, ty, z * .17, 0, 7); ctx.fill(); ctx.strokeStyle = sel ? '#fff' : '#000a'; ctx.lineWidth = sel ? 2.5 : 1.5; ctx.stroke();
-      emoji((m.cart || m.ct) ? SH.CART.e : m.sm ? SH.CREATURES[m.sm].e : m.bs ? SH.CREATURES[m.bs].e : (w2 ? WEAPON_E[w2] : '✊'), tx, ty, z * .22);
+      drawUnitSpr(m, own, tx, ty - z * .02, z * .36, col);
       if (own && (m.mp > 0 || m.at > 0) && S.status === 'playing') { ctx.fillStyle = '#3fbf7f'; ctx.beginPath(); ctx.arc(tx - z * .15, ty - z * .15, z * .05, 0, 7); ctx.fill(); }
       if (own && (m.pts > 0 || classAvail(m))) emoji('⭐', tx + z * .12, ty - z * .15, z * .16);
       const bk = hc.id + ':' + m.o; badges.set(bk, (badges.get(bk) || { c: hc, col, n: 0 })); badges.get(bk).n++;
       if (!own && atkSet.has('u' + m.id)) { ctx.strokeStyle = '#ff4d52'; ctx.lineWidth = 3; ctx.strokeRect(ox + m.x * z + 2, oy + m.y * z + 2, z - 4, z - 4); }
       return;
     }
-    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(cx, cy, z * .36, 0, 7); ctx.fill();
-    ctx.strokeStyle = own && u && u.id === m.id ? '#fff' : '#000a'; ctx.lineWidth = own && u && u.id === m.id ? 3 : 2; ctx.stroke();
-    const w = own ? (m.eq.arma && m.eq.arma.k) : m.w;
-    emoji((m.cart || m.ct) ? SH.CART.e : m.sm ? SH.CREATURES[m.sm].e : m.bs ? SH.CREATURES[m.bs].e : (w ? WEAPON_E[w] : '✊'), cx, cy, z * .42);
+    { const sel = own && u && u.id === m.id; // base del color del equipo bajo los pies; blanca y gruesa si está seleccionada
+      ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(cx, cy + z * .34, z * .34, z * .1, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = sel ? '#fff' : '#000a'; ctx.lineWidth = sel ? 3 : 1.5; ctx.stroke(); }
+    drawUnitSpr(m, own, cx, cy - z * .04, z * .9, col);
     hpBar(cx, cy + z * .43, z * .7, own ? m.hp / m.e.maxHp : m.hp / m.mhp);
     ctx.font = 'bold ' + Math.floor(z * .24) + 'px sans-serif'; ctx.textAlign = 'right'; ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.strokeText(m.lv, cx + z * .44, cy - z * .3); ctx.fillText(m.lv, cx + z * .44, cy - z * .3);
     if (own && (m.mp > 0 || m.at > 0) && S.status === 'playing') { ctx.fillStyle = '#3fbf7f'; ctx.beginPath(); ctx.arc(cx - z * .34, cy - z * .34, z * .08, 0, 7); ctx.fill(); }
@@ -1166,6 +1464,7 @@ function draw() {
       ctx.font = 'bold ' + Math.floor(bh * .75) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 2.5;
       const tx = '⚔ ' + bd.n; ctx.strokeText(tx, bx + bw / 2, by + bh / 2 + 1); ctx.fillText(tx, bx + bw / 2, by + bh / 2 + 1); } }
   ctx.textAlign = 'start';
+  drawFx(ox, oy, z);
   drawMini();
 }
 
@@ -1236,9 +1535,14 @@ function chatOnState(prev) {
   chatFirst = false; chatBadge();
 }
 $('nStory').onclick = () => { openSheet('story'); };
+$('nHist').onclick = () => { openSheet('hist', { metric: 0, ht: S.turn }); };
+$('nWorld').onclick = () => { openSheet('world', { tab: 'guild' }); };
 $('nSum').onclick = () => { openSheet('summary'); };
 $('nChat').onclick = () => { openSheet('chat'); chatMark(); chatBadge(); };
 $('sheet').addEventListener('keydown', e => { if (e.target && e.target.id === 'chIn' && e.key === 'Enter') { e.preventDefault(); chatSend(); } });
+$('nSnd').textContent = sndOn ? '🔊' : '🔇';
+$('nSnd').onclick = () => { sndOn = !sndOn; try { localStorage.setItem('ada_snd', sndOn ? '1' : '0'); } catch (e) {} $('nSnd').textContent = sndOn ? '🔊' : '🔇'; if (sndOn) sfx('turn'); toast(sndOn ? 'Sonido activado' : 'Sonido desactivado'); };
+fetch('/api/version').then(r => r.json()).then(v => { const t = 'v' + v.version; $('hVer').textContent = '· ' + t; window.APP_VER = t; const lv = $('lVer'); if (lv) lv.textContent = t; }).catch(() => {});
 $('nHome').onclick = () => {
   if (!S) return; const mine = S.cities.filter(c => c.o === S.you).sort((a, b) => (b.cap ? 1 : 0) - (a.cap ? 1 : 0) || a.id - b.id);
   if (!mine.length) { const u = S.mine[0]; if (u) centerOn(u.x, u.y); return; }
@@ -1249,8 +1553,845 @@ $('nNext').onclick = () => {
   if (!list.length) return toast('No quedan unidades con acciones');
   const i = list.findIndex(u => u.id > navUnit); const u = list[i < 0 ? 0 : i]; navUnit = u.id; selectUnit(u.id, true);
 };
+/* ---------- pixel art (v1.40): sprites de 16x16 definidos como tablas de letras ---------- */
+const SPR = {};
+const SPR_PAL = { k: '#1b1522', d: '#3a3744', m: '#6b6877', l: '#a9a7b4', w: '#eceaf2', n: '#4a2e1b', b: '#7a4a28', B: '#a8713f', z: '#d2a46a', S: '#f0c096', s: '#c88a62', r: '#d9463e', R: '#8a2430', o: '#ec8a2c', y: '#f4d24f', Y: '#c79a22', e: '#58b04c', E: '#2f7038', c: '#98d95a', u: '#4a7be0', U: '#28458f', a: '#66d0ea', p: '#9a5bd0', P: '#54307e', q: '#e585b8', x: '#f5f0dc', X: '#cfc7a8', g: '#7c8f5a', G: '#59683e' };
+
+// 16x16, '.' = transparente. Letras: ver SPR_PAL. Dinámicas: T/t equipo, H/h casco, C/D pechera.
+SPR.unit = [
+'................',
+'.....kkkkkk.....',
+'....khHHHHhk....',
+'...khHHHHHHhk...',
+'...khHSSSSHhk...',
+'...khSkSSkShk...',
+'....kSSSSSSk....',
+'.....kSSSSk.....',
+'...kkCCCCCCkk...',
+'..kSkCTTTTCkSk..',
+'..kSkCTTTTCkSk..',
+'..kskDTTTTDkskk.',
+'...kkDDttDDkk...',
+'....knnkknnk....',
+'....kBBkkBBk....',
+'....kkkk.kkkk...'
+];
+SPR.lobo = [
+'................',
+'................',
+'..k.k...........',
+'.kmkmk......kk..',
+'.kmmmmkkkkkkmmk.',
+'kmmwmmmmmmmmmmmk',
+'kkmmkmmmmmmmmmk.',
+'.kmmmmmmmmmmmk..',
+'..kmmwwwwmmmk...',
+'..kmmmmmmmmmk...',
+'...kmk.kmkkmk...',
+'...kmk.kmk.kmk..',
+'...kdk.kdk.kdk..',
+'...kkk.kkk.kkk..',
+'................',
+'................'
+];
+SPR.ciervo = [
+'..k..k..........',
+'.kBk.kBk........',
+'..kBkBk.........',
+'...kBBk.....k...',
+'....kBkkkkkkBk..',
+'...kkBBBBBBBBBk.',
+'..kBBkBBBBBBBBk.',
+'..kBBBBBBBBBBk..',
+'...kkBBBBBBBBk..',
+'....kBBwwwBBk...',
+'....kBk.kBkkBk..',
+'....kBk.kBk.kBk.',
+'....kbk.kbk.kbk.',
+'....kkk.kkk.kkk.',
+'................',
+'................'
+];
+SPR.jabali = [
+'................',
+'................',
+'................',
+'.....kk.........',
+'..kkkbbkkkkkk...',
+'.kbbbbbbbbbbbkk.',
+'kbwkbbbbbbbbbbbk',
+'kbbbbbbnbnbnbbk.',
+'.kwbbbbbbbbbbk..',
+'..kkbbbbbbbbbk..',
+'...kbk.kbkkbk...',
+'...kbk.kbk.kbk..',
+'...kkk.kkk.kkk..',
+'................',
+'................',
+'................'
+];
+SPR.oso = [
+'................',
+'..kk....kk......',
+'.knnk..knnk.....',
+'.knnkkkknnk.....',
+'..knnnnnnnk.....',
+'..knSnnnSnnk....',
+'..knnnknnnk.kk..',
+'.kknnnnnnnkknnk.',
+'kbbnnnnnnnnnnnnk',
+'kbbbnnnnnnnnnnk.',
+'kbbbbnnnnnnnnk..',
+'.kbbbnnnnnnnk...',
+'..kbk.kbk.kbk...',
+'..kbk.kbk.kbk...',
+'..kkk.kkk.kkk...',
+'................'
+];
+SPR.conejo = [
+'................',
+'...k.k..........',
+'..kwkwk.........',
+'..kwkwk.........',
+'..kwSwk.........',
+'..kwwwkk........',
+'.kwkwwwwk.......',
+'.kwwwwwwwk..kk..',
+'kkwwwwwwwwkkwwk.',
+'kwwwwwwwwwwwwwk.',
+'.kwwwwwwwwwwwk..',
+'..kkwwkkwwkkk...',
+'...kwwk.kwwk....',
+'...kkkk.kkkk....',
+'................',
+'................'
+];
+SPR.cabra = [
+'................',
+'.kk.............',
+'kXXk....kk......',
+'kXkk...kXk......',
+'.kkkkkkkXXk.....',
+'.kwwwwwkkk......',
+'kwSwwwwwwwwkk...',
+'kwwwwwwwwwwwwk..',
+'.kwwwwwwwwwwwk..',
+'..kwwwwwwwwwk...',
+'..kwk.kwk.kwk...',
+'..kwk.kwk.kwk...',
+'..kdk.kdk.kdk...',
+'..kkk.kkk.kkk...',
+'................',
+'................'
+];
+SPR.toro = [
+'................',
+'................',
+'.kk........kk...',
+'kwwk......kwwk..',
+'.kkkkkkkkkkkk...',
+'..kbbbbbbbbbk...',
+'.kbSbbnbbbbbbk..',
+'kbbbbbbbbbbbbbkk',
+'kbbbbbbbbbbbbbbk',
+'.kbbbbbbbbbbbbk.',
+'..kbbbbbbbbbbk..',
+'..kbk.kbkk.kbk..',
+'..kbk.kbk..kbk..',
+'..kdk.kdk..kdk..',
+'..kkk.kkk..kkk..',
+'................'
+];
+SPR.tortuga = [
+'................',
+'................',
+'................',
+'.....kkkkkk.....',
+'...kkeEeEeEkk...',
+'..kEeEeEeEeEEk..',
+'.kEeEeEkEeEeEEk.',
+'kSSkEeEeEeEeEEk.',
+'kSkSkEEEEEEEEk..',
+'.kkk.kkkkkkkk...',
+'..kSk.kSk.kSk...',
+'..kkk.kkk.kkk...',
+'................',
+'................',
+'................',
+'................'
+];
+SPR.murcielago = [
+'................',
+'................',
+'.k..........k...',
+'kPk........kPk..',
+'kPPk..kk..kPPk..',
+'kPPPkkPPkkPPPk..',
+'kPkPPkPPkPPkPk..',
+'kk.kPPPPPPk.kk..',
+'....kPrPPrPk....',
+'.....kPPPPk.....',
+'.....kkPPkk.....',
+'......kwwk......',
+'......kkkk......',
+'................',
+'................',
+'................'
+];
+SPR.serpiente = [
+'................',
+'................',
+'................',
+'.....kkkk.......',
+'....kEEEEk......',
+'...kEeSeEk......',
+'...kErEEEkkk....',
+'....kkEEEEEEk...',
+'.....kkkkkEEEk..',
+'...kk.....kEEk..',
+'..kEEkkkkkEEk...',
+'.kEEeeEEEEEk....',
+'kEEEEEEEkkk.....',
+'.kkkkkkk........',
+'................',
+'................'
+];
+SPR.arana = [
+'................',
+'................',
+'k...k......k...k',
+'.k..k.kkkk.k..k.',
+'..k.kkddddkk.k..',
+'k.kkdddrddddkk.k',
+'.kkddrdddrddkk..',
+'..kkddddddddkk..',
+'.k..kdddddddk.k.',
+'k..k.kkddkk.k..k',
+'.....k.kk.k.....',
+'....k........k..',
+'................',
+'................',
+'................',
+'................'
+];
+SPR.escorpion = [
+'................',
+'.....kkkk.......',
+'....koook.......',
+'.....kook.......',
+'..kk..kook......',
+'.kook.kook......',
+'.kookkkookkk....',
+'..kkoooooooook..',
+'kk..koSooSoook..',
+'kook.kooooook...',
+'.kkk.k.kk.k.k...',
+'....k.k..k.k....',
+'................',
+'................',
+'................',
+'................'
+];
+
+SPR.goblin = [
+'................',
+'................',
+'.kk.......kk....',
+'kEEkkkkkkkEEk...',
+'.kEEEEEEEEEk....',
+'..kEyEEEyEk.....',
+'..kEkEEEkEk.....',
+'..kEEEwEEEk.....',
+'...kkEEEkk......',
+'..kbbkEkbbk.....',
+'.kSkbbbbbkSk....',
+'.kkkbbbbbkkk....',
+'...kbbkkbbk.....',
+'...kEk..kEk.....',
+'..kkkk..kkkk....',
+'................'
+];
+SPR.esqueleto = [
+'................',
+'....kkkkkkk.....',
+'...kxxxxxxxk....',
+'..kxxxxxxxxxk...',
+'..kxkkxxxkkxk...',
+'..kxkkxxxkkxk...',
+'...kxxxkxxxk....',
+'....kkxxxkk.....',
+'..kkkxkxkxkkk...',
+'.kxkkxXxXxkkxk..',
+'.kxk.kxxxk.kxk..',
+'.kxk.kXxXk.kxk..',
+'..k..kxkxk..k...',
+'.....kxkxk......',
+'....kxxkxxk.....',
+'....kkkkkkk.....'
+];
+SPR.orco = [
+'................',
+'....kkkkkk......',
+'...kEEEEEEk.....',
+'..kEEEEEEEEk....',
+'..kEyEEEEyEk....',
+'..kEkEEEEkEk....',
+'..kEEwEEwEEk....',
+'...kEwEEwEk.....',
+'.kkkkEEEEkkkk...',
+'kEEkRRRRRRkEEk..',
+'kEEkRRddRRkEEk..',
+'kEEkddddddkEEk..',
+'.kkkkddddkkkk...',
+'...kbbkkbbk.....',
+'...kbbk.kbbk....',
+'..kkkkk.kkkkk...'
+];
+SPR.troll = [
+'..kkkkkkkk......',
+'.kggggggggk.....',
+'kggGgggGgggk....',
+'kgyGgggGygk.....',
+'kggggkkggggk....',
+'.kggkwkwkgk.....',
+'..kkkkkkkk......',
+'.kggkGGGGkggk...',
+'kgggkGggGkgggk..',
+'kgggkggggkgggk..',
+'kgGgkggggkgGgk..',
+'.kkgkggggkgkk...',
+'...kggkkggk.....',
+'...kggk.kggk....',
+'..kkkkk.kkkkk...',
+'................'
+];
+SPR.bandido = [
+'................',
+'....kkkkkk......',
+'...kddddddk.....',
+'..kddddddddk....',
+'..kdkkkkkkdk....',
+'..kdSkSSkSdk....',
+'...kddddddk.....',
+'..kkkddddkkk....',
+'.kSkkrrrrkkSk...',
+'.kSkdrRRrdkSk...',
+'..kkdrRRrdkk.k..',
+'...kddddddk.kwk.',
+'...kdkkkkdk.kwk.',
+'...kdk..kdk.kbk.',
+'..kkkk..kkkk.k..',
+'................'
+];
+SPR.zombi = [
+'................',
+'....kkkkkk......',
+'...kggggggk.....',
+'..kggggggggk....',
+'..kgrkgggkrk....',
+'..kgkkgggkkk....',
+'...kgggkkgk.....',
+'....kkgggkk.....',
+'..kkkEEEEkkkk...',
+'.kgkkEEEEkkgggk.',
+'.kggkEREEkggkkk.',
+'.kkkkEEEEkkk....',
+'...kEEkkEEk.....',
+'...kEEk.kEEk....',
+'..kkkkk.kkkkk...',
+'................'
+];
+SPR.fantasma = [
+'................',
+'....kkkkkk......',
+'...kwwwwwwk.....',
+'..kwwwwwwwwk....',
+'..kwkkwwkkwk....',
+'..kwkkwwkkwk....',
+'..kwwwkkwwwk....',
+'..kwwwwwwwwk....',
+'..kwwwwwwwwk....',
+'.kwkwwwwwwwkwk..',
+'.kwwkwwwwwwkwk..',
+'..kwwkwwwwkwwk..',
+'..kwkkkwwkkkwk..',
+'...k..kwwk..k...',
+'................',
+'................'
+];
+SPR.golem = [
+'................',
+'...kkkkkkkk.....',
+'..kmmmmmmmmk....',
+'..kmkaakaakmk...',
+'..kmmmmmmmmk....',
+'.kkkkmmmmkkkk...',
+'kmmmkdmmdkmmmk..',
+'kmlmkmmmmkmlmk..',
+'kmmmkmmmmkmmmk..',
+'kmlmkmlmmkmlmk..',
+'.kkkkmmmmkkkk...',
+'...kmmkkmmk.....',
+'...kmmk.kmmk....',
+'..kmmmk.kmmmk...',
+'..kkkkk.kkkkk...',
+'................'
+];
+
+SPR.reylobo = [
+'..y.y.y.........',
+'..kyYyYk........',
+'.kkkkkkkkk......',
+'kddkdkdkkdkkk...',
+'kdddddddddddddk.',
+'kdwyddddddddddk.',
+'kkddkdddddddddk.',
+'.kddddddddddddk.',
+'..kddwwwwdddddk.',
+'..kddmmmmdddddk.',
+'..kddk.kddkkddk.',
+'..kdmk.kdmk.kdmk',
+'..kdmk.kdmk.kdmk',
+'..kkkk.kkkk.kkkk',
+'................',
+'................'
+];
+SPR.liche = [
+'...kkkkkkk......',
+'..kyYyYyYyk.....',
+'..kxxxxxxxk.....',
+'.kxxkkxkkxxk....',
+'.kxxkaxkaxxk....',
+'..kxxxkxxxk.....',
+'..kkxxxxxkk.....',
+'.kPPkxXxkPPk.aa.',
+'kPPPPkkkPPPPkaak',
+'kPpPPPPPPPPPkbk.',
+'kPpPPaPPaPPPkbk.',
+'kPPPPPPPPPPPkbk.',
+'kPpPPPPPPPPPkbk.',
+'kPPPPPPPPPPPkbk.',
+'.kPPPPPPPPPk.k..',
+'..kkkkkkkkk.....'
+];
+SPR.dragon = [
+'..k.........k...',
+'.kRkk......kRRk.',
+'.kRrRkk...kRrRk.',
+'kRrrrRRkkkRrrRk.',
+'kRryrRRRRRRRrRk.',
+'.kRrrrRRRRRRRRk.',
+'..kkRRRrrRRRRRk.',
+'....kRRrrRRRRRRk',
+'..kRRRRRRRRRRRk.',
+'.kRrRRRyyRRRRk..',
+'kRrrRkRyyRkRRk..',
+'kkkkRRkRRRkRRRk.',
+'....kRRk.kRRkkk.',
+'....kRRk..kRRk..',
+'....kkkk..kkkk..',
+'................'
+];
+SPR.minotauro = [
+'.kk..........kk.',
+'kwwk........kwwk',
+'kwwkkkkkkkkkkwwk',
+'.kkkbbbbbbbbkkk.',
+'..kbbSbbbbSbbk..',
+'..kbbkbbbbkbbk..',
+'..kbbbSnnSbbbk..',
+'...kkbbbbbbkk...',
+'..kkkbbbbbbkkk..',
+'.kbbkbbddbbkbbk.',
+'kbbbkbbddbbkbbbk',
+'kbbbkbbbbbbkbbbk',
+'.kkkkbbbbbbkkkk.',
+'...kbbkkkkbbk...',
+'...kbbk..kbbk...',
+'..kkkkk..kkkkk..'
+];
+SPR.hidra = [
+'.kk..kk..kk.....',
+'kEEkkEEkkEEk....',
+'kEykkEykkEyk....',
+'kEEkkEEkkEEk....',
+'.kEkkEEkkEk.....',
+'..kEkEEkEk......',
+'...kEEEEEk......',
+'...kEEeEEEk.....',
+'..kEEeEEeEEk....',
+'.kEEEEEEEEEEk...',
+'kEEeEEEEEEeEEk..',
+'kEEEEEEEEEEEEk..',
+'.kEEkEEEEkEEk...',
+'..kkk.kkkk.kk...',
+'................',
+'................'
+];
+SPR.coloso = [
+'....kkkkkkkk....',
+'...kddddddddk...',
+'..kddkoodkoodk..',
+'..kdddddddddk...',
+'.kkkkddddddkkkk.',
+'kddddkddddkddddk',
+'kdmdkdmddmkdmddk',
+'kddddkddddkddddk',
+'kdmdkddmmddkdmdk',
+'kddddkddddkddddk',
+'.kkkkkddddkkkkk.',
+'...kdddkkdddk...',
+'...kdddk.kddk...',
+'..kddddk.kdddk..',
+'..kkkkkk.kkkkk..',
+'................'
+];
+SPR.conde = [
+'....kkkkkk......',
+'...kdddddk......',
+'..kkSSSSSkk.....',
+'.kRkSrSSrSkRk...',
+'.kRkSSSSSSkRk...',
+'.kRRkSwSwkRRk...',
+'.kRRkkSSkkRRRk..',
+'kRRRkddddkRRRRk.',
+'kRRRRkddkRRRRRk.',
+'kRrRRkwddkRRrRk.',
+'kRRRRkddddkRRRk.',
+'kRRRRkddddkRRRk.',
+'kRRRRRkddkRRRRk.',
+'kRrRRRkddkRRrRk.',
+'kRRRRRkkkkRRRRk.',
+'.kkkkkk..kkkkk..'
+];
+SPR.cart = [
+'................',
+'................',
+'................',
+'...kkkkkkkkkk...',
+'..kBBBBBBBBBBk..',
+'..kBzzBzzBzzBk..',
+'..kBzzBzzBzzBk.k',
+'..kBBBBBBBBBBkkb',
+'..kbbbbbbbbbbkb.',
+'.kkkkkkkkkkkkkk.',
+'.kdmmk....kmmdk.',
+'kdmddmk..kdmddmk',
+'kmdkdmk..kmdkdmk',
+'kdmddmk..kdmddmk',
+'.kdmmk....kmmdk.',
+'..kkk......kkk..'
+];
+SPR.builder = [
+'................',
+'....kkkkkkk.....',
+'...kyyyyyyyk....',
+'..kyyyyyyyyyk...',
+'..kkyyyyyyykk...',
+'...kSkSSkSk.....',
+'...kSSSSSSk.....',
+'....kSkkSk......',
+'...kkoooookk....',
+'..kSkoooookSk...',
+'..kSkoYYYokSk.kk',
+'..kskooooosk.kbk',
+'...kkddddkk..kbk',
+'....kddkddk.kmmk',
+'....kBBkkBBk.kmk',
+'....kkkk.kkkk...'
+];
+SPR.angel = [
+'......kyyk......',
+'.....kyYYyk.....',
+'.....kkkkkk.....',
+'..kk.kSSSSk.kk..',
+'.kwwkkSkkSkkwwk.',
+'kwwwkkSSSSkkwwwk',
+'kwxwwkkSSkkwwxwk',
+'kwxwwkwwwwkwwxwk',
+'kwxwkwwwwwwkwxwk',
+'.kwwkwwYYwwkwwk.',
+'..kkkwwwwwwkkk..',
+'...kwwwwwwwwk...',
+'...kwwwwwwwwk...',
+'....kwwwwwwk....',
+'.....kwwwwk.....',
+'......kkkk......'
+];
+
+// Armas: se dibujan sobre el soldado (mano derecha en x=13,y=10)
+SPR.w_daga = [
+'................','................','................','................','................','................',
+'.............w..',
+'.............l..',
+'.............l..',
+'............YYY.',
+'.............b..',
+'.............Y..',
+'................','................','................','................'
+];
+SPR.w_espada = [
+'................','................',
+'.............w..',
+'.............lm.',
+'.............lm.',
+'.............lm.',
+'.............lm.',
+'.............lm.',
+'.............lm.',
+'............YYYY',
+'.............b..',
+'.............Y..',
+'................','................','................','................'
+];
+SPR.w_estoque = [
+'................',
+'.............w..',
+'.............l..',
+'.............l..',
+'.............l..',
+'.............l..',
+'.............l..',
+'.............l..',
+'...........YYYY.',
+'............Y.Y.',
+'.............b..',
+'.............Y..',
+'................','................','................','................'
+];
+SPR.w_katana = [
+'................',
+'..............w.',
+'..............l.',
+'.............wl.',
+'.............l..',
+'.............l..',
+'.............l..',
+'.............l..',
+'............kkk.',
+'.............r..',
+'.............r..',
+'.............k..',
+'................','................','................','................'
+];
+SPR.w_hacha = [
+'................','................','................',
+'.............bll',
+'.............bll',
+'.............bl.',
+'.............b..',
+'.............b..',
+'.............b..',
+'.............b..',
+'.............b..',
+'.............b..',
+'.............b..',
+'................','................','................'
+];
+SPR.w_hachabatalla = [
+'................','................',
+'..........lll.ll',
+'..........llbll.',
+'..........llbll.',
+'..........llbll.',
+'...........lbl..',
+'.............b..',
+'.............b..',
+'.............b..',
+'.............b..',
+'.............b..',
+'.............b..',
+'................','................','................'
+];
+SPR.w_lanza = [
+'.............w..',
+'.............l..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'................','................'
+];
+SPR.w_baston = [
+'............aa..',
+'...........aaww.',
+'............aa..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'................','................'
+];
+SPR.w_varita = [
+'................','................','................','................','................',
+'.............y..',
+'............yyy.',
+'.............b..',
+'.............b..',
+'.............b..',
+'.............b..',
+'................','................','................','................','................'
+];
+SPR.w_arco = [
+'................','................',
+'.............bb.',
+'.............wbb',
+'.............w.b',
+'.............w.b',
+'.............w.b',
+'.............w.b',
+'.............w.b',
+'.............w.b',
+'.............wb.',
+'.............wb.',
+'.............bb.',
+'................','................','................'
+];
+SPR.w_arcolargo = [
+'................',
+'.............bb.',
+'.............wbb',
+'.............w.b',
+'.............w.b',
+'.............w.b',
+'.............w.b',
+'.............w.b',
+'.............w.b',
+'.............w.b',
+'.............w.b',
+'.............w.b',
+'.............wbb',
+'.............bb.',
+'................','................'
+];
+SPR.w_ballesta = [
+'................','................','................','................','................','................',
+'..............b.',
+'.............bB.',
+'.........nnnnwBb',
+'.........bbbbbBb',
+'..........nnnwBb',
+'..............B.',
+'..............b.',
+'................','................','................'
+];
+SPR.w_maza = [
+'................','................',
+'............mmm.',
+'...........mlmmm',
+'...........mmmmm',
+'............mmm.',
+'.............b..',
+'.............b..',
+'.............b..',
+'.............b..',
+'.............b..',
+'................','................','................','................','................'
+];
+SPR.w_bumeran = [
+'................','................','................','................',
+'...........BB...',
+'..........BBBB..',
+'.............BB.',
+'..............B.',
+'..............B.',
+'.............BB.',
+'................','................','................','................','................','................'
+];
+SPR.w_latigo = [
+'................','................','................',
+'..............rr',
+'.............b..',
+'............b...',
+'............b...',
+'............b...',
+'.............b..',
+'..............b.',
+'.............b..',
+'................','................','................','................','................'
+];
+SPR.w_guadana = [
+'.........lll....',
+'.......llllll...',
+'......ll..B.....',
+'.........lB.....',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'................','................'
+];
+SPR.w_orbe = [
+'................','................','................','................','................',
+'............aaa.',
+'...........awwaa',
+'...........aaaaa',
+'............aaa.',
+'................','................','................','................','................','................','................'
+];
+
+
+SPR.ram = ['................', '................', '................', '...kkkkkkkkkk...', '..kBBBBBBBBBBk..', '..kbbbbbbbbbbk..', '..kkkkkkkkkkkk..', '...kb......bk...', '...kb......bk...', '..kkkkkkkkkkkkkk', '.kBBBBBBBBBBBklk', '.kbbbbbbbbbbbkmk', '..kkkkkkkkkkkkk.', '..kddk....kddk..', '..kddk....kddk..', '...kk......kk...'];
+SPR.cata = ['...........kmmk.', '...........kmmk.', '..........kbk...', '.........kbk....', '........kbk.....', '.......kbk......', '......kbk.......', '....kbbkkkkkkk..', '..kBBBBBBBBBBBk.', '..kbbbbbbbbbbbk.', '..kkkkkkkkkkkkk.', '...kb......bk...', '..kddk....kddk..', '..kddk....kddk..', '...kk......kk...', '................'];
+const SPR_TIER = [null, ['#8b5a2b', '#5a3a1a'], ['#9aa0ac', '#5d6270'], ['#6aa0d8', '#3f6ea0'], ['#a07be0', '#5b3fa0'], ['#d8523a', '#8a2430']];
+const sprCache = new Map();
+function sprShade(c, f) { // oscurece un color (#rrggbb o hsl) multiplicando su brillo
+  const cv = document.createElement('canvas'); cv.width = cv.height = 1; const x = cv.getContext('2d'); x.fillStyle = c; x.fillRect(0, 0, 1, 1); const d = x.getImageData(0, 0, 1, 1).data;
+  return `rgb(${Math.round(d[0] * f)},${Math.round(d[1] * f)},${Math.round(d[2] * f)})`;
+}
+function sprImg(layers, dyn) { // layers: nombres de sprite que se apilan; dyn: letras dinámicas (equipo, casco, pechera)
+  const key = layers.join('+') + '|' + Object.keys(dyn || {}).map(k => k + dyn[k]).join(',');
+  let cv = sprCache.get(key); if (cv) return cv;
+  cv = document.createElement('canvas'); cv.width = cv.height = 16; const x = cv.getContext('2d');
+  for (const nm of layers) { const rows = SPR[nm]; if (!rows) continue; rows.forEach((r, y) => { for (let i = 0; i < 16; i++) { const ch = r[i]; if (!ch || ch === '.') continue; const col = (dyn && dyn[ch]) || SPR_PAL[ch]; if (!col) continue; x.fillStyle = col; x.fillRect(i, y, 1, 1); } }); }
+  sprCache.set(key, cv); return cv;
+}
+function drawSpr(layers, cx, cy, size, dyn, flip) { // se escala por múltiplos enteros cuando hay sitio, para que los píxeles se vean nítidos
+  const img = sprImg(layers, dyn), sz = size >= 24 ? Math.max(1, Math.round(size / 16)) * 16 : size;
+  const prev = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false;
+  if (flip) { ctx.save(); ctx.translate(cx, 0); ctx.scale(-1, 1); ctx.drawImage(img, -sz / 2, cy - sz / 2, sz, sz); ctx.restore(); } else ctx.drawImage(img, cx - sz / 2, cy - sz / 2, sz, sz);
+  ctx.imageSmoothingEnabled = prev;
+}
+function unitDyn(col, ah, ac) { // colores del equipo del jugador y de su casco/pechera según la calidad
+  const d = { T: col, t: sprShade(col, .6) };
+  const h = SPR_TIER[ah], c = SPR_TIER[ac];
+  d.H = h ? h[0] : '#7a4a28'; d.h = h ? h[1] : '#4a2e1b';
+  d.C = c ? c[0] : col; d.D = c ? c[1] : d.t;
+  return d;
+}
+// dibuja cualquier unidad (soldado con su arma, invocación, bestia, carreta o constructor) con su sprite
+function drawUnitSpr(m, own, cx, cy, size, col) {
+  const sgk = m.sg && (typeof m.sg === 'string' ? m.sg : m.sg.k); if (sgk && SPR[sgk]) return drawSpr([sgk], cx, cy, size);
+  if (m.cart || m.ct) return drawSpr(['cart'], cx, cy, size);
+  if (m.bld || m.bl) return drawSpr(['builder'], cx, cy, size);
+  const ck = m.sm || m.bs; if (ck) { if (SPR[ck]) return drawSpr([ck], cx, cy, size, null, true); return emoji(SH.CREATURES[ck].e, cx, cy, size * .7); }
+  const w = own ? (m.eq && m.eq.arma && m.eq.arma.k) : m.w, ah = own ? (m.eq && m.eq.casco ? m.eq.casco.t : 0) : (m.ah || 0), ac = own ? (m.eq && m.eq.pechera ? m.eq.pechera.t : 0) : (m.ac || 0);
+  drawSpr(w && SPR['w_' + w] ? ['unit', 'w_' + w] : ['unit'], cx, cy, size, unitDyn(col, ah, ac));
+}
 function hpBar(cx, cy, w, f) { f = Math.max(0, Math.min(1, f)); ctx.fillStyle = '#000a'; ctx.fillRect(cx - w / 2, cy, w, 4); ctx.fillStyle = f > .5 ? '#3fbf7f' : f > .25 ? '#e6b450' : '#e5484d'; ctx.fillRect(cx - w / 2, cy, w * f, 4); }
-(function loop() { if (dirty) { dirty = false; try { draw(); } catch (e) { console.error(e); } } requestAnimationFrame(loop); })();
+setInterval(() => { if (S && S.status === 'playing' && !document.hidden) dirty = true; }, 700); // anima el agua
+(function loop() { if (fx.length) dirty = true; if (dirty) { dirty = false; try { draw(); } catch (e) { console.error(e); } } requestAnimationFrame(loop); })();
 
 /* ---------- avisos (notificaciones push) ---------- */
 const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);

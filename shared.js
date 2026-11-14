@@ -24,6 +24,12 @@
     alma: { n: 'Alma', e: '👻' },
     escama: { n: 'Escama de dragón', e: '🐉' },
   };
+  // valor de referencia de cada material (para ayudar a fijar precios en el comercio)
+  const MAT_VAL = { cuero: 1, hueso: 1, hierro: 1.5, acero: 3, alma: 4, escama: 8 };
+  // producción pasiva de las ciudades por turno: terreno a 3 casillas + edificios (se acumula y se entrega al llegar a 1)
+  const INCOME = { r: 3, f: { cuero: 0.10 }, g: { cuero: 0.03 }, h: { hierro: 0.09 }, m: { hierro: 0.09 }, d: { hueso: 0.08 }, base: { cuero: 0.4, hueso: 0.4 }, cap: { cuero: 0.3, hueso: 0.3, hierro: 0.3 },
+    herreria: { hierro: 0.5 }, cuartel: { hueso: 0.4 }, atalaya: { cuero: 0.3 }, iglesia: { hueso: 0.3 }, rey: 2, mult: { normal: 1, bajo: 0.5, apagado: 0 } };
+  const itemVal = it => it ? 12 + 8 * it.t + 6 * (it.fx ? it.fx.length : 0) : 0; // valor de referencia de un objeto en el comercio
   const MAT_ORDER = ['cuero', 'hueso', 'hierro', 'acero', 'alma', 'escama'];
   // ---- gemas: 6 clases × 3 calidades; se guardan como materiales (rubi1, rubi2, rubi3…) y se engastan en objetos con engarces ----
   // w = efecto en un arma, a = efecto en una armadura (f = efecto de AFFIX, v = valor por calidad)
@@ -36,7 +42,7 @@
     diamante: { n: 'Diamante', e: '⚪', w: { f: 'bestias', v: [0.1, 0.2, 0.35] },  a: { f: 'erudito', v: [0.1, 0.2, 0.35] } },
   };
   const GEM_IDS = Object.keys(GEMS), GEM_LV = ['astillado', 'normal', 'perfecto'];
-  for (const id of GEM_IDS) for (let l = 1; l <= 3; l++) { MATS[id + l] = { n: GEMS[id].n + ' ' + GEM_LV[l - 1], e: GEMS[id].e, gem: id, lv: l }; MAT_ORDER.push(id + l); }
+  for (const id of GEM_IDS) for (let l = 1; l <= 3; l++) { MATS[id + l] = { n: GEMS[id].n + ' ' + GEM_LV[l - 1], e: GEMS[id].e, gem: id, lv: l }; MAT_ORDER.push(id + l); MAT_VAL[id + l] = [0, 5, 14, 40][l]; }
   const gemOf = key => MATS[key] && MATS[key].gem ? MATS[key] : null;
   // efecto de una gema en un objeto: { f, v }
   const gemFx = (key, weapon) => { const m = gemOf(key); if (!m) return null; const d = GEMS[m.gem][weapon ? 'w' : 'a']; return { f: d.f, v: d.v[m.lv - 1] }; };
@@ -52,23 +58,23 @@
   const AM = [0, 1, 1.7, 2.6, 3.8, 5.3];   // multiplicador de defensa de armaduras
 
   const KINDS = {
-    daga:      { n: 'Daga',        e: '🗡️', slot: 'arma',       w: true, base: 4,  range: 1, min: 1, pierce: 0.25, mov: 1, d: 'Ignora 25% de defensa, +1 movimiento' },
-    espada:    { n: 'Espada',      e: '⚔️', slot: 'arma',       w: true, base: 7,  range: 1, min: 1, d: 'Arma cuerpo a cuerpo equilibrada' },
-    hacha:     { n: 'Hacha',       e: '🪓', slot: 'arma',       w: true, base: 8,  range: 1, min: 1, d: 'Más daño que la espada. Una mano (admite escudo)' },
-    katana:    { n: 'Katana',      e: '⛩️', slot: 'arma',       w: true, base: 9,  range: 1, min: 1, pierce: 0.2, d: 'Filo afilado: ignora 20% de defensa. Una mano' },
-    hachabatalla: { n: 'Hacha de batalla', e: '⚒️', slot: 'arma', w: true, base: 13, range: 1, min: 1, pierce: 0.15, mov: -1, two: true, d: 'Golpe devastador, ignora 15% de defensa, pesada (-1 movimiento). Dos manos' },
-    lanza:     { n: 'Lanza',       e: '🪝', slot: 'arma',       w: true, base: 8,  range: 2, min: 1, two: true, reach: true, d: 'Alcance 2 y sin penalización a quemarropa. Dos manos' },
-    baston:    { n: 'Báculo',      e: '🪄', slot: 'arma',       w: true, magic: true, base: 9,  range: 3, min: 1, pierce: 0.25, two: true, d: 'Arma mágica: alcance 3, ignora 25% de defensa. Dos manos' },
-    varita:    { n: 'Varita',      e: '✨', slot: 'arma',       w: true, magic: true, base: 6,  range: 2, min: 1, pierce: 0.2, d: 'Arma mágica: alcance 2, ignora 20% de defensa. Una mano (admite escudo)' },
-    arco:      { n: 'Arco',        e: '🏹', slot: 'arma',       w: true, base: 5,  range: 3, min: 1, two: true, d: 'Alcance 3. Dos manos' },
-    arcolargo: { n: 'Arco largo',  e: '🎯', slot: 'arma',       w: true, base: 6,  range: 5, min: 2, two: true, d: 'Alcance 5 (no dispara a casillas adyacentes). Dos manos' },
-    ballesta:  { n: 'Ballesta',    e: '🔱', slot: 'arma',       w: true, base: 10, range: 4, min: 1, two: true, pierce: 0.4, single: true, d: 'Alcance 4, ignora 40% de defensa, un solo disparo por turno. Dos manos' },
-    estoque:   { n: 'Estoque',    e: '🤺', slot: 'arma',       w: true, base: 5,  range: 1, min: 1, quick: true, d: 'Dos ataques por turno (el segundo hace 60%). Una mano (admite escudo)' },
-    maza:      { n: 'Maza',        e: '🔨', slot: 'arma',       w: true, base: 8,  range: 1, min: 1, slow: 0.35, d: '35% de aturdir al objetivo (−2 de movimiento un turno). Una mano (admite escudo)' },
-    bumeran:   { n: 'Bumerán',     e: '🪃', slot: 'arma',       w: true, base: 5,  range: 3, min: 1, d: 'Alcance 3. Una mano (admite escudo)' },
-    latigo:    { n: 'Látigo',      e: '🪢', slot: 'arma',       w: true, base: 5,  range: 2, min: 1, reach: true, mov: 1, d: 'Alcance 2 sin penalización a quemarropa y +1 movimiento. Una mano' },
+    daga:      { n: 'Daga',        e: '🗡️', slot: 'arma',       w: true, base: 8,  range: 1, min: 1, pierce: 0.25, mov: 1, d: 'Ignora 25% de defensa, +1 movimiento' },
+    espada:    { n: 'Espada',      e: '⚔️', slot: 'arma',       w: true, base: 9,  range: 1, min: 1, d: 'Arma cuerpo a cuerpo equilibrada' },
+    hacha:     { n: 'Hacha',       e: '🪓', slot: 'arma',       w: true, base: 9,  range: 1, min: 1, d: 'Más daño que la espada. Una mano (admite escudo)' },
+    katana:    { n: 'Katana',      e: '⛩️', slot: 'arma',       w: true, base: 8,  range: 1, min: 1, pierce: 0.2, d: 'Filo afilado: ignora 20% de defensa. Una mano' },
+    hachabatalla: { n: 'Hacha de batalla', e: '⚒️', slot: 'arma', w: true, base: 10, range: 1, min: 1, pierce: 0.15, mov: -1, two: true, d: 'Golpe devastador, ignora 15% de defensa, pesada (-1 movimiento). Dos manos' },
+    lanza:     { n: 'Lanza',       e: '🪝', slot: 'arma',       w: true, base: 9,  range: 2, min: 1, two: true, reach: true, d: 'Alcance 2 y sin penalización a quemarropa. Dos manos' },
+    baston:    { n: 'Báculo',      e: '🪄', slot: 'arma',       w: true, magic: true, base: 8,  range: 3, min: 1, pierce: 0.2, two: true, d: 'Arma mágica: alcance 3, ignora 25% de defensa. Dos manos' },
+    varita:    { n: 'Varita',      e: '✨', slot: 'arma',       w: true, magic: true, base: 7,  range: 2, min: 1, pierce: 0.2, d: 'Arma mágica: alcance 2, ignora 20% de defensa. Una mano (admite escudo)' },
+    arco:      { n: 'Arco',        e: '🏹', slot: 'arma',       w: true, base: 9,  range: 3, min: 1, two: true, d: 'Alcance 3. Dos manos' },
+    arcolargo: { n: 'Arco largo',  e: '🎯', slot: 'arma',       w: true, base: 9,  range: 5, min: 2, two: true, d: 'Alcance 5 (no dispara a casillas adyacentes). Dos manos' },
+    ballesta:  { n: 'Ballesta',    e: '🔱', slot: 'arma',       w: true, base: 7, range: 4, min: 1, two: true, pierce: 0.15, single: true, d: 'Alcance 4, ignora 40% de defensa, un solo disparo por turno. Dos manos' },
+    estoque:   { n: 'Estoque',    e: '🤺', slot: 'arma',       w: true, base: 8,  range: 1, min: 1, quick: true, d: 'Dos ataques por turno (el segundo hace 60%). Una mano (admite escudo)' },
+    maza:      { n: 'Maza',        e: '🔨', slot: 'arma',       w: true, base: 9,  range: 1, min: 1, slow: 0.35, d: '35% de aturdir al objetivo (−2 de movimiento un turno). Una mano (admite escudo)' },
+    bumeran:   { n: 'Bumerán',     e: '🪃', slot: 'arma',       w: true, base: 8,  range: 3, min: 1, d: 'Alcance 3. Una mano (admite escudo)' },
+    latigo:    { n: 'Látigo',      e: '🪢', slot: 'arma',       w: true, base: 8,  range: 2, min: 1, reach: true, mov: 1, d: 'Alcance 2 sin penalización a quemarropa y +1 movimiento. Una mano' },
     guadana:   { n: 'Guadaña',     e: '🌾', slot: 'arma',       w: true, base: 10, range: 1, min: 1, two: true, exe: 0.30, d: '+30% de daño a enemigos por debajo de la mitad de salud. Dos manos' },
-    orbe:      { n: 'Orbe',        e: '🔮', slot: 'arma',       w: true, base: 6,  range: 3, min: 1, pierce: 0.2, magic: true, d: 'Arma mágica: alcance 3, ignora 20% de defensa. Una mano (admite escudo)' },
+    orbe:      { n: 'Orbe',        e: '🔮', slot: 'arma',       w: true, base: 8,  range: 3, min: 1, pierce: 0.15, magic: true, d: 'Arma mágica: alcance 3, ignora 20% de defensa. Una mano (admite escudo)' },
     escudo:    { n: 'Escudo',      e: '🛡️', slot: 'escudo',     def: 4, d: 'Solo con armas de una mano' },
     casco:     { n: 'Casco',       e: '⛑️', slot: 'casco',      def: 2 },
     guantes:   { n: 'Guantes',     e: '🧤', slot: 'guantes',    def: 1 },
@@ -76,13 +82,15 @@
     pechera:   { n: 'Pechera',     e: '🥋', slot: 'pechera',    def: 4 },
     pantalones:{ n: 'Pantalones',  e: '👖', slot: 'pantalones', def: 3 },
     botas:     { n: 'Botas',       e: '🥾', slot: 'botas',      def: 1 },
+    mochila:   { n: 'Mochila',     e: '🎒', slot: 'mochila',    def: 0, pack: true, d: 'Amplía el inventario de quien la lleva' },
   };
   const WEAPON_KINDS = ['daga', 'espada', 'hacha', 'katana', 'hachabatalla', 'lanza', 'baston', 'varita', 'arco', 'arcolargo', 'ballesta', 'estoque', 'maza', 'bumeran', 'latigo', 'guadana', 'orbe'];
-  const GEAR_KINDS = ['escudo', 'casco', 'guantes', 'hombreras', 'pechera', 'pantalones', 'botas'];
-  const SLOTS = ['arma', 'escudo', 'casco', 'guantes', 'hombreras', 'pechera', 'pantalones', 'botas'];
-  const SLOT_NAMES = { arma: 'Arma', escudo: 'Escudo', casco: 'Casco', guantes: 'Guantes', hombreras: 'Hombreras', pechera: 'Pechera', pantalones: 'Pantalones', botas: 'Botas' };
+  const GEAR_KINDS = ['escudo', 'casco', 'guantes', 'hombreras', 'pechera', 'pantalones', 'botas', 'mochila'];
+  const SLOTS = ['arma', 'escudo', 'casco', 'guantes', 'hombreras', 'pechera', 'pantalones', 'botas', 'mochila'];
+  const PACK = [0, 6, 10, 15, 21, 30]; // espacios extra según el material de la mochila
+  const SLOT_NAMES = { arma: 'Arma', escudo: 'Escudo', casco: 'Casco', guantes: 'Guantes', hombreras: 'Hombreras', pechera: 'Pechera', pantalones: 'Pantalones', botas: 'Botas', mochila: 'Mochila' };
 
-  const COUNT = { daga: 1, espada: 3, hacha: 3, katana: 4, hachabatalla: 5, lanza: 3, baston: 4, varita: 2, arco: 2, arcolargo: 3, ballesta: 4, estoque: 2, maza: 3, bumeran: 2, latigo: 2, guadana: 4, orbe: 3, escudo: 3, casco: 2, guantes: 1, hombreras: 2, pechera: 4, pantalones: 3, botas: 2 };
+  const COUNT = { daga: 1, espada: 3, hacha: 3, katana: 4, hachabatalla: 5, lanza: 3, baston: 4, varita: 2, arco: 2, arcolargo: 3, ballesta: 4, estoque: 2, maza: 3, bumeran: 2, latigo: 2, guadana: 4, orbe: 3, escudo: 3, casco: 2, guantes: 1, hombreras: 2, pechera: 4, pantalones: 3, botas: 2, mochila: 3 };
   function recipe(kind, t) {
     const weapon = !!KINDS[kind].w;
     if (t === 5) return { escama: Math.max(1, Math.ceil(COUNT[kind] / 2)), alma: COUNT[kind] }; // dracónico: escamas de dragón + almas
@@ -148,7 +156,7 @@
   };
   function armorSet(eq) {
     const cnt = {};
-    for (const slot of SLOTS) { if (slot === 'arma') continue; const it = eq && eq[slot]; if (it && it.t >= 2) cnt[it.t] = (cnt[it.t] || 0) + 1; }
+    for (const slot of SLOTS) { if (slot === 'arma' || slot === 'mochila') continue; const it = eq && eq[slot]; if (it && it.t >= 2) cnt[it.t] = (cnt[it.t] || 0) + 1; }
     let t = 0; for (const k in cnt) if (cnt[k] >= 3 && +k > t) t = +k;
     if (!t) return null;
     const n = cnt[t], def = SET_BONUS[t], b = {}, txt = [];
@@ -180,14 +188,14 @@
   const TOURN = { first: 10, every: 18, len: 4, radius: 1, minTurn: 6 };
   const MERCH = { every: 8, offset: 4, stay: 7, max: 3 };
   const ELITE_NAMES = ['Colmillo Rojo', 'Garra Negra', 'Ojo de Ceniza', 'Sombra Hueca', 'Rompehuesos', 'Furia Gris', 'Aliento Frío', 'Cuerno Roto', 'Mordisco Sangriento', 'Espina Venenosa', 'Lomo de Hierro', 'Paso Silente', 'Voz del Abismo', 'Cráneo Ardiente'];
-  const SITES = { cofre: { n: 'Cofre', e: '🎁' }, ruina: { n: 'Ruinas antiguas', e: '🏛️' }, tesoro: { n: 'Tesoro de mazmorra', e: '💎' }, trampa: { n: 'Trampa', e: '⚠️' } };
+  const SITES = { cofre: { n: 'Cofre', e: '🎁' }, ruina: { n: 'Ruinas antiguas', e: '🏛️' }, tesoro: { n: 'Tesoro de mazmorra', e: '💎' }, trampa: { n: 'Trampa', e: '⚠️' }, tumba: { n: 'Tumba', e: '🪦' } };
   // ---- mazmorras (v1.29): zonas aparte del mapa, aisladas por muros; se entra y se sale por una puerta ----
   // tier 1-5: nivel de las criaturas, nivel recomendado, vida perdida en trampas (% de la vida máxima) y riqueza del tesoro
   const DUNGEON = {
     w: 22, h: 15, buf: 8, reset: 20, // tamaño de cada mazmorra, separación con el mapa y turnos hasta reabastecerse tras despejarla
     tiers: [
-      { n: 'Cueva', e: '🟢', lv: [2, 4], rec: 3, trap: 0.10, rich: 1, pool: [['lobo', 3], ['serpiente', 3], ['murcielago', 3], ['arana', 2], ['goblin', 2]], boss: [['troll', 1]], bossLv: 6 },
-      { n: 'Catacumba', e: '🔵', lv: [4, 7], rec: 6, trap: 0.14, rich: 2, pool: [['esqueleto', 3], ['zombi', 3], ['bandido', 2], ['goblin', 2], ['arana', 2], ['murcielago', 1]], boss: [['troll', 1], ['orco', 1]], bossLv: 9 },
+      { n: 'Cueva', e: '🟢', lv: [2, 4], rec: 3, trap: 0.10, rich: 1, pool: [['lobo', 3], ['serpiente', 3], ['murcielago', 3], ['arana', 2], ['goblin', 2]], boss: [['troll', 1]], bossLv: 5 },
+      { n: 'Catacumba', e: '🔵', lv: [4, 7], rec: 6, trap: 0.14, rich: 2, pool: [['esqueleto', 3], ['zombi', 3], ['bandido', 2], ['goblin', 2], ['arana', 2], ['murcielago', 1]], boss: [['troll', 1], ['orco', 1]], bossLv: 8 },
       { n: 'Mazmorra profunda', e: '🟣', lv: [7, 10], rec: 9, trap: 0.18, rich: 3, pool: [['orco', 3], ['fantasma', 2], ['escorpion', 2], ['zombi', 2], ['bandido', 2], ['esqueleto', 2]], boss: [['minotauro', 1], ['conde', 1]], bossLv: 5 },
       { n: 'Abismo', e: '🟠', lv: [10, 13], rec: 12, trap: 0.22, rich: 4, pool: [['troll', 3], ['golem', 3], ['fantasma', 2], ['orco', 2], ['bandido', 2]], boss: [['hidra', 1], ['liche', 1], ['reylobo', 1]], bossLv: 8 },
       { n: 'Infierno', e: '🔴', lv: [13, 15], rec: 15, trap: 0.28, rich: 5, pool: [['golem', 3], ['troll', 3], ['fantasma', 2], ['orco', 2]], boss: [['dragon', 1], ['coloso', 1]], bossLv: 11 },
@@ -218,19 +226,23 @@
     cazajefes:    { n: 'Cazajefes',    e: '🐉', d: 'Su meta son los jefes del mapa (Rey Lobo, Liche, Dragón). Ignora a los demás salvo que lo ataquen.',
       b: { rec: 2, order: ['cuartel', 'herreria', 'muralla', 'atalaya'], al: 'recent', need: 1.1, cNeed: 0.8, cVal: 1.1, bVal: 2.2, nCity: 34, cityVal: 46, uVal: 1, paz: 0.7, ali: 0.35 } },
   };
+  // intereses extra de los bots: mazmorras (dg), torneos (tn) y mercaderes (mc), de 0 a 1
+  const BOT_X = { granjero: { dg: .1, tn: .3, mc: .9 }, conquistador: { dg: .2, tn: .6, mc: .2 }, equilibrado: { dg: .4, tn: .5, mc: .5 }, cazador: { dg: .9, tn: .4, mc: .3 },
+    diplomatico: { dg: .2, tn: .3, mc: .8 }, defensor: { dg: .15, tn: .2, mc: .4 }, saqueador: { dg: .5, tn: .5, mc: .3 }, mercader: { dg: .35, tn: .5, mc: 1 }, cazajefes: { dg: .8, tn: .3, mc: .3 } };
+  for (const k in BOT_X) Object.assign(PERS[k].b, BOT_X[k]);
   const BOT_LEVELS = { facil: 'Fácil', normal: 'Normal', dificil: 'Difícil' };
   // ---- clases (nivel 6) y especializaciones (nivel 12) ----
   const CLASS_LV = 6, SUB_LV = 12;
   const CLASSES = {
     guardian: { n: 'Guardián', e: '🛡️', d: '+15% salud, +4 defensa y aura de +3% a los aliados cercanos.', mods: { hpPct: 0.15, def: 4, aura: 0.03 },
-      sub: { muralla: { n: 'Muralla', e: '🧱', d: '+6 defensa y devuelve 25% del daño cuerpo a cuerpo.', mods: { def: 6, espinas: 0.25 } },
-             protector: { n: 'Protector', e: '💞', d: 'Cura 10% de su salud por turno y aura +4%.', mods: { regen: 0.10, aura: 0.04 } } } },
-    duelista: { n: 'Duelista', e: '⚔️', d: '+15% de daño y +20% contra enemigos por debajo de la mitad de salud.', mods: { dmgPct: 0.15, execute: 0.20 },
-      sub: { verdugo: { n: 'Verdugo', e: '🪓', d: '+40% contra enemigos heridos y +5% de daño.', mods: { execute: 0.40, dmgPct: 0.05 } },
-             sanguinario: { n: 'Sanguinario', e: '🩸', d: 'Recupera 20% del daño que hace.', mods: { vida: 0.20 } } } },
-    cazador: { n: 'Cazador', e: '🏹', d: '+1 alcance con armas a distancia, +1 movimiento y +30% de daño a criaturas.', mods: { range: 1, mov: 1, vsCre: 0.30 },
-      sub: { francotirador: { n: 'Francotirador', e: '🎯', d: '+1 alcance más e ignora 20% de defensa.', mods: { range: 1, certero: 0.20 } },
-             rastreador: { n: 'Rastreador', e: '🐾', d: '+30% de daño a criaturas y +1 movimiento.', mods: { vsCre: 0.30, mov: 1 } } } },
+      sub: { muralla: { n: 'Muralla', e: '🧱', d: '+6 defensa y devuelve 30% del daño cuerpo a cuerpo.', mods: { def: 6, espinas: 0.30 } },
+             protector: { n: 'Protector', e: '💞', d: 'Cura 6% de su salud por turno y aura +4%.', mods: { regen: 0.06, aura: 0.04 } } } },
+    duelista: { n: 'Duelista', e: '⚔️', d: '+22% de daño y +20% contra enemigos por debajo de la mitad de salud.', mods: { dmgPct: 0.22, execute: 0.20 },
+      sub: { verdugo: { n: 'Verdugo', e: '🪓', d: '+40% contra enemigos heridos y +12% de daño.', mods: { execute: 0.40, dmgPct: 0.12 } },
+             sanguinario: { n: 'Sanguinario', e: '🩸', d: 'Recupera 30% del daño que hace y +5% de daño.', mods: { vida: 0.30, dmgPct: 0.05 } } } },
+    cazador: { n: 'Cazador', e: '🏹', d: '+1 alcance con armas a distancia, +1 movimiento, +10% de daño y +30% de daño a criaturas.', mods: { range: 1, mov: 1, vsCre: 0.30, dmgPct: 0.10 },
+      sub: { francotirador: { n: 'Francotirador', e: '🎯', d: '+1 alcance más e ignora 25% de defensa.', mods: { range: 1, certero: 0.25 } },
+             rastreador: { n: 'Rastreador', e: '🐾', d: '+30% de daño a criaturas, +1 movimiento y +10% de daño.', mods: { vsCre: 0.30, mov: 1, dmgPct: 0.10 } } } },
     sanador: { n: 'Sanador', e: '✚', d: 'Cuenta como +2 puntos de Médico y se cura 5% por turno.', mods: { medico: 2, regen: 0.05 },
       sub: { medico_campo: { n: 'Médico de campaña', e: '⛑️', d: '+3 puntos de Médico.', mods: { medico: 3 } },
              custodio: { n: 'Custodio', e: '💠', d: '+3 defensa, aura +4% y +1 punto de Médico.', mods: { def: 3, aura: 0.04, medico: 1 } } } },
@@ -240,9 +252,9 @@
   };
   // clases de magia (nivel 6) — las invocaciones usan 'summons'
   Object.assign(CLASSES, {
-    mago: { n: 'Mago', e: '🔮', d: '+30% de daño con báculo y varita y +1 alcance a distancia.', mods: { magic: 0.30, range: 1 },
-      sub: { hechicero: { n: 'Hechicero', e: '🌩️', d: '+25% más de daño mágico e ignora 15% de defensa.', mods: { magic: 0.25, certero: 0.15 } },
-             arcano: { n: 'Arcano', e: '🌀', d: '+1 alcance, +1 movimiento y se cura 8% por turno.', mods: { range: 1, mov: 1, regen: 0.08 } } } },
+    mago: { n: 'Mago', e: '🔮', d: '+18% de daño con báculo y varita y +1 alcance a distancia.', mods: { magic: 0.18, range: 1 },
+      sub: { hechicero: { n: 'Hechicero', e: '🌩️', d: '+12% más de daño mágico e ignora 15% de defensa.', mods: { magic: 0.12, certero: 0.15 } },
+             arcano: { n: 'Arcano', e: '🌀', d: '+1 alcance, +1 movimiento y se cura 3% por turno.', mods: { range: 1, mov: 1, regen: 0.03 } } } },
     invocador: { n: 'Invocador', e: '🐾', d: '+10% salud y +2 defensa. Invoca lobos u osos cerca de una ciudad (cuestan huesos).', mods: { hpPct: 0.10, def: 2 }, summons: ['lobo', 'oso'],
       sub: { domador: { n: 'Domador', e: '🦴', d: 'Sus invocaciones hacen +30% de daño.', mods: { sumDmg: 0.30 } },
              alfa: { n: 'Alfa', e: '🐺', d: 'Sus invocaciones tienen +35% de salud.', mods: { sumHp: 0.35 } } } },
@@ -254,24 +266,26 @@
   Object.assign(CLASSES, {
     berserker: { n: 'Berserker', e: '😡', d: '+25% de daño y +10% de salud, pero −2 de defensa.', mods: { dmgPct: 0.25, hpPct: 0.10, def: -2 },
       sub: { frenesi: { n: 'Frenesí', e: '💢', d: 'Recupera 15% del daño que hace y +10% de daño.', mods: { vida: 0.15, dmgPct: 0.10 } },
-             titan: { n: 'Titán', e: '🗿', d: '+20% de salud, +10% de daño y +2 defensa.', mods: { hpPct: 0.20, dmgPct: 0.10, def: 2 } } } },
+             titan: { n: 'Titán', e: '🗿', d: '+10% de salud, +10% de daño y +2 defensa.', mods: { hpPct: 0.10, dmgPct: 0.10, def: 2 } } } },
     paladin: { n: 'Paladín', e: '⚜️', d: '+10% de salud, +3 defensa, se cura 5% por turno y aura de +3%.', mods: { hpPct: 0.10, def: 3, regen: 0.05, aura: 0.03 },
       sub: { cruzado: { n: 'Cruzado', e: '✝️', d: '+15% de daño, +2 defensa y aura +2%.', mods: { dmgPct: 0.15, def: 2, aura: 0.02 } },
              inquebrantable: { n: 'Inquebrantable', e: '🏛️', d: '+5 defensa y devuelve 20% del daño cuerpo a cuerpo.', mods: { def: 5, espinas: 0.20 } } } },
     monje: { n: 'Monje', e: '🥋', d: '+1 movimiento, +15% de daño y se cura 5% por turno.', mods: { mov: 1, dmgPct: 0.15, regen: 0.05 },
-      sub: { puno: { n: 'Puño de hierro', e: '👊', d: '+15% de daño e ignora 15% de defensa.', mods: { dmgPct: 0.15, certero: 0.15 } },
-             zen: { n: 'Maestro zen', e: '☯️', d: 'Se cura 12% por turno, +3 defensa y +1 movimiento.', mods: { regen: 0.12, def: 3, mov: 1 } } } },
+      sub: { puno: { n: 'Puño de hierro', e: '👊', d: '+10% de daño e ignora 15% de defensa.', mods: { dmgPct: 0.10, certero: 0.15 } },
+             zen: { n: 'Maestro zen', e: '☯️', d: 'Se cura 4% por turno, +2 defensa y +1 movimiento.', mods: { regen: 0.04, def: 2, mov: 1 } } } },
     bardo: { n: 'Bardo', e: '🎵', d: 'Aura de +6% a los aliados cercanos, +1 movimiento y cuenta como +1 de Médico.', mods: { aura: 0.06, mov: 1, medico: 1 },
-      sub: { trovador: { n: 'Trovador', e: '🎶', d: 'Aura +6% más.', mods: { aura: 0.06 } },
-             juglar: { n: 'Juglar', e: '🃏', d: 'Aura +3%, +1 movimiento y +10% de daño.', mods: { aura: 0.03, mov: 1, dmgPct: 0.10 } } } },
+      sub: { trovador: { n: 'Trovador', e: '🎶', d: 'Aura +6% más, +10% de salud y +2 defensa.', mods: { aura: 0.06, hpPct: 0.10, def: 2 } },
+             juglar: { n: 'Juglar', e: '🃏', d: 'Aura +3%, +1 movimiento y +18% de daño.', mods: { aura: 0.03, mov: 1, dmgPct: 0.18 } } } },
     alquimista: { n: 'Alquimista', e: '⚗️', d: 'Sus golpes envenenan (15% de su daño por turno), cuenta como +1 de Médico y +5% de salud.', mods: { veneno: 0.15, medico: 1, hpPct: 0.05 },
-      sub: { toxicologo: { n: 'Toxicólogo', e: '🧪', d: 'Veneno +35% de su daño por turno.', mods: { veneno: 0.35 } },
-             boticario: { n: 'Boticario', e: '🌿', d: '+3 puntos de Médico y se cura 6% por turno.', mods: { medico: 3, regen: 0.06 } } } },
+      sub: { toxicologo: { n: 'Toxicólogo', e: '🧪', d: 'Veneno +35% de su daño por turno y +8% de daño.', mods: { veneno: 0.35, dmgPct: 0.08 } },
+             boticario: { n: 'Boticario', e: '🌿', d: '+3 puntos de Médico, +4% de daño y se cura 8% por turno.', mods: { medico: 3, regen: 0.08, dmgPct: 0.04 } } } },
     elementalista: { n: 'Elementalista', e: '🌋', d: '+20% de daño con armas mágicas y sus golpes queman (25% de su daño por turno).', mods: { magic: 0.20, fuego: 0.25 },
       sub: { piromante: { n: 'Piromante', e: '🔥', d: 'Quemadura +35% y +10% de daño mágico.', mods: { fuego: 0.35, magic: 0.10 } },
              criomante: { n: 'Criomante', e: '❄️', d: '35% de ralentizar al objetivo y +10% de daño mágico.', mods: { hielo: 0.35, magic: 0.10 } } } },
   });
-  const CART = { e: '🛒', hp: 80, def: 2, mov: 6, cap: 150, cost: { cuero: 8, hueso: 8, hierro: 3 } };
+  // constructor: unidad auxiliar (no cuenta como unidad) que traza carreteras y estaciones de suministros
+  const BUILDER = { e: '👷', hp: 50, def: 2, mov: 4, cost: { cuero: 6, hierro: 4, hueso: 2 }, road: { cuero: 1, hierro: 1 }, station: { hierro: 8, acero: 3, cuero: 6 }, roadCost: 0.5, near: 2 };
+  const CART = { e: '🛒', hp: 80, def: 2, mov: 6, cap: 150, aura: 2, heal: 0.12, cost: { cuero: 8, hueso: 8, hierro: 3 } };
   const HERO = { emb: ['👑', '🦅', '🐉', '🦁', '🔥', '⚜️', '🌟', '🛡️'], xp: 1.5, aura: 0.10, range: 2, wait: 3, loss: 2, pickTurn: 1 };
   const SUMMON = { max: 2, range: 2, cost: { lobo: { hueso: 4 }, oso: { hueso: 7 }, esqueleto: { hueso: 4 } } };
   function classMods(u) {
@@ -292,11 +306,28 @@
       cost: [{ hierro: 8, hueso: 6 }, { acero: 6, hierro: 8 }] },
     atalaya:  { n: 'Atalaya', e: '🔭', d: '+2 casillas de visión por nivel alrededor de la ciudad.',
       cost: [{ cuero: 6, hueso: 6, hierro: 2 }, { hierro: 5, acero: 2, hueso: 6 }] },
+    taller:   { n: 'Taller del constructor', e: '🏗️', max: 2, d: 'Nv1: contrata un 👷 constructor (máx. 1 por ciudad) que traza carreteras (las unidades cruzan cada casilla de carretera por solo 0,5 de movimiento). Nv2: el constructor levanta 📦 estaciones de suministros: las ciudades con una estación cerca comparten el inventario.',
+      cost: [{ hierro: 5, cuero: 6, hueso: 2 }, { hierro: 8, acero: 3, cuero: 8, hueso: 4 }] },
+    asedio:   { n: 'Taller de asedio', e: '🛠️', max: 2, d: 'Nv1: construye 🐏 arietes (rompen murallas pegados a la ciudad). Nv2: también ☄️ catapultas (rompen murallas desde 3 casillas). Máx. 2 máquinas por ciudad. Solo con asedios activados.',
+      cost: [{ hierro: 8, cuero: 8, hueso: 4 }, { hierro: 12, acero: 4, cuero: 8, hueso: 6 }] },
+    iglesia:  { n: 'Iglesia', e: '⛪', max: 5, d: 'Por nivel: +2 defensa en la ciudad (+1 a 2 casillas), −8% al coste en huesos y almas (reclutar, resucitar, invocar). Nivel 5: un 👼 Ángel guardián protege la ciudad.',
+      cost: [{ hierro: 6, hueso: 6, alma: 1 }, { hierro: 8, hueso: 8, alma: 2 }, { acero: 4, hierro: 8, hueso: 10, alma: 3 }, { acero: 6, hierro: 10, hueso: 12, alma: 4 }, { acero: 10, escama: 2, hueso: 16, alma: 6 }] },
   };
+  const bMax = k => (BUILDINGS[k] && BUILDINGS[k].max) || BUILD_MAX;
+  // iglesia: aura de defensa, descuento de huesos/almas y ángel guardián (solo daña criaturas)
+  const CHURCH = { def: 2, disc: 0.08, angelLv: 5, range: 7 };
+  const ANGEL = { n: 'Ángel guardián', names: ['Elizabeth', 'Nathaly'], e: '👼', hp: 400, dmg: 38, def: 16, mov: 4, rng: 2, attacks: 2, pierce: 0.3 };
   // ---- ciudad de 3×3 (v1.27): estar en ella (centro) o pegado a ella (anillo) da bonos ----
   // pvp: defensa contra jugadores; hordeDef / hordeAtk: defensa y ataque contra hordas que asaltan la ciudad [centro, anillo]
   const CITY_GUARD = { pvp: [8, 4], hordeDef: [10, 6], hordeAtk: [0.3, 0.2] };
-  const BUILD_ORDER = ['herreria', 'cuartel', 'muralla', 'atalaya'];
+  const BUILD_ORDER = ['herreria', 'cuartel', 'muralla', 'atalaya', 'iglesia', 'taller', 'asedio'];
+  // mundo abierto fase 2: regiones por peligro (según la distancia al centro), jefes mundiales, protección de novato y gremios
+  const WORLD = { regions: [{ n: 'Tierras seguras', e: '🌿', to: 0.22, lv: 0.3, loot: 1 }, { n: 'Tierras medias', e: '🌲', to: 0.52, lv: 0.65, loot: 1.25 }, { n: 'Tierras salvajes', e: '🔥', to: 9, lv: 1, loot: 1.6 }],
+    prot: 24, wb: { first: 24, every: 48, stay: 72, hpMul: 2.5, dmgMul: 1.25, reward: { alma: 6, escama: 3, hierro: 10, acero: 4 } }, guild: { max: 8, dist: 12, def: 2 } };
+  // asedios (opción del anfitrión): la muralla tiene vida, se abre una brecha al romperla y las ciudades rodeadas pasan hambre
+  const SIEGE = { wall: [300, 800], regen: 0.1, hunger: 6, hungerHp: 0.08, maxPerCity: 2, tower: 14, towerRange: 2, besiege: { dist: 3, min: 2 }, repair: { hierro: 4, hueso: 3 },
+    ram:  { n: 'Ariete', e: '🐏', lv: 1, hp: 140, def: 6, mov: 2, dmg: 14, min: 1, range: 1, wall: 90, cost: { hierro: 8, cuero: 6, hueso: 4 } },
+    cata: { n: 'Catapulta', e: '☄️', lv: 2, hp: 70, def: 2, mov: 2, dmg: 26, min: 2, range: 3, wall: 70, cost: { hierro: 10, cuero: 8, hueso: 4, acero: 1 } } };
   const BUILD_MAX = 2;
   const ORDERS = { goto: { n: 'Ir a…', e: '📍' }, home: { n: 'Volver y depositar', e: '🏠' }, guard: { n: 'Vigilar', e: '🛡️' } };
 
@@ -313,6 +344,8 @@
       jefes: 'Cazajefes: el primero en derrotar a 2 jefes (aparecen más a menudo)',
       campeon: 'Campeón: el primero que lleve una unidad a nivel 12',
       puntos: 'Carrera de puntos: el primero en llegar a 600 puntos' } },
+    siege:      { n: 'Asedios (taller de asedio, murallas con vida, brechas y cercos)', def: 'si', o: { si: 'Activados: las murallas hay que romperlas con arietes y catapultas', no: 'Desactivados: se conquista como siempre' } },
+    income:     { n: 'Producción de las ciudades (materiales por turno según terreno y edificios)', def: 'normal', o: { normal: 'Normal', bajo: 'Baja (la mitad)', apagado: 'Apagada: solo botín' } },
     events:     { n: 'Eventos del mundo', def: 'todo', o: { todo: 'Clima, torneos y mercaderes ambulantes', clima: 'Solo clima', calma: 'Nada: mundo tranquilo' } },
     teams:      { n: 'Equipos (solo en el modo «Por equipos»)', def: 'dos', o: { dos: '2 equipos', cinco: '5 equipos' } },
     worldSize:  { n: 'Tamaño del mundo (solo Mundo abierto)', def: 'enorme', o: { grande: 'Grande (120 × 120)', enorme: 'Enorme (160 × 160)', gigante: 'Gigante (220 × 220)' } },
@@ -375,6 +408,12 @@
       { t: 'Acero y leyenda', txt: 'Con palos y cuero no se derriba a un jefe. Que la forja no se apague: alguien debe llegar a nivel 8 y vestir equipo de acero o mejor.',
         done: 'El yunque canta y las armaduras brillan. Los bardos ya inventan canciones sobre ustedes; todavía no saben que son demasiado optimistas.',
         goals: [{ k: 'level', n: 8, txt: 'Una unidad de nivel 8' }, { k: 'tier', n: 3, txt: 'Equipar algo de calidad Acero o mejor' }], reward: { m: { acero: 8, alma: 4 }, w: [30, 35, 25, 9, 1] } },
+      { t: 'El refugio sagrado', txt: 'La ceniza apaga el ánimo de la gente. Levanten una iglesia: que alguna de sus ciudades alcance un templo de nivel 3 y la fe vuelva a las murallas.',
+        done: 'Las campanas suenan por primera vez desde que despertó el volcán. Los aldeanos lloran, ríen y vuelven a abrir las ventanas.',
+        goals: [{ k: 'church', n: 3, txt: 'Una iglesia de nivel 3 en alguna ciudad' }], reward: { m: { alma: 6, hueso: 10, hierro: 8 }, w: [35, 35, 22, 7, 1] } },
+      { t: 'Bajo la tierra', txt: 'Las criaturas salen de las grietas del volcán. Hay mazmorras bajo el mapa: despejen al menos una (derroten a su jefe) y traigan lo que haya allí abajo.',
+        done: 'El último eco del jefe se apaga bajo la roca. Han regresado con cofres, cicatrices y la certeza de que el Rey Lobo ya no tiene dónde esconderse.',
+        goals: [{ k: 'dungeon', n: 1, txt: 'Despejar una mazmorra (derrotar a su jefe)' }], reward: { m: { acero: 8, alma: 6, escama: 1 }, w: [25, 35, 28, 10, 2] } },
       { t: 'El rey de los lobos', txt: 'El aullido se oye desde las montañas: el Rey Lobo ha bajado a cazar. Está en el mapa. Derrótenlo antes de que su manada arrase las ciudades.',
         done: 'El Rey Lobo cae y su aullido se apaga. Entre sus huesos aparece un colmillo con un símbolo: la marca del Liche.', boss: 'reylobo', lv: [-1, 5, 12],
         goals: [{ k: 'boss', t: 'reylobo', txt: 'Derrotar al Rey Lobo' }], reward: { m: { alma: 6, acero: 8 }, w: [20, 30, 30, 15, 5] } },
@@ -442,6 +481,7 @@
    * env: { w, h, terr(x,y)->char, occ(x,y)->0 libre|1 aliado (se puede cruzar)|2 bloqueado, stop(x,y)->bool }
    * Devuelve Map(key=y*w+x -> {c: costo, p: previo, end: se puede terminar ahí})
    */
+  const ROAD_COST = 0.5;
   function reach(env, sx, sy, mp) {
     const w = env.w, h = env.h;
     const res = new Map();
@@ -460,9 +500,10 @@
         if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
         const tc = TERR[env.terr(nx, ny)];
         if (!tc || tc.c >= 99) continue;
+        const tcc = env.road && env.road(nx, ny) ? Math.min(tc.c, ROAD_COST) : tc.c;
         const o = env.occ(nx, ny);
         if (o === 2) continue;
-        const nc = c + tc.c;
+        const nc = c + tcc;
         if (nc > mp) continue;
         const k = ny * w + nx;
         const old = res.get(k);
@@ -476,9 +517,9 @@
   }
 
   return {
-    SKILLS, SKILL_ORDER, MATS, MAT_ORDER, TIER_NAMES, WM, AM, KINDS, WEAPON_KINDS, GEAR_KINDS, SLOTS, SLOT_NAMES,
+    SKILLS, SKILL_ORDER, MATS, MAT_ORDER, TIER_NAMES, WM, AM, KINDS, WEAPON_KINDS, GEAR_KINDS, SLOTS, SLOT_NAMES, PACK,
     recipe, itemValue, MAX_TIER, ENCHANT_STEPS, MAX_FX, REFORGE_COST, SET_BONUS, armorSet, itemName, tierName, RARITY, AFFIX, WEAPON_FX, ARMOR_FX, affixText, upgradeCost, ENCHANT_COST,
-    CART, HERO, KING, BOSS_IDS, DUNGEON, TEAM_E, STORY, SUMMON, WORLD_OPTS, PRESETS, VICTORY, GEMS, GEM_IDS, GEM_LV, gemOf, gemFx, gemText, SOCKETS_BY_R, MAX_SOCKETS, SOCKET_STEPS, GEM_UP, CLASS_LV, SUB_LV, CLASSES, classMods, BUILDINGS, CITY_GUARD, BUILD_ORDER, BUILD_MAX, ORDERS,
+    WORLD, SIEGE, CART, HERO, KING, BOSS_IDS, DUNGEON, TEAM_E, STORY, SUMMON, WORLD_OPTS, PRESETS, VICTORY, GEMS, GEM_IDS, GEM_LV, gemOf, gemFx, gemText, SOCKETS_BY_R, MAX_SOCKETS, SOCKET_STEPS, GEM_UP, CLASS_LV, SUB_LV, CLASSES, classMods, BUILDER, ROAD_COST, MAT_VAL, itemVal, INCOME, BUILDINGS, bMax, CHURCH, ANGEL, CITY_GUARD, BUILD_ORDER, BUILD_MAX, ORDERS,
     SEASON_LEN, SEASONS, seasonIdx, WEATHER, WEATHER_ORDER, TOURN, MERCH, ELITE_NAMES, SITES, PERS, BOT_LEVELS, PACTS, TERR, CREATURES, DIRS, cheb, reach,
   };
 });

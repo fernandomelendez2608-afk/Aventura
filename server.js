@@ -131,11 +131,12 @@ function notify(g, p, payload, opts) {
     }).catch(e => console.error('Aviso fallido:', e.message));
   }
 }
+const wants = (p, k) => !(p.pn && p.pn[k] === false); // preferencias de avisos del jugador (por defecto, todo activado)
 function notifyTurn(g, before) {
   if (!vapid) return;
   const evs = g.events.filter(e => e.id >= before);
   for (const p of g.players) {
-    if (p.bot || !p.push || !p.push.length) continue;
+    if (p.bot || !p.push || !p.push.length || !wants(p, 'turn')) continue;
     if (!p.alive && g.status !== 'over') continue;
     const mine = evs.filter(e => e.to && e.to.includes(p.id));
     const dead = mine.filter(e => e.k === 'dead').length;
@@ -170,7 +171,7 @@ function notifyAttacks(g, before) { // ataques de otros jugadores en tiempo real
     if (e.k !== 'phit' || !e.to) continue;
     for (const pid of e.to) {
       const p = g.players[pid];
-      if (!p || p.bot || !p.push || !p.push.length) continue;
+      if (!p || p.bot || !p.push || !p.push.length || !wants(p, 'attack')) continue;
       if (p._lp && now - p._lp < 5 * 60000) continue;
       p._lp = now;
       notify(g, p, { title: '⚔️ ¡Te están atacando! · ' + g.code, body: e.text, tag: 'atk-' + g.code, url: '/' }, { ttl: 3600, urgency: 'high', topic: 'atk' + g.code });
@@ -182,7 +183,7 @@ function notifyChat(g, msg) {
   if (!vapid) return;
   const now = Date.now(), from = g.players[msg.p]; if (!from) return;
   for (const p of g.players) {
-    if (p.bot || p.id === msg.p || !p.push || !p.push.length) continue;
+    if (p.bot || p.id === msg.p || !p.push || !p.push.length || !wants(p, 'chat')) continue;
     if (msg.al && E.pactOf(g, msg.p, p.id) !== 'alianza') continue;
     if ([...conns].some(([c, ci]) => c.open && ci.code === g.code && ci.pid === p.id)) continue; // ya la está viendo
     if (p._lc && now - p._lc < 3 * 60000) continue;
@@ -198,7 +199,7 @@ function notifyEvents(g, before) { // propuestas, pactos y hordas: aviso inmedia
     if (e.id < before || !e.nt || !NT_TITLE[e.nt] || !e.to) continue;
     for (const pid of e.to) {
       const p = g.players[pid];
-      if (!p || p.bot || p.auto || !p.push || !p.push.length) continue;
+      if (!p || p.bot || p.auto || !p.push || !p.push.length || !wants(p, 'events')) continue;
       p._ln = p._ln || {};
       if (p._ln[e.nt] && now - p._ln[e.nt] < 60000) continue;
       p._ln[e.nt] = now;
@@ -214,7 +215,7 @@ function remindAll() { // aviso cuando queda poco para que acabe el turno y aún
     const total = g.cfg.turnHours * 3600000, left = g.endsAt - now;
     if (left <= 0 || left > Math.max(20 * 60000, total * 0.2)) continue;
     for (const p of g.players) {
-      if (p.bot || p.auto || !p.alive || p.ready || !p.push || !p.push.length || p.remT === g.turn) continue;
+      if (p.bot || p.auto || !p.alive || p.ready || !p.push || !p.push.length || !wants(p, 'remind') || p.remT === g.turn) continue;
       p.remT = g.turn; touchGame(g);
       notify(g, p, { title: '⏳ Se acaba el turno · ' + g.code, body: 'Quedan ' + fmtDur(left) + ' y aún no pulsas «Fin de turno».', tag: 'rem-' + g.code, url: '/' }, { ttl: 1800, topic: 'rem' + g.code });
     }
@@ -331,6 +332,9 @@ function onMessage(c, text) {
         touchGame(g);
         send(c, { t: 'push', ok: true, subs: me.push.length });
         if (!had) notify(g, me, { title: '🔔 Avisos activados', body: 'Te avisaré cuando empiece tu turno, te ataquen o se acabe el tiempo.', tag: 'welcome', url: '/' }, { ttl: 600 });
+      } else if (m.a === 'prefs') {
+        const pn = {}; for (const k of ['turn', 'attack', 'chat', 'events', 'remind']) if (m.pn && m.pn[k] === false) pn[k] = false;
+        me.pn = pn; touchGame(g); send(c, { t: 'push', ok: true, subs: me.push.length });
       } else if (m.a === 'unsub') {
         me.push = me.push.filter(x => x.endpoint !== m.endpoint);
         touchGame(g);
@@ -434,6 +438,7 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
     return res.end(JSON.stringify({ ok: true, now: Date.now(), conns: [...conns.keys()].filter(c => c.open).length, games: gamesInfo(), store: storeInfo(), push: !!vapid }));
   }
+  if (p === '/api/version') { res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); return res.end(JSON.stringify({ version: require('./package.json').version })); }
   if (p === '/api/backup' || p === '/api/restore') {
     if (!ADMIN_KEY || url.searchParams.get('key') !== ADMIN_KEY) { res.writeHead(403); return res.end('Clave de administrador inválida o no configurada (variable ADMIN_KEY)'); }
     if (p === '/api/backup') {

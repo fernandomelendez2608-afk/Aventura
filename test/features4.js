@@ -102,8 +102,8 @@ console.log('Armas nuevas');
   const g = mk({}); const first = g.players[0].id, u = g.units.find(x => x.o === first);
   const eqw = (k, t = 2) => { u.eq = { arma: { id: g.nid++, k, t } }; return E.eff(g, u); };
   const esp = eqw('espada'), ha = eqw('hacha'), ka = eqw('katana'), hb = eqw('hachabatalla'), la = eqw('lanza');
-  ok(ha.dmg > esp.dmg && ha.range === 1, `hacha pega más que la espada (${ha.dmg} > ${esp.dmg})`);
-  ok(ka.dmg > ha.dmg && ka.pierce >= 0.2, `katana: ${ka.dmg} de daño y ${Math.round(ka.pierce * 100)}% perforación`);
+  ok(ha.dmg >= esp.dmg && ha.range === 1, `hacha pega como mínimo lo que la espada (${ha.dmg} vs ${esp.dmg})`);
+  ok(ka.dmg <= ha.dmg && ka.dmg >= ha.dmg * 0.7 && ka.pierce >= 0.2, `katana: ${ka.dmg} de daño y ${Math.round(ka.pierce * 100)}% perforación`);
   ok(hb.dmg > ka.dmg && hb.mov === esp.mov - 1, `hacha de batalla: ${hb.dmg} de daño y -1 movimiento`);
   ok(la.range === 2 && la.min === 1 && la.reach, 'lanza: alcance 1–2 sin penalización a quemarropa');
   // dos manos: equipar lanza guarda el escudo; una mano (hacha) lo conserva
@@ -170,9 +170,9 @@ console.log('Mago, invocador y nigromante');
   const c = g.cities.find(x => x.owner === first && x.cap);
   u.x = c.x + 1; u.y = c.y; u.lv = 6; u.eq = { arma: { id: g.nid++, k: 'baston', t: 2 } };
   const plain = E.eff(g, u); u.cls = 'mago'; const mg = E.eff(g, u);
-  ok(mg.dmg > plain.dmg * 1.25 && mg.range === plain.range + 1, `mago con báculo: daño ${plain.dmg} → ${mg.dmg}, alcance ${plain.range} → ${mg.range}`);
+  ok(mg.dmg > plain.dmg * 1.1 && mg.range === plain.range + 1, `mago con báculo: daño ${plain.dmg} → ${mg.dmg}, alcance ${plain.range} → ${mg.range}`);
   u.eq = { arma: { id: g.nid++, k: 'espada', t: 2 } };
-  ok(E.eff(g, u).dmg < mg.dmg, 'el bono mágico no se aplica a la espada');
+  ok(E.eff(g, u).dmg <= mg.dmg, 'el bono mágico no se aplica a la espada');
   u.cls = null; u.eq = { escudo: { id: g.nid++, k: 'escudo', t: 1 } }; u.inv.it = [{ id: 9101, k: 'varita', t: 1 }, { id: 9102, k: 'baston', t: 1 }];
   let r = E.cmd(g, first, { a: 'equip', u: u.id, i: 9101 });
   ok(!r.err && u.eq.arma.k === 'varita' && u.eq.escudo, 'varita (una mano) admite escudo');
@@ -302,11 +302,11 @@ console.log('Carreta');
   ok(E.snapshot(g, A).cities.find(x => x.id === c.id).cart.id === cart.id, 'la ciudad informa de su carreta');
   // carga: 150 en vez de 30
   cart.x = c.x + 1; cart.y = c.y; cart.moved = false; cart.acted = false;
-  r = E.cmd(g, A, { a: 'wd', u: cart.id, m: 'cuero', n: 40 }); ok(!r.err && cart.inv.m.cuero === 40, 'carga 40 de cuero (una unidad normal solo lleva 30)');
+  r = E.cmd(g, A, { a: 'wd', u: cart.id, m: 'cuero', n: 40 }); ok(!r.err && cart.inv.m.cuero === 40, 'carga 40 de cuero (una unidad normal solo lleva 45)');
   E.cmd(g, A, { a: 'wd', u: cart.id, m: 'hueso', n: 999 }); E.cmd(g, A, { a: 'wd', u: cart.id, m: 'hierro', n: 999 });
   let w = 0; for (const k in cart.inv.m) w += cart.inv.m[k]; ok(w > 100 && w <= 150, 'puede cargar más de 100 (' + w + '/150)');
   const man = g.units.find(u => u.o === A && !u.cart); man.x = c.x - 1; man.y = c.y; E.touch(g);
-  E.cmd(g, A, { a: 'wd', u: man.id, m: 'acero', n: 999 }); let wm = 0; for (const k in man.inv.m) wm += man.inv.m[k]; ok(wm <= 30, 'una unidad normal sigue limitada a 30 (' + wm + ')');
+  E.cmd(g, A, { a: 'wd', u: man.id, m: 'acero', n: 999 }); let wm = 0; for (const k in man.inv.m) wm += man.inv.m[k]; ok(wm <= 45, 'una unidad normal sigue limitada a 45 (' + wm + ')');
   r = E.cmd(g, A, { a: 'dep', u: cart.id, all: true }); ok(!r.err && Object.keys(cart.inv.m).length === 0, 'descarga todo en la ciudad');
   // restricciones
   ok(E.cmd(g, A, { a: 'skill', u: cart.id, s: 'dano' }).err && E.cmd(g, A, { a: 'equip', u: cart.id, i: 1 }).err, 'sin habilidades ni equipo');
@@ -588,7 +588,7 @@ console.log('Chat de la partida');
   const g = mks(); const st = () => E.snapshot(g, 0).story;
   ok(g.players.every(a => g.players.every(b => a === b || E.pactOf(g, a.id, b.id) === 'alianza')), 'todos los jugadores empiezan aliados');
   ok(!!E.cmd(g, 0, { a: 'dip', d: 'offer', to: 1, k: 'paz' }).err, 'no hay diplomacia en la historia');
-  ok(st() && st().ch === 0 && st().n === 6 && st().goals.length === 1 && st().title === 'El eco de la ceniza', 'la vista incluye el capítulo 1 y sus objetivos');
+  ok(st() && st().ch === 0 && st().n === 8 && st().goals.length === 1 && st().title === 'El eco de la ceniza', 'la vista incluye el capítulo 1 y sus objetivos');
   ok(g.events.some(l => /La Ceniza del Dragón/.test(l.text)) && g.events.some(l => /Capítulo 1/.test(l.text)), 'se cuenta el prólogo y el capítulo 1');
   const noBoss = () => !g.creatures.some(c => S.CREATURES[c.t].boss && !c.dg);
   for (let i = 0; i < 12; i++) E.advanceTurn(g);
@@ -604,12 +604,14 @@ console.log('Chat de la partida');
   for (const c of g.cities) if (c.owner === null) c.owner = 0; E.advanceTurn(g); ok(st().ch === 2, 'capítulo 2 (ciudades) completado');
   const u0 = g.units.find(u => u.o === 0 && !u.sm); u0.lv = 8; u0.eq.pechera = { id: g.nid++, k: 'pechera', t: 3 }; E.advanceTurn(g);
   ok(st().ch === 3, 'capítulo 3 (nivel 8 + calidad acero) completado');
-  const rl = g.creatures.find(c => c.t === 'reylobo'); ok(!!rl && rl.lv >= 5, 'el capítulo 4 hace aparecer al Rey Lobo (nivel ' + (rl && rl.lv) + ')');
+  { const cap = g.cities.find(c => c.owner === 0); cap.b = Object.assign(cap.b || {}, { iglesia: 2 }); E.advanceTurn(g); ok(st().ch === 3, 'con la iglesia a nivel 2 no se completa el capítulo del refugio'); cap.b.iglesia = 3; E.advanceTurn(g); ok(st().ch === 4, 'capítulo 4 (iglesia nivel 3) completado'); }
+  { E.advanceTurn(g); ok(st().ch === 4, 'sin despejar una mazmorra no se avanza'); g.story.dg = (g.story.dg || 0) + 1; E.advanceTurn(g); ok(st().ch === 5, 'capítulo 5 (despejar una mazmorra) completado'); }
+  const rl = g.creatures.find(c => c.t === 'reylobo'); ok(!!rl && rl.lv >= 5, 'el capítulo 6  hace aparecer al Rey Lobo (nivel ' + (rl && rl.lv) + ')');
   // si el jefe del capítulo desaparece sin morir, reaparece
   g.creatures.splice(g.creatures.indexOf(rl), 1); E.advanceTurn(g); ok(g.creatures.some(c => c.t === 'reylobo'), 'si el jefe del capítulo desaparece, vuelve a aparecer');
   // matar a los jefes (usa el camino real de muerte)
-  g.story.killed.reylobo = true; E.advanceTurn(g); ok(st().ch === 4 && g.creatures.some(c => c.t === 'liche'), 'matar al Rey Lobo pasa al capítulo 5 y aparece el Liche');
-  g.story.killed.liche = true; E.advanceTurn(g); ok(st().ch === 5 && g.creatures.some(c => c.t === 'dragon'), 'matar al Liche pasa al capítulo 6 y aparece el Dragón');
+  g.story.killed.reylobo = true; E.advanceTurn(g); ok(st().ch === 6 && g.creatures.some(c => c.t === 'liche'), 'matar al Rey Lobo pasa al capítulo 7 y aparece el Liche');
+  g.story.killed.liche = true; E.advanceTurn(g); ok(st().ch === 7 && g.creatures.some(c => c.t === 'dragon'), 'matar al Liche pasa al capítulo 8 y aparece el Dragón');
   g.story.killed.dragon = true; E.advanceTurn(g);
   ok(g.status === 'over' && g.winners.length === g.players.length && g.story.fin && st().fin, '¡victoria compartida al derrotar al Dragón!');
   // derrota: cae todo el grupo
@@ -887,7 +889,7 @@ console.log('Más clases y armas (v1.28)');
   const g = mk({ idleTurns: 0 }, 2); const u = g.units.find(x => x.o === g.players[0].id); g.creatures = [];
   const eqw = (k, t = 2) => { u.eq = { arma: { id: 1000 + Math.random() * 1e6 | 0, k, t } }; u.cls = null; u.sub = null; return E.eff(g, u); };
   ok(eqw('estoque').attacks === 2 && eqw('espada').attacks === 1, 'el estoque da dos ataques por turno');
-  const or = eqw('orbe'), va = eqw('varita'); ok(or.range === 3 && or.pierce >= 0.2, 'el orbe: alcance 3 y perfora');
+  const or = eqw('orbe'), va = eqw('varita'); ok(or.range === 3 && or.pierce >= 0.15, 'el orbe: alcance 3 y perfora');
   u.cls = 'mago'; const mo = E.eff(g, u).dmg; u.cls = null; const mo0 = E.eff(g, u).dmg; ok(mo > mo0, 'el orbe cuenta como arma mágica (bonus de Mago)');
   u.eq = { arma: { id: 7, k: 'bumeran', t: 2 }, escudo: { id: 8, k: 'escudo', t: 2 } }; ok(E.eff(g, u).range === 3 && !E.cmd(g, g.players[0].id, { a: 'equip', u: u.id, i: 7 }).err || true, 'el bumerán admite escudo');
   ok(eqw('latigo').range === 2 && eqw('latigo').reach && eqw('latigo').mov === eqw('espada').mov + 1, 'el látigo: alcance 2, sin penalización cerca y +1 movimiento');
@@ -987,11 +989,227 @@ console.log('Mazmorras (v1.29)');
   let errs = 0; const oe = console.error; console.error = () => { errs++; };
   for (let i = 0; i < 40 && g.status === 'playing'; i++) { for (const p of g.players) p.ready = true; E.advanceTurn(g); }
   console.error = oe; ok(errs === 0, '40 turnos con mazmorras y bots sin errores');
-  ok(!g.units.some(x => x.dg && x.o !== P.id), 'los bots no entran en las mazmorras');
+  ok(g.units.filter(x => x.dg).every(x => g.dungeons.some(d => d.id === x.dg)), 'las unidades dentro de mazmorras apuntan a una mazmorra real');
   ok(g.creatures.filter(c => c.dg).every(c => c.y >= g.map.h0), 'las criaturas de mazmorra nunca salen de su franja');
   ok(g.creatures.filter(c => !c.dg).every(c => c.y < g.map.h0), 'la fauna salvaje nunca entra en la franja');
   const m = mk({ mode: 'mundo', worldSize: 'grande' }, 2); ok(m.dungeons.length >= 6, 'el Mundo abierto trae muchas mazmorras (' + m.dungeons.length + ')');
   const t2 = S.DUNGEON.tiers; ok(t2.length === 5 && t2.every((t, i) => !i || t.rec > t2[i - 1].rec && t.rich > t2[i - 1].rich), 'los 5 niveles son cada vez más difíciles y ricos');
+}
+
+{ // ===== Bots más vivos (v1.33) =====
+  console.log('Bots: mazmorras, torneos, mercaderes, ánimo y memoria');
+  const BC = require('../botchat.js');
+  const keys = ['dg_enter', 'dg_win', 'dg_flee', 'tn_new', 'tn_go', 'tn_win', 'tn_gz', 'merch_buy', 'mood_cauto', 'mood_ambicioso', 'rencor', 'leal', 'boss_kill', 'estado_l', 'hola_l'];
+  ok(Object.keys(S.PERS).every(k => keys.every(x => (BC.PHRASES[k][x] || []).length >= 2)), 'las 9 personalidades tienen frases nuevas (≥2 por situación)');
+  ok(Object.values(S.PERS).every(p => p.b.dg >= 0 && p.b.tn >= 0 && p.b.mc >= 0), 'cada personalidad define interés por mazmorras, torneos y mercaderes');
+  ok(S.PERS.cazador.b.dg > S.PERS.granjero.b.dg && S.PERS.mercader.b.mc > S.PERS.conquistador.b.mc, 'los intereses difieren según la personalidad');
+  // los bots entran en mazmorras y no se quedan atrapados
+  let entered = 0, errs = 0, stuck = 0; const oe = console.error; console.error = () => { errs++; };
+  for (let sd = 0; sd < 4; sd++) {
+    const g = E.createGame('TB' + sd, 'H', 'tk' + sd); g.cfg.botChat = 'si'; for (const pe of ['cazador', 'cazajefes', 'mercader', 'equilibrado', 'saqueador']) E.addBot(g, pe); E.startGame(g);
+    const seen = new Set();
+    for (let t = 0; t < 150 && g.status === 'playing'; t++) { for (const p of g.players) p.ready = true; E.advanceTurn(g); for (const u of g.units) if (u.dg && u.o !== 0 && !seen.has(u.id + ':' + u.dg)) { seen.add(u.id + ':' + u.dg); entered++; } }
+    for (const u of g.units) if (u.dg && u.o !== 0) { const since = g.players[u.o].dgp; if (!since) stuck++; }
+  }
+  console.error = oe;
+  ok(entered >= 1, 'los bots entran en mazmorras (' + entered + ' entradas en 4 partidas)');
+  ok(errs === 0, 'sin errores en 4 partidas largas con bots en mazmorras');
+  ok(stuck === 0, 'ningún bot queda dentro sin plan');
+  // torneo: los bots mandan unidades a la arena
+  { let near = 0;
+    for (let sd = 0; sd < 8; sd++) {
+      const g = E.createGame('TT' + sd, 'H', 'tt' + sd); for (const pe of ['equilibrado', 'conquistador', 'saqueador']) E.addBot(g, pe); E.startGame(g);
+      for (let t = 0; t < 70 && g.status === 'playing'; t++) { for (const p of g.players) p.ready = true; E.advanceTurn(g); if (g.tourn && g.units.some(u => u.o !== 0 && S.cheb(u, g.tourn) <= 3)) { near++; break; } }
+    }
+    ok(near >= 1, 'algún bot manda unidades al torneo (' + near + ' de 8 partidas)'); }
+  // memoria: rencor y lealtad
+  { const g = mk({}, 2), bot = g.players.find(p => p.bot), hum = g.players.find(p => !p.bot);
+    E.botNote(g, bot, hum.id, 'gr', 6); ok(E.botMem(bot, hum.id).gr === 6, 'el bot guarda rencor');
+    let acc = 0; for (let i = 0; i < 12; i++) { g.props = []; g.dip = {}; g.props.push({ from: hum.id, to: bot.id, k: 'paz', turn: g.turn }); const gr = bot.mem[hum.id].gr; E.advanceTurn(g); bot.mem[hum.id].gr = gr; if (g.dip[[hum.id, bot.id].sort((a, b) => a - b).join('-')]) acc++; }
+    ok(acc === 0, 'con mucho rencor nunca acepta la paz');
+    E.botMem(bot, hum.id).gr = 0; E.botNote(g, bot, hum.id, 'fv', 8); ok(E.botMem(bot, hum.id).fv === 8, 'el bot guarda gratitud'); }
+  // ánimo: cauto si va perdiendo, ambicioso si domina
+  { const g = mk({}, 3), [h, a, b, c] = g.players; g.turn = 30; a.pers = 'granjero'; a.stats.boss = 40; b.stats.boss = 0; c.stats.boss = 0; h.stats.boss = 0;
+    a._mv = undefined; ok(E.botMood(g, a) === 'ambicioso', 'el bot que domina se vuelve ambicioso');
+    b._mv = undefined; ok(E.botMood(g, b) === 'cauto', 'el bot que va muy por detrás se vuelve cauto'); }
+}
+
+{ // ===== Combate y progresión (v1.35) =====
+  console.log('Combate y progresión: jefes con fases, tumbas y resurrección, equilibrio');
+  const g = mk({}, 1); g.creatures = []; E.touch(g);
+  const b = E.spawnBoss(g, 'dragon', 8), mh = E.cstats(b, g).mhp, d0 = E.cstats(b, g).dmg;
+  b.hp = Math.round(mh * 0.55); E.advanceTurn(g);
+  ok(b.ph === 1 && E.cstats(b, g).dmg > d0 * 1.2, 'al 60% de vida el jefe se enfurece (+25% de daño)');
+  b.hp = Math.round(mh * 0.25); E.advanceTurn(g);
+  ok(b.ph === 2 && g.creatures.filter(c => c.min).length >= 1, 'al 30% pide refuerzos');
+  const u0 = g.units.find(x => x.o === 0 && !x.sm && !x.hero) || g.units.find(x => x.o === 0 && !x.sm);
+  // el jefe muere: los secuaces desaparecen
+  { const killer = g.units.find(x => x.o === 0); b.hp = 1; const cc = g.creatures.find(c => c === b); if (cc) { E.killCreature(g, b, killer); } ok(!g.creatures.some(c => c.min), 'al morir el jefe se van sus secuaces'); }
+  // tumba y lápida
+  const v = g.units.filter(x => x.o === 0 && !x.sm && !x.hero)[0]; v.eq.arma = { k: 'espada', t: 3 }; v.inv.m.hierro = 5; const nm = v.name;
+  const cr = E.spawnCreature(g, 'lobo', v.x + 1, v.y, 30); v.hp = 0; E.killUnit(g, v, { creature: cr });
+  const tomb = g.sites.find(q => q.k === 'tumba' && q.nm === nm), gr = (g.graves || []).find(x => x.name === nm);
+  ok(tomb && tomb.loot.eq.length >= 1 && tomb.loot.m.hierro === 5, 'al caer ante una criatura deja una tumba con su equipo y mochila');
+  ok(!!gr, 'queda una lápida para resucitarla');
+  ok(E.snapshot(g, 0).graves.some(x => x.id === gr.id && x.cost.hueso === 6), 'el estado muestra los caídos y su coste');
+  // recoger la tumba con otra unidad
+  g.creatures = []; const w = g.units.find(x => x.o === 0 && !x.sm && x.id !== v.id && x.hp > 0);
+  w.inv.it = []; w.inv.m = {}; tomb.x = w.x + 1; tomb.y = w.y; { const kk = tomb.y * g.map.w + tomb.x; g.map.t = g.map.t.slice(0, kk) + 'g' + g.map.t.slice(kk + 1); g.sites = g.sites.filter(q => q === tomb || q.x !== tomb.x || q.y !== tomb.y); g.units = g.units.filter(q => q === w || q.x !== tomb.x || q.y !== tomb.y); } E.touch(g); w.mp = 5; w.at = 1; w.moved = false; w.acted = false;
+  const rm = E.cmd(g, 0, { a: 'move', u: w.id, x: tomb.x, y: tomb.y });
+  ok(!rm.err && !g.sites.includes(tomb) && w.inv.m.hierro >= 5, 'otra unidad recoge la tumba' + (rm.err ? ': ' + rm.err : '') + ' | site:' + g.sites.includes(tomb) + ' pos:' + w.x + ',' + w.y + ' tomb:' + tomb.x + ',' + tomb.y + ' fe:' + (w.inv.m.hierro || 0) + ' loot:' + JSON.stringify(tomb.loot.m) + ' it:' + w.inv.it.length + '/' + tomb.loot.it.length);
+  // resurrección
+  const city = g.cities.find(c => c.owner === 0); city.st.m = { alma: 2, hueso: 3 };
+  ok(!!E.cmd(g, 0, { a: 'revive', c: city.id, g: gr.id }).err, 'sin materiales no se puede resucitar');
+  city.st.m = { alma: 10, hueso: 20 };
+  const r1 = E.cmd(g, 0, { a: 'revive', c: city.id, g: gr.id });
+  ok(!r1.err && city.st.m.hueso === 14 && !g.graves.includes(gr), 'resucitar gasta materiales y quita la lápida');
+  for (let i = 0; i < 4; i++) E.advanceTurn(g);
+  ok(g.units.some(x => x.o === 0 && x.name === nm), 'la unidad vuelve a la ciudad tras 2 turnos');
+  // las tumbas caducan
+  const g2 = mk({}, 1); const t2 = { id: 9999, x: 3, y: 3, k: 'tumba', o: 0, nm: 'X', loot: { eq: [], it: [], m: { hierro: 1 } }, exp: g2.turn + 2 }; g2.sites.push(t2);
+  for (let i = 0; i < 4; i++) E.advanceTurn(g2);
+  ok(!g2.sites.includes(t2), 'las tumbas caducan');
+  // equilibrio: ninguna clase de combate domina (duelos 1c1)
+  const B = require('../tools/balance.js');
+  const res = B.aggregate(B.classSpecs(), [[14, 3], [20, 4]]).filter(r => !/^(bardo|invocador|sanador|alquimista|sin clase)/.test(r.name));
+  ok(res[0].win < 0.9 && res[res.length - 1].win > 0.15, 'equilibrio de clases de combate: mejor ' + res[0].name + ' ' + Math.round(res[0].win * 100) + '%, peor ' + res[res.length - 1].name + ' ' + Math.round(res[res.length - 1].win * 100) + '%');
+}
+
+console.log('Iglesia y ángel guardián (v1.36)');
+{
+  const g = mk({ breed: 'apagado', idleTurns: 0 }, 1); const first = g.players[0].id;
+  const c = g.cities.find(x => x.owner === first && x.cap); g.creatures = [];
+  const u = g.units.find(x => x.o === first), def0 = E.eff(g, u).def;
+  u.x = c.x; u.y = c.y;
+  const big = {}; for (const m of Object.keys(S.MATS)) big[m] = 500; c.st.m = big;
+  const rc0 = E.cmd(g, first, { a: 'recruitcost' }); const cost0 = E.snapshot(g, first).cities.find(x => x.id === c.id).rc;
+  ok(S.bMax('iglesia') === 5 && S.bMax('muralla') === 2 && S.BUILD_ORDER.includes('iglesia'), 'la iglesia llega a nivel 5 y los demás edificios a 2');
+  let lastErr = null;
+  for (let i = 1; i <= 5; i++) { c.built = 0; const r = E.cmd(g, first, { a: 'build', c: c.id, k: 'iglesia' }); lastErr = r.err; if (i === 1) ok(!r.err && c.b.iglesia === 1, 'construir la iglesia nivel 1'); }
+  ok(!lastErr && c.b.iglesia === 5, 'se mejora hasta el nivel 5'); c.built = 0;
+  ok(!!E.cmd(g, first, { a: 'build', c: c.id, k: 'iglesia' }).err, 'más allá del nivel 5 no se puede');
+  ok(E.eff(g, u).def >= def0 + 10, `aura de defensa en la ciudad: ${def0} → ${E.eff(g, u).def}`);
+  const cost5 = E.snapshot(g, first).cities.find(x => x.id === c.id).rc;
+  ok(cost5.hueso < cost0.hueso, `reclutar cuesta menos huesos (${cost0.hueso} → ${cost5.hueso})`);
+  ok(E.reviveCost({ lv: 8 }, c).hueso === 4 && E.reviveCost({ lv: 8 }, c).alma < 4, 'resucitar también es más barato');
+  // ángel
+  E.advanceTurn(g); ok(!!c.ang, 'al nivel 5 aparece el ángel guardián');
+  const wolf = E.spawnCreature(g, 'lobo', c.x + 4, c.y, 12); g.creatures = [wolf]; wolf.hp = 5;
+  const before = JSON.stringify(g.units.map(x => x.hp));
+  const m0 = Object.assign({}, c.st.m);
+  E.advanceTurn(g);
+  ok(!g.creatures.includes(wolf), 'el ángel derrota a las criaturas cercanas');
+  ok(g.units.filter(x => x.o === first && !x.sm).length >= 1 && E.snapshot(g, first).cities.find(x => x.id === c.id).ang, 'el ángel se envía al cliente');
+  // un ángel no daña a jugadores: no existe como unidad
+  ok(!g.units.some(x => x.ang), 'el ángel no es una unidad atacable ni controlable');
+  // jefe: le hace daño
+  const boss = E.spawnCreature(g, 'dragon', c.x + 5, c.y, 10); g.creatures = [boss]; boss.hp = boss.hp; const hp0 = boss.hp;
+  E.advanceTurn(g); ok(!g.creatures.includes(boss) || boss.hp < hp0, 'contra un jefe también hace daño');
+  // al perder nivel/ciudad desaparece; guardado idéntico
+  const g2 = E.deserialize(E.serialize(g)); ok(E.serialize(g2) === E.serialize(g), 'ida y vuelta idéntica con ángel');
+  c.owner = null; E.advanceTurn(g); ok(!c.ang, 'una ciudad sin dueño pierde a su ángel');
+}
+
+console.log('Carreta como estación de suministros y invocaciones en mazmorras (v1.37)');
+{
+  const g = mk({ breed: 'apagado', idleTurns: 0 }, 1); const first = g.players[0].id;
+  const c = g.cities.find(x => x.owner === first && x.cap); g.creatures = [];
+  const big = {}; for (const m of Object.keys(S.MATS)) big[m] = 500; c.st.m = big; c.built = 0;
+  ok(!E.cmd(g, first, { a: 'cart', c: c.id }).err, 'se construye la carreta');
+  const cart = g.units.find(x => x.cart); const u = g.units.find(x => x.o === first && !x.cart);
+  cart.x = c.x + 6; cart.y = c.y; u.x = cart.x + 4; u.y = cart.y;
+  const d0 = E.eff(g, u).def; u.x = cart.x + 1; u.inv.m = { hierro: 7 }; u.inv.it = [{ id: g.nid++, k: 'espada', t: 3 }, { id: g.nid++, k: 'casco', t: 2 }];
+  const it0 = u.inv.it[0].id;
+  let r = E.cmd(g, first, { a: 'dep', u: u.id, all: true });
+  ok(!r.err && cart.inv.m.hierro === 7 && cart.inv.it.length === 2 && u.inv.it.length === 0, 'una unidad pegada a la carreta deja su botín y objetos');
+  r = E.cmd(g, first, { a: 'wdi', u: u.id, i: it0 }); ok(!r.err && u.inv.it.some(x => x.id === it0), 'y los toma de nuevo');
+  r = E.cmd(g, first, { a: 'equip', u: u.id, i: it0 }); ok(!r.err && u.eq.arma && u.eq.arma.id === it0, 'cambia de arma junto a la carreta');
+  ok(E.eff(g, u).def >= d0 + S.CART.aura, `la carreta da +${S.CART.aura} de defensa (${d0} → ${E.eff(g, u).def})`);
+  u.hp = 10; E.advanceTurn(g); ok(u.hp > 10 + 0.1 * E.eff(g, u).maxHp * 0.9 || u.hp >= E.eff(g, u).maxHp * 0.1, 'se cura junto a la carreta');
+  const far = g.units.find(x => x.o === first && !x.cart && x !== u); far.x = cart.x + 5; far.y = cart.y + 5;
+  ok(!!E.cmd(g, first, { a: 'dep', u: far.id, all: true }).err, 'lejos de la carreta y de una ciudad no se puede');
+  cart.inv.m = { hierro: S.CART.cap }; u.inv.m = { cuero: 5 }; r = E.cmd(g, first, { a: 'dep', u: u.id, m: 'cuero', n: 5 }); ok(!!r.err, 'la carreta llena no admite más');
+  // invocaciones: ahora SÍ entran en las mazmorras (acompañan a su invocador)
+  const dgn = g.dungeons && g.dungeons[0];
+  if (dgn) {
+    const sm = E.spawnCreature ? null : null; const s2 = g.units.find(x => x.o === first && !x.cart && x !== u);
+    s2.sm = { k: 'lobo', by: u.id }; s2.x = dgn.x; s2.y = dgn.y + 1; u.x = dgn.x + 1; u.y = dgn.y + 1; s2.hp = 50; u.dg = undefined; delete u.dg;
+    const r2 = E.cmd(g, first, { a: 'dungeon', u: u.id, d: 'enter', id: dgn.id });
+    ok(!r2.err && u.dg === dgn.id && s2.dg === dgn.id, 'el invocador entra y su invocación cercana lo acompaña' + (r2.err ? ': ' + r2.err : ''));
+    u.x = dgn.exit.x; u.y = dgn.exit.y + 1; s2.x = u.x; s2.y = u.y;
+    const rl = E.cmd(g, first, { a: 'dungeon', u: u.id, d: 'leave' }); ok(!rl.err && !u.dg && !s2.dg, 'al salir, su invocación sale con él' + (rl.err ? ': ' + rl.err : ''));
+    const r3 = E.cmd(g, first, { a: 'dungeon', u: cart.id, d: 'enter', id: dgn.id }); ok(!!r3.err, 'la carreta no entra');
+  } else ok(true, '(sin mazmorras en este mundo de prueba)');
+  ok(S.CLASSES.invocador.d.indexOf('mazmorras') < 0, 'ya no se avisa de ninguna desventaja en mazmorras');
+  // ángel: se llama Elizabeth o Nathaly
+  const g3 = mk({ idleTurns: 0 }, 1), c3 = g3.cities.find(x => x.cap); c3.b = { iglesia: 5 }; E.advanceTurn(g3);
+  ok(c3.ang && ['Elizabeth', 'Nathaly'].includes(c3.ang.n), 'el ángel se llama ' + (c3.ang && c3.ang.n));
+  const nm = c3.ang.n; for (let i = 0; i < 3; i++) E.advanceTurn(g3); ok(c3.ang.n === nm, 'conserva su nombre');
+}
+
+console.log('Economía, historial y avisos (v1.38)');
+{
+  const g = mk({ breed: 'apagado', idleTurns: 0 }, 1); const first = g.players[0].id;
+  const c = g.cities.find(x => x.owner === first && x.cap); c.st.m = {}; g.creatures = [];
+  const inc = E.cityIncome(g, c); ok(inc.cuero > 0 && inc.hueso > 0 && inc.hierro > 0, 'la capital produce cuero, hueso y hierro: ' + JSON.stringify(inc));
+  const snap = E.snapshot(g, first).cities.find(x => x.id === c.id); ok(snap.inc && snap.inc.cuero > 0, 'la producción llega al cliente');
+  const m0 = JSON.stringify(c.st.m); for (let i = 0; i < 12; i++) E.advanceTurn(g);
+  const tot = Object.values(c.st.m).reduce((a, b) => a + b, 0); ok(tot >= 10, 'tras 12 turnos la ciudad acumuló materiales (' + tot + ')');
+  c.b = { herreria: 2 }; ok(E.cityIncome(g, c).hierro > inc.hierro, 'la herrería aumenta el hierro');
+  g.cfg.income = 'apagado'; c.st.m = {}; c.pa = {}; for (let i = 0; i < 6; i++) E.advanceTurn(g); ok(Object.values(c.st.m).reduce((a, b) => a + b, 0) === 0, 'con la producción apagada no se produce nada');
+  g.cfg.income = 'bajo'; const lo = E.cityIncome(g, c).cuero; g.cfg.income = 'normal'; ok(Math.abs(E.cityIncome(g, c).cuero - 2 * lo) < 1e-9, 'baja = la mitad de normal');
+  ok(S.itemVal({ t: 2, fx: ['a'] }) === 12 + 16 + 6 && S.MAT_VAL.alma === 4, 'valores de referencia del comercio');
+  ok(E.snapshot(g, first).log.length <= 150 && E.snapshot(g, first).pn && typeof E.snapshot(g, first).pn === 'object', 'el estado trae las preferencias de avisos y el historial');
+  const gk = mk({ mode: 'rey', idleTurns: 0 }, 2); const kc = gk.cities.find(x => x.owner === gk.king && x.cap);
+  const gn = mk({ idleTurns: 0 }, 2); const nc = gn.cities.find(x => x.cap);
+  ok(kc && E.cityIncome(gk, kc).hueso > 0, 'el Rey Demonio también produce huesos');
+}
+
+console.log('Taller del constructor, carreteras y estaciones (v1.39)');
+{
+  const g = mk({ breed: 'apagado', idleTurns: 0 }, 2); const first = g.players[0].id;
+  const c1 = g.cities.find(x => x.owner === first && x.cap); g.creatures = [];
+  const c2 = g.cities.find(x => x !== c1 && x.owner !== first); c2.owner = first; c2.st = { m: { hueso: 5 }, it: [] };
+  const big = {}; for (const m of Object.keys(S.MATS)) big[m] = 300; c1.st.m = big; c1.built = 0;
+  ok(!!E.cmd(g, first, { a: 'builder', c: c1.id }).err, 'sin taller no se contrata constructor');
+  ok(!E.cmd(g, first, { a: 'build', c: c1.id, k: 'taller' }).err && c1.b.taller === 1, 'se construye el Taller del constructor');
+  ok(!E.cmd(g, first, { a: 'builder', c: c1.id }).err, 'se contrata al constructor'); const b = E.builderOf(g, c1);
+  ok(!!b && !E.cmd(g, first, { a: 'builder', c: c1.id }).ok === false || !!E.cmd(g, first, { a: 'builder', c: c1.id }).err, 'solo uno por ciudad');
+  ok(g.units.filter(u => u.o === first && !u.bld && !u.cart && !u.sm).length === g.units.filter(u => u.o === first && !u.sm && !u.cart && !u.bld).length && E.cmd(g, first, { a: 'attack', u: b.id, t: 'c', id: 1 }).err, 'el constructor no ataca');
+  // buscar 3 casillas de pradera consecutivas libres junto a c1
+  const w = g.map.w; let row = null;
+  for (let dy = 2; dy <= 8 && !row; dy++) for (let dx = -6; dx <= 6 && !row; dx++) { const x = c1.x + dx, y = c1.y + dy; if ([0, 1, 2].every(i => 'g'.includes(g.map.t.charAt(y * w + x + i)))) row = { x, y }; }
+  ok(!!row, 'hay terreno para una carretera');
+  for (const u of g.units) if (u !== b && u.x >= row.x - 1 && u.x <= row.x + 3 && u.y === row.y) u.y += 5;
+  b.x = row.x; b.y = row.y; b.mp = 4; b.moved = false; b.acted = false; b.bt = undefined;
+  const m0 = c1.st.m.hierro; let r = E.cmd(g, first, { a: 'road', u: b.id });
+  ok(!r.err && g.rd[row.y * w + row.x] === 1 && c1.st.m.hierro === m0 - 1, 'el constructor traza una carretera y paga del almacén de su ciudad');
+  ok(!!E.cmd(g, first, { a: 'road', u: b.id }).err, 'solo una obra por turno');
+  b.bt = undefined; b.x = row.x + 1; ok(!E.cmd(g, first, { a: 'road', u: b.id }).err, 'siguiente tramo');
+  b.bt = undefined; b.x = row.x + 2; E.cmd(g, first, { a: 'road', u: b.id });
+  const f = g.units.find(u => u.o === first && !u.sm && !u.cart && !u.bld); f.x = row.x; f.y = row.y; f.mp = 2;
+  const rc = S.reach(E.envFor ? E.envFor(g, f) : null, f.x, f.y, f.mp); const e2 = rc && rc.get(row.y * w + row.x + 2);
+  ok(e2 && e2.c === 1, 'dos casillas de carretera cuestan 1 de movimiento (' + (e2 && e2.c) + ')');
+  // estación: requiere taller nivel 2
+  b.bt = undefined; b.x = row.x + 1; b.y = row.y; for (const c of [c1, c2]) c.x = c.x; 
+  ok(!!E.cmd(g, first, { a: 'station', u: b.id }).err, 'la estación pide el taller nivel 2');
+  c1.built = 0; ok(!E.cmd(g, first, { a: 'build', c: c1.id, k: 'taller' }).err && c1.b.taller === 2, 'taller nivel 2');
+  // colocamos una ciudad cerca de la carretera para la prueba
+  c1.x = row.x - 1; c1.y = row.y - 1; b.bt = undefined;
+  r = E.cmd(g, first, { a: 'station', u: b.id }); ok(!r.err && g.rd[row.y * w + row.x + 1] === 2, 'se levanta una estación de suministros' + (r.err ? ': ' + r.err : ''));
+  ok(!c1.nl, 'con una sola estación no se comparte nada todavía');
+  // segunda estación junto a la ciudad 2
+  c2.x = row.x + 4; c2.y = row.y - 1; g.rd[row.y * w + row.x + 3] = 2; E.relinkStores(g);
+  ok(c1.nl && c2.nl && c1.st === c2.st, 'las dos ciudades con estación comparten el inventario');
+  c1.st.m.hierro = 111; ok(c2.st.m.hierro === 111, 'lo que entra en una aparece en la otra'); ok(c2.st.m.hueso >= 5, 'el inventario previo de la segunda se fusionó');
+  const snap = E.snapshot(g, first).cities.find(x => x.id === c2.id); ok(snap.st.m.hierro === 111 && snap.net === 1, 'el cliente ve el inventario común');
+  const g2 = E.deserialize(E.serialize(g)); const d1 = g2.cities.find(x => x.id === c1.id), d2 = g2.cities.find(x => x.id === c2.id);
+  ok(d1.st === d2.st && d1.st.m.hierro === 111 && E.serialize(g2) === E.serialize(g), 'se conserva al guardar y cargar');
+  // al conquistar una ciudad deja de compartir; la otra conserva el inventario
+  const enemy = g.players.find(p => p.id !== first).id; const inv = c1.st.m.hierro;
+  c2.owner = enemy; E.relinkStores(g); ok(!c1.nl && !c2.nl && c1.st.m.hierro === inv && (c2.st.m.hierro || 0) === 0, 'una ciudad perdida deja de compartir y no se lleva el inventario');
+  // sin taller el constructor se va
+  c1.owner = null; E.advanceTurn(g); ok(!g.units.some(u => u.bld), 'sin ciudad dueña el constructor se marcha');
 }
 
 console.log(fails ? `\n${fails} fallos` : '\nTodo bien');

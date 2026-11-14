@@ -9,7 +9,7 @@ Sin dependencias: solo Node.js 18+ (`npm start`). El cliente es una página web 
 - Cada jugador empieza con **una capital y 4 unidades idénticas** (sin armas ni armadura, 1 punto de habilidad).
 - Los turnos son **simultáneos**: todos mueven a la vez. El turno termina cuando todos los humanos pulsan **Fin de turno** o cuando se acaba el tiempo (configurable de 3 min a 24 h).
 - **Mundo vivo**: aparecen criaturas con el tiempo (ciervos, jabalíes, lobos, osos, goblins, esqueletos, orcos, trolls) que **suben de nivel** cada 10 turnos, y **jefes** (Rey Lobo, Liche, Dragón de Ceniza) que dan almas y acero. Cuanto más lejos de tu capital, más peligro.
-- **Botín**: cada criatura suelta cuero, hueso, hierro, acero y (las fuertes) **almas**. El botín va a la **mochila de la unidad** que la derrota (30 de peso).
+- **Botín**: cada criatura suelta cuero, hueso, hierro, acero y (las fuertes) **almas**. El botín va a la **mochila de la unidad** que la derrota (45 de peso).
 - **Ciudades**: junto a una ciudad tuya (casilla adyacente) la unidad deposita el botín, toma materiales, se equipa y se cura. En la ciudad se **forja** el equipo (hasta 4 objetos por turno) y se **reclutan** más unidades (hasta 14). Las aldeas sin dueño se conquistan entrando en ellas.
 - **Subir de nivel** (+1 punto por nivel, hasta nivel 20), cada punto a elegir:
 
@@ -112,7 +112,7 @@ Los bots escriben en el chat con una etiqueta 🤖 y frases propias según su pe
 Una mejora de ciudad (pestaña **Construir** de la ciudad, abajo del todo) que crea una **carreta**: un almacén móvil.
 
 - **Coste:** 8 cuero, 8 hueso y 3 hierro del almacén de la ciudad.
-- **Carga:** hasta **150** (una mochila normal lleva 30), con materiales y objetos. Cárgala o descárgala junto a una ciudad tuya desde su pestaña «Carga» (botones +1, Todo y «Depositar todo»).
+- **Carga:** hasta **150** (una mochila normal lleva 45), con materiales y objetos. Cárgala o descárgala junto a una ciudad tuya desde su pestaña «Carga» (botones +1, Todo y «Depositar todo»).
 - **Movilidad 6** (una unidad normal tiene 3).
 - **No cuenta como unidad:** no ocupa puestos del tope de 14/20.
 - **Máximo una por ciudad.** Si la destruyen, la ciudad puede construir otra. Si te la matan, el enemigo se queda con parte de la carga (lo que le quepa en la mochila).
@@ -334,7 +334,7 @@ En «Ajustes del mundo → Modo de juego» elige **Por equipos** y, en el ajuste
 - **Gana el último equipo con jugadores vivos** (victoria compartida para todo el equipo). Los bots atacan siempre a los otros equipos, sea cual sea su personalidad.
 
 ## Modo Historia (v1.20)
-Nuevo modo cooperativo: «Ajustes del mundo → Modo de juego → Historia». Es una campaña de **6 capítulos dentro de una sola partida**, «La Ceniza del Dragón». Todos los jugadores (humanos y bots) están **aliados contra el mundo** (sin PvP ni diplomacia) y los jefes aleatorios no aparecen: solo los que manda la historia.
+Nuevo modo cooperativo: «Ajustes del mundo → Modo de juego → Historia». Es una campaña de **8 capítulos (6 hasta v1.37)) dentro de una sola partida**, «La Ceniza del Dragón». Todos los jugadores (humanos y bots) están **aliados contra el mundo** (sin PvP ni diplomacia) y los jefes aleatorios no aparecen: solo los que manda la historia.
 
 | Capítulo | Objetivo (entre todos) |
 |---|---|
@@ -420,7 +420,7 @@ Ajuste «Eventos del mundo»: Clima + torneos + mercaderes (por defecto) / Solo 
 - Al entrar, la unidad pasa a otra "instancia" (una franja subterránea bajo el mapa, aislada por muros). La puerta 🚪 te devuelve al sitio por el que entraste.
 - Cada mazmorra tiene 6 salas: criaturas, tesoros 💎 y trampas ⚠️ ocultas (se descubren al pisarlas).
 - Al fondo hay un jefe con recompensa extra. Despejada, se reabastece a los 20 turnos.
-- Los bots no entran. Las unidades dentro solo las ve su dueño.
+- Las unidades dentro solo las ve su dueño. (Desde v1.33 los bots sí entran, ver abajo.)
 
 ### Fortaleza del Rey Demonio (v1.30.1)
 En el modo «Reto del Rey Demonio», la ciudad del rey se dibuja como fortaleza oscura: suelo carmesí, torres de pinchos, antorchas 🔥, volcán y 😈 sobre el torreón. Los edificios (muralla, herrería, cuartel, atalayas) se siguen viendo.
@@ -436,3 +436,111 @@ En el modo «Reto del Rey Demonio», la ciudad del rey se dibuja como fortaleza 
 - Antorchas en las paredes con brillo cálido, y un halo de luz alrededor de tus unidades dentro de la mazmorra.
 - Cinco temas por nivel: cueva, catacumba, cripta, fuego y abismo. La sala del jefe se tiñe de rojo.
 - Tesoros 💎 con brillo dorado y trampas ⚠️ con aro rojo; lo no explorado queda mucho más oscuro.
+
+## Bots con más vida (v1.33)
+- **Mazmorras:** los bots que las prefieren (Cazador y Cazajefes sobre todo; Equilibrado, Saqueador y Forjador a ratos) forman un grupo de hasta 5, eligen la mazmorra más difícil que les convenga, entran, matan solo lo que pueden vencer, recogen tesoros y salen si se debilitan.
+- **Torneos:** según su personalidad mandan a sus 2 mejores unidades a la arena.
+- **Mercaderes:** los que comercian (Granjero, Diplomático, Forjador) van a comprar, pagando con el excedente de sus almacenes.
+- **Ánimo:** el bot que va muy por detrás se vuelve *cauto* (más paz, menos ataques); el que domina se vuelve *ambicioso* (ataca antes, valora más las ciudades). Lo comenta en el chat.
+- **Memoria:** cada bot recuerda quién lo atacó (rencor) y quién le hizo tratos o pactos (gratitud). Con rencor ataca aunque sea pacífico y rechaza la paz; con gratitud acepta pactos más fácil y no ataca. Ambos se desvanecen con el tiempo.
+- **Frases:** unas 14 situaciones nuevas por personalidad (mazmorras, torneos, mercaderes, ánimo, rencor, lealtad, jefes abatidos) y variantes para partidas largas.
+
+## Versión visible, efectos y sonido (v1.34)
+- La versión aparece en la pantalla de inicio y en la sala de espera (se lee de `/api/version`), para saber qué hay desplegado en Render.
+- Efectos en el mapa: números flotantes de daño (rojo) y curación (verde), «⬆ Nv.N» dorado al subir de nivel y ✖ cuando algo cae a la vista.
+- Sonido sintetizado (sin archivos): golpe, herida, muerte, subida de nivel, nuevo turno y entrada a mazmorra. Botón 🔊/🔇 para silenciarlo (se recuerda).
+- Equilibrio: los jefes de las mazmorras de nivel 1 y 2 bajan un nivel (troll 6→5 y 9→8) porque quedaban muy por encima del nivel recomendado.
+
+## Combate y progresión (v1.35)
+
+- **Balance de clases y armas** ajustado con simulaciones de duelos (`node tools/balance.js agg|cagg`): Mago +18 % (antes +30 %), Orbe base 8, y recortes a las clases que dominaban 1c1. Los duelos no miden veneno/quemadura/invocaciones/auras, así que apoyos e invocadores se ven peor en la tabla de lo que son en partida.
+- **Jefes con fases**: al bajar de vida cambian de fase (+25 % de daño por fase, `c.ph`) y los jefes de mazmorra (`bd`) escalan con el nivel del grupo.
+- **Tumbas y resurrección**: al caer ante una criatura, la unidad deja una 🪦 tumba (30 turnos) con su equipo y mochila; cualquiera puede recogerla (o saquearla). Queda una lápida en «🪦 Caídos» de la ciudad: se resucita pagando almas + huesos (`reviveCost`), vuelve tras 2 turnos. Los bots también resucitan.
+
+## Iglesia y ángel guardián (v1.36)
+
+- Nuevo edificio **⛪ Iglesia**, de nivel 1 a 5 (los demás siguen en 2). Por nivel: **+2 de defensa** a quien esté en la ciudad o pegado a ella (+1 por nivel a 2 casillas; se combina con la muralla tomando el mejor de los dos) y **−8 % de coste en huesos y almas** al reclutar, resucitar caídos, invocar y reclutar bestias del Rey Demonio (−40 % al nivel 5).
+- **Nivel 5: 👼 Ángel guardián.** Vive en la ciudad (no es una unidad: no cuenta para el límite, no se controla y nadie puede atacarlo ni herirlo). Cada turno, antes de que actúen las criaturas, vuela hasta la criatura más cercana en 7 casillas (prefiere las que asaltan la ciudad y los jefes) y la golpea 2 veces (38 de daño, 30 % perforación). **Solo daña criaturas**, nunca a jugadores. El botín que consigue va al almacén de la ciudad. Si la ciudad cambia de dueño, el ángel sirve al nuevo; si queda sin dueño, desaparece.
+- Ajustes en `S.CHURCH` y `S.ANGEL` (shared.js). Los bots también construyen iglesias.
+
+## Carreta-estación y invocaciones (v1.37)
+
+- **🛒 La carreta es ahora una estación de suministros andante** (mini ciudad): cualquier unidad tuya pegada a ella puede **dejar y tomar materiales y objetos** (hasta su capacidad de 150) y **cambiar de equipo** (equipar/quitar) igual que junto a una ciudad. Bono pequeño: **+2 de defensa** y **+12 % de salud por turno** para las unidades pegadas (no se acumula con el +25 % de curación de una ciudad; en una ciudad manda la ciudad). La propia carreta sigue cargándose en las ciudades.
+- **Invocaciones en mazmorras (v1.37.1):** se quitó la restricción: las invocaciones **sí entran en mazmorras**. Las que estén a 3 casillas o menos del invocador entran con él, y salen con él al salir (también pueden entrar/salir por su cuenta). La carreta sigue sin entrar.
+- **Ángel guardián con nombre:** al aparecer se llama **Elizabeth** o **Nathaly** (al azar) y conserva el nombre; se muestra bajo el ángel en el mapa y en los avisos.
+
+## Economía, modos y comodidad (v1.38)
+
+**Economía**
+- **Producción de las ciudades:** cada ciudad con dueño produce materiales por turno según el terreno a 3 casillas (bosque/pradera → cuero, colinas/montaña → hierro, desierto → hueso), la capital (+) y sus edificios (herrería → hierro, cuartel/iglesia → hueso, atalaya → cuero). Se acumula en fracciones y se entrega al llegar a 1; se ve en la hoja de la ciudad («🏭 Produce por turno»). Ajuste del mundo «Producción de las ciudades»: Normal / Baja (la mitad) / Apagada (solo botín). Un mundo ya guardado empieza a producir al actualizar.
+- **Referencia de precios en el comercio:** valor de cada material (`S.MAT_VAL`) y de los objetos (`S.itemVal`); la hoja de comercio muestra lo que das y lo que pides con un aviso. Los bots usan los mismos valores.
+- **Rey Demonio:** su producción de huesos se duplica.
+
+**Modos**
+- **Historia: 8 capítulos.** Nuevos «El refugio sagrado» (iglesia nivel 3) y «Bajo la tierra» (despejar una mazmorra), antes del Rey Lobo. Una campaña ya empezada se desplaza de capítulo al actualizar.
+
+**Comodidad**
+- **📚 Manual** dentro del juego (referencia por secciones plegables) y pestaña **🔔 Avisos**: elige qué notificaciones recibir (inicio de turno, ataques, chat, pactos/hordas, recordatorio). Se guardan en el servidor.
+- **Registro con filtros** (Combate, Ciudad, Pactos y comercio, Mundo), agrupado por turno y con 150 eventos.
+
+## Taller del constructor, carreteras y estaciones de suministros (v1.39)
+
+- Nuevo edificio **🏗️ Taller del constructor** (niveles 1–2). Con él puedes **contratar un 👷 constructor** (máximo uno por ciudad; no cuenta como unidad, no ataca ni sube de nivel; se va si pierde su ciudad). Los materiales de sus obras salen del almacén de su ciudad.
+- **Nivel 1 — carreteras:** el constructor traza una carretera en la casilla donde está (1 cuero + 1 hierro, una obra por turno; solo sobre pradera, bosque, colinas o desierto y fuera de las ciudades). Cruzar una casilla de carretera cuesta solo **0,5 de movimiento** (para todas las unidades, también en el alcance que se marca en pantalla).
+- **Nivel 2 — 📦 estaciones de suministros:** un tipo de carretera (8 hierro, 3 acero, 6 cuero) que se levanta sobre una carretera a 2 casillas o menos de una ciudad tuya. **Las ciudades de un mismo dueño que tengan una estación cerca comparten un único inventario** (al unirse se suman sus almacenes). Si una ciudad se pierde, se conquista o queda abandonada, deja de compartir y no se lleva nada; la otra conserva el inventario común. Al guardar y cargar se conserva.
+- Los bots construyen el taller (si tienen 2+ ciudades), contratan constructor y unen sus ciudades con carretera y estaciones.
+- Cliente: carreteras y estaciones dibujadas en el mapa, taller visible en la ciudad, hoja del constructor con botones «Trazar» y «Levantar», botón «Contratar» en la ciudad, sección nueva en el manual.
+
+## Pixel art — fase 1: unidades y criaturas (v1.40)
+
+- Las unidades dejan los emojis y se dibujan como **sprites de 16×16 píxeles**: soldado con su **arma en la mano** (17 armas distintas), **color del equipo** en la ropa y la base, y **casco y pechera que cambian de color según la calidad** (cuero, hierro, acero, alma, dracónico). También se ven así las unidades de otros jugadores.
+- Las **27 criaturas**, las invocaciones y bestias (reusan el sprite de su criatura), la **carreta**, el **👷 constructor** y el **ángel** tienen sprite propio.
+- Escalado en múltiplos enteros y sin suavizado, para que los píxeles queden nítidos en el móvil. Si falta un sprite, se usa el emoji de antes.
+- Pendiente: terreno (fase 2) y ciudades, edificios y efectos (fase 3). Las hojas y paneles siguen con emojis.
+
+## Pixel art — fase 2: terreno (v1.41)
+
+- Pradera, bosque, colinas, montaña, desierto y agua se dibujan como **losetas pixel art de 16×16**, con 3 variantes por tipo repartidas según la casilla para que el mapa no se vea repetido (flores en la pradera, pinos y árboles, montículos, picos nevados, cactus).
+- El **agua se anima** (las olas se mueven cada ~0,7 s).
+- Las mazmorras y el minimapa no cambian. Pendiente: ciudades, edificios y efectos (fase 3).
+
+## Pixel art — fase 3: ciudades, edificios, sitios y efectos (v1.42)
+
+- **Ciudades:** casas (4 colores de tejado y pared; grises si la ciudad está en ruinas), 🔨 herrería con chimenea y fuego, cuartel con bandera del color del jugador, establo, atalayas, iglesia (tejado dorado desde el nivel 4, vidrieras azules y aureola en el 5), taller del constructor (con grúa en el nivel 2) y torre del homenaje/castillo con la bandera de tu color. Las ciudades neutrales muestran un castillo en ruinas. La muralla se mantiene dibujada con almenas.
+- **Mapa:** cofres, ruinas, tumbas, tesoros de mazmorra, trampas, entradas y puertas de mazmorra, estaciones de suministros (caja), mercaderes (puesto) y arena del torneo tienen su sprite.
+- **Efectos:** el anillo de impacto ahora es una ráfaga de píxeles.
+- Se mantienen en estilo anterior: la fortaleza del Rey Demonio, las hojas y paneles (emojis) y el minimapa.
+
+## Asedios, botín de aldeas y crías (v1.43)
+
+- **Asedios** (ajuste del mundo «Asedios», activado por defecto en partidas nuevas; las partidas ya empezadas siguen sin asedios):
+  - Edificio nuevo **🛠️ Taller de asedio** (nv. 1: 🐏 arietes; nv. 2: ☄️ catapultas; máx. 2 máquinas por ciudad; no cuentan como unidad). El ariete rompe la muralla pegado a ella; la catapulta, desde 3–4 casillas del centro.
+  - La **muralla tiene vida** (300 en nivel 1, 800 en nivel 2). Con la muralla en pie **no se puede entrar** a la ciudad; al llegar a 0 se abre una **brecha** (y se pierde su bono de defensa) hasta que el dueño la **repara** (devuelve la mitad, una vez por turno, con materiales). Si no hay cerco, la muralla herida se regenera un 10% por turno.
+  - **Cerco**: con 2 o más enemigos a 3 casillas o menos, la ciudad no produce ni recluta y cuenta turnos de cerco; tras 6 turnos, las unidades dentro pasan hambre (−8% de salud por turno). Una carreta propia a 2 casillas frena el cerco.
+  - Las **atalayas** disparan a las máquinas de asedio cercanas (y a cualquier enemigo si la ciudad está en cerco).
+  - Los bots reparan sus murallas y los agresivos construyen máquinas y rompen murallas de ciudades enemigas cercanas.
+- **Aldeas neutrales**: al capturar una por primera vez ganas una **construcción de nivel 1 al azar** y un **soldado de nivel 3** (una sola vez por aldea; no en el reto de una unidad).
+- **Crías**: nacen con el **nivel promedio de sus padres** (con los puntos de habilidad correspondientes), además del bono de nacimiento.
+
+## Mundo abierto — fase 2 (v1.44)
+
+Todo esto solo en el modo Mundo abierto. Se abre desde el botón **🌍** del mapa (Gremio · Ranking · Jefe mundial).
+
+- **Regiones por peligro**: según la distancia al centro del mapa hay 🌿 Tierras seguras (monstruos hasta ~30% de su nivel máximo), 🌲 Tierras medias (~65%, botín ×1,25) y 🔥 Tierras salvajes (hasta el 100%, botín ×1,6). Los jugadores nuevos nacen en las seguras (o en las medias si no hay sitio). La hoja de cada unidad muestra en qué región está.
+- **Protección de novato**: 24 turnos tras llegar (o tras empezar de nuevo). Nadie puede atacarte ni pisar tus ciudades, y tú tampoco puedes atacar a jugadores. Se puede terminar antes desde el menú 🌍.
+- **Jefes mundiales**: cada 48 turnos (el primero a los 24) aparece un jefe con 2,5× de vida y +25% de daño en las tierras salvajes, avisado a todos con su posición; se retira a los 72 turnos. Todos los que le hagan daño reciben materiales, una gema y experiencia en su ciudad (más cuanto mayor sea su parte del daño); el que más daño haga se lleva además un objeto raro.
+- **Ranking global**: tu puesto, los 15 primeros y los mejores gremios.
+- **Gremios**: hasta 8 jugadores. El líder invita; los miembros son **aliados permanentes** (no se atacan y comparten visión). Si dos ciudades del gremio están a 12 casillas o menos, las unidades cerca de cada una ganan **+2 de defensa** (territorio del gremio). La etiqueta `[TAG]` sale en las listas de jugadores. Se puede salir o expulsar; si se va el líder, pasa al siguiente miembro.
+
+## Historial por turnos (v1.45)
+
+- Botón **📈** (también en la hoja de Jugadores): gráfica de **puntos, unidades o ciudades** por turno de los 8 mejores jugadores (y la tuya), con una línea amarilla en el turno elegido.
+- **Turno a turno** (◀◀ ◀ ▶ ▶▶): la clasificación de ese turno y **qué pasó** en él (tu registro más la crónica pública del mundo, sin repetir).
+- El servidor guarda el estado de cada turno (hasta 500; al pasar, se aclara la parte antigua) y una **crónica pública** de los últimos 400 sucesos grandes (ciudades, jefes, historia, estaciones, duelos y avisos del mundo), que dura mucho más que el registro. Las partidas antiguas cargan sin problema y empiezan a anotar desde ahora.
+
+
+## v1.46 — Mochilas, prioridad de botín y mercader equilibrado
+- **Mochila base de 45 espacios** (antes 30).
+- **🎒 Objeto equipable «Mochila»**: nuevo hueco de equipo que amplía el inventario de la unidad que la lleva. Espacios extra según el material: cuero +6, hierro +10, acero +15, alma +21, dracónica +30. Se forja en la ciudad (3 de material), cae como botín raro y se puede encantar/engastar como el resto. No da defensa y no cuenta para los sets de armadura. No puedes quitártela (ni cambiarla por una peor) si la carga no cabría sin ella.
+- **Prioridad del botín**: los objetos raros van primero, luego los materiales por valor (gemas, escamas, almas, acero…) y al final hierro, hueso y cuero. Si la mochila está llena, se **descarta cuero/hueso (lo más barato)** para hacer sitio a lo valioso en vez de perderlo; lo barato nunca desplaza a lo caro. El mensaje de botín avisa de lo descartado. Vale para criaturas, jefes, cofres/sitios y tumbas.
+- **Mercader**: los precios se calculan con el valor real (recargo ×1,3): los objetos cuestan según su material y efectos (mitad almas, mitad acero), el lote de hueso (que nadie quería) se cambia por lotes útiles, el mapa del tesoro cuesta 8 de hierro y **cada compra encarece un 10 % lo que queda** en el carro.

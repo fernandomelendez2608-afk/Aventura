@@ -239,6 +239,75 @@ const PHRASES = {
   },
 };
 
+
+// Frases nuevas (v1.33): mazmorras, torneos, mercaderes, ánimo, rencor/lealtad, jefes y variantes de fin de partida (_l)
+const MORE = {
+  granjero: {
+    dg_enter: ['Voy a asomarme a una mazmorra... por el botín, ¡no por pelear!', 'Dicen que abajo hay tesoros. Con cuidado entramos 🕳️'], dg_win: ['¡Mazmorra despejada! Y sin romper demasiados platos.', 'Salimos con los bolsillos llenos 🌾'], dg_flee: ['Uf, ahí abajo hacía mucho calor. Retirada.', 'Mejor volvemos a casa antes de que sea tarde.'],
+    tn_new: ['¿Un torneo? Yo mejor miro desde la valla.', 'Un torneo... qué ruido van a hacer.'], tn_go: ['Mandaré a mi mejor gente al torneo, solo por participar.', 'A ver si mis muchachos traen algo del torneo.'], tn_win: ['¡Ganamos el torneo! Esto lo celebro con una buena cosecha 🏆', '¿Yo, campeón? ¡Qué sorpresa más grata!'], tn_gz: ['Felicidades, {n}, bien merecido el torneo.', '¡Enhorabuena, {n}! Qué buen golpe.'],
+    merch_buy: ['Buen trato con el mercader. ¡Me encanta comerciar!', 'Compré unas cositas al mercader 🛒'], mood_cauto: ['Voy flojo... a cuidar mejor lo que tengo.', 'Toca apretarse el cinturón y pedir paz a todos.'], mood_ambicioso: ['Mis campos van sobrados... quizá es hora de pensar en más tierras.', 'Me va tan bien que se me despierta el apetito 🌾'],
+    rencor: ['Tú me quitaste lo mío, {n}. No lo olvido.', 'Hablas muy bonito, {n}, pero recuerdo tus ataques.'], leal: ['Siempre es un gusto, {n}. Los buenos tratos se recuerdan.', '{n}, cuenta conmigo: me has tratado bien.'], boss_kill: ['¡{n} ha vencido a {b}! Qué valientes son algunos.', 'Vi lo de {b}, {n}. Impresionante.'],
+    estado_l: ['Ya con medio mapa recorrido, mis graneros están llenos.', 'Esta partida se está alargando, pero aquí sigo, sembrando.'], hola_l: ['¡Hola otra vez, {n}! Seguimos vivos.', 'Buenas, {n}. Llevamos ya muchos turnos juntos.'],
+  },
+  equilibrado: {
+    dg_enter: ['Entramos a una mazmorra: riesgo calculado.', 'Hora de ver qué guarda el subsuelo.'], dg_win: ['Mazmorra limpia. Buen negocio.', 'Despejada y con botín. Todo según lo previsto.'], dg_flee: ['Retirada táctica: no valía la pena.', 'Demasiada oposición, otra vez será.'],
+    tn_new: ['Torneo a la vista. Veremos quién llega.', 'Se abre un torneo: buena ocasión para medir fuerzas.'], tn_go: ['Envío a mis mejores al torneo.', 'Competiré en el torneo, solo si compensa.'], tn_win: ['Torneo ganado. Un buen balance de fuerzas.', 'Campeón del torneo. Estaba en los cálculos 🏆'], tn_gz: ['Bien jugado, {n}.', 'Felicidades por el torneo, {n}.'],
+    merch_buy: ['Compra hecha al mercader, buen precio.', 'El mercader tenía justo lo que buscaba.'], mood_cauto: ['Voy por detrás: toca consolidar y no arriesgar.', 'Me replegaré hasta recuperar el ritmo.'], mood_ambicioso: ['Voy por delante, y pienso aprovecharlo.', 'Con esta ventaja, ya puedo permitirme apretar.'],
+    rencor: ['No olvido lo de antes, {n}.', 'Cuando quieras ajustamos cuentas, {n}.'], leal: ['Contigo da gusto, {n}. Seguimos así.', 'Eres de fiar, {n}. Lo tendré en cuenta.'], boss_kill: ['Buen golpe contra {b}, {n}.', '{n} ha tumbado a {b}; subo mis cálculos de su fuerza.'],
+    estado_l: ['A estas alturas todo se decide por detalles.', 'Partida larga: seguimos ajustando.'], hola_l: ['Hola de nuevo, {n}. La cosa se pone seria.', 'Buenas, {n}. Ya queda menos.'],
+  },
+  conquistador: {
+    dg_enter: ['¡A la mazmorra! Esos tesoros no se defienden solos.', 'Abajo hay botín y yo lo quiero ⚔️'], dg_win: ['¡Despejada! Todo lo que había abajo es mío.', 'Ni una criatura en pie. Ahora, a por más.'], dg_flee: ['Me retiro, pero volveré con más tropas.', 'Esta mazmorra no se acaba de rendir... aún.'],
+    tn_new: ['¡Un torneo! Esa corona será mía.', 'Por fin, un lugar donde lucirse.'], tn_go: ['Mis mejores guerreros van al torneo. ¡Cuidado!', 'Al torneo con lo mejor que tengo ⚔️'], tn_win: ['¡Campeón! Que todos tiemblen 🏆', '¡Ganado! Y esto es solo el principio.'], tn_gz: ['Bien, {n}. Pero la próxima la gano yo.', 'Te lo has ganado, {n}... esta vez.'],
+    merch_buy: ['Compré al mercader. Armas nuevas siempre vienen bien.', 'Un mercader más que me sirve para la guerra.'], mood_cauto: ['Voy mal... pero esto no ha terminado.', 'Me replegaré un poco. Solo un poco.'], mood_ambicioso: ['Voy ganando. ¡Es hora de conquistar más!', 'El mapa se me queda pequeño.'],
+    rencor: ['Me atacaste, {n}. Lo pagarás.', 'No olvido a quien me ataca, {n}.'], leal: ['Mi aliado, {n}. Juntos somos imparables.', 'Con {n} da gusto luchar.'], boss_kill: ['{n} ha vencido a {b}... interesante rival.', 'Bien, {n}. Matar a {b} no es poca cosa.'],
+    estado_l: ['La guerra sigue y yo con ella.', 'Aún quedan muchas ciudades por tomar.'], hola_l: ['Hola, {n}. ¿Vienes a rendirte?', 'Buenas, {n}. Ya sabes lo que quiero.'],
+  },
+  cazador: {
+    dg_enter: ['¡Mazmorra! Criaturas para cazar y botín que recoger 🏹', 'Entramos. Hoy se caza bajo tierra.'], dg_win: ['¡Mazmorra limpia! Qué buena cacería.', 'Despejada entera. Nivel de mi gente: subiendo.'], dg_flee: ['Mis heridos necesitan descanso: salimos.', 'Ahí abajo había algo demasiado grande.'],
+    tn_new: ['¿Torneo? Prefiero cazar... aunque algo mandaré.', 'Un torneo: buena práctica antes de la próxima cacería.'], tn_go: ['Mando un par de arqueros al torneo.', 'A ver cómo se defienden mis cazadores en el torneo.'], tn_win: ['¡Ganamos el torneo! Pura puntería 🏆', 'Campeón del torneo, y sin un rasguño.'], tn_gz: ['Buen tiro, {n}.', '¡Bien hecho, {n}!'],
+    merch_buy: ['El mercader tenía buen material para cazar.', 'Compré flechas... o lo que sea 🛒'], mood_cauto: ['La caza no va bien. Me concentro en lo mío.', 'Toca volver a lo básico y cazar con calma.'], mood_ambicioso: ['Estoy en racha: más criaturas, más nivel.', 'Voy tan bien que hasta el jefe empieza a verse a tiro.'],
+    rencor: ['Te tengo en la mira, {n}.', 'Me debes una, {n}. Y la cobro.'], leal: ['Contigo comparto cacería, {n}.', '{n}, me caes bien. Se nota.'], boss_kill: ['¡{n} ha cazado a {b}! Eso sí es una presa.', 'Buena pieza, {n}: {b}.'],
+    estado_l: ['Ya casi no quedan criaturas fuertes sin cazar.', 'Mis cazadores están en su mejor nivel.'], hola_l: ['Hola, {n}. ¿Cazando por aquí?', 'Buenas, {n}. Los bosques están animados.'],
+  },
+  diplomatico: {
+    dg_enter: ['Exploraremos una mazmorra, prometo ser amable con los monstruos.', 'Entramos a una mazmorra: la diplomacia también necesita recursos 🕊️'], dg_win: ['Despejada. Con ese botín podremos ayudar a más gente.', 'Mazmorra resuelta, y con buen trato al final.'], dg_flee: ['No hubo manera de negociar con ellos. Salimos.', 'Retirada ordenada; hay conversaciones imposibles.'],
+    tn_new: ['Un torneo: una excelente ocasión para encontrarnos.', 'Qué bonito, un torneo. Que gane el mejor.'], tn_go: ['Enviaré representantes al torneo.', 'Participaré, que la cortesía también compite.'], tn_win: ['¡Ganamos! Gracias a todos por la buena competencia 🏆', 'Campeón del torneo: dedicado a mis aliados.'], tn_gz: ['¡Enhorabuena, {n}! Muy bien jugado.', 'Felicidades, {n}. Brindemos por ello.'],
+    merch_buy: ['Un trato justo con el mercader, como me gusta.', 'Comercio y buenas palabras: ¡compré algo!'], mood_cauto: ['Vamos algo justos: ¿alguien quiere una alianza?', 'Es buen momento de reforzar amistades.'], mood_ambicioso: ['Mi posición es fuerte: ofrezcamos paz a quien la quiera.', 'Voy bien, y con más fuerza puedo mediar mejor.'],
+    rencor: ['Me dolió lo que hiciste, {n}. Necesitaré tiempo.', 'No guardo odio, {n}, pero tampoco olvido.'], leal: ['Gracias por tu confianza, {n}. Es mutua.', 'Eres un buen amigo, {n}.'], boss_kill: ['¡Gran hazaña, {n}, vencer a {b}! Que nos sirva a todos.', 'Felicidades por {b}, {n}.'],
+    estado_l: ['A estas alturas, las alianzas lo son todo.', 'Hemos llegado lejos juntos, ¿verdad?'], hola_l: ['Hola, {n}. Qué bien tenerte por aquí tanto tiempo.', 'Saludos, {n}. Siempre un placer.'],
+  },
+  defensor: {
+    dg_enter: ['Una mazmorra... reforzaré mi retaguardia antes y entramos.', 'Bajamos con escudos arriba 🛡️'], dg_win: ['Mazmorra despejada, sin perder la formación.', 'Resistimos y vencimos allá abajo.'], dg_flee: ['Retirada en bloque: lo importante es volver enteros.', 'Hay batallas que no merece la pena dar.'],
+    tn_new: ['Un torneo. Si me atacan allí, sabré defenderme.', 'Torneo... nunca me ha gustado salir de casa.'], tn_go: ['Mandaré a mi unidad más firme al torneo.', 'Participaré, pero sin descuidar mis murallas.'], tn_win: ['¡Torneo ganado a base de aguante! 🏆', 'Campeón: resistir también es ganar.'], tn_gz: ['Bien merecido, {n}.', 'Buena victoria, {n}.'],
+    merch_buy: ['Compré material al mercader para reforzar mis defensas.', 'Con lo que traía el mercader me hago más fuerte.'], mood_cauto: ['Me atrinchero más: que vengan, si se atreven.', 'Las murallas suben otro piso.'], mood_ambicioso: ['Mis defensas ya sobran: salgamos a ensanchar el territorio.', 'Voy tan holgado que me animo a expandirme.'],
+    rencor: ['{n}, tus ataques los recuerdo: mis murallas también.', 'No olvido, {n}.'], leal: ['Contigo guardo las espaldas, {n}.', 'Siempre un aliado de confianza, {n}.'], boss_kill: ['¡{n} derrotó a {b}! Eso lo cambia todo.', 'Menos mal que alguien se ocupó de {b}, {n}.'],
+    estado_l: ['Mis murallas siguen en pie.', 'El tiempo me da la razón: quien resiste, gana.'], hola_l: ['Hola, {n}. Las puertas están cerradas, pero tú puedes pasar.', 'Buenas, {n}. Todo en orden por aquí.'],
+  },
+  saqueador: {
+    dg_enter: ['¡Una mazmorra! Cofres sin dueño, mi tipo de sitio 🗡️', 'Bajo a vaciar lo que haya.'], dg_win: ['Vacié la mazmorra entera. Gracias por el botín.', '¡Todo mío! Cada rincón.'], dg_flee: ['Demasiado duro, mejor busco algo más fácil.', 'Pierdo más de lo que gano ahí dentro. Fuera.'],
+    tn_new: ['Torneo: mucha gente reunida, mucho que aprovechar.', 'Un torneo... y todos mirando a otro lado.'], tn_go: ['Mandaré a mis más ágiles al torneo.', 'Voy por el premio. Lo que hay en la arena me interesa.'], tn_win: ['¡Torneo mío! Cobro el premio y me largo 🏆', 'Campeón, y con el botín en la bolsa.'], tn_gz: ['Buen premio, {n}. Qué ganas de quitárselo...', 'Felicidades, {n}. Cuida tu bolsa.'],
+    merch_buy: ['El mercader fue fácil de convencer... pagando.', 'Compré algo bueno. ¡Y no robé nada, lo juro!'], mood_cauto: ['Hoy no es mi día: me escondo un rato.', 'Cuando el botín escasea, a esperar en las sombras.'], mood_ambicioso: ['Voy cargado: ya puedo ir a por presas más grandes.', 'El botín me hace valiente 🗡️'],
+    rencor: ['Te la tengo guardada, {n}.', '{n}, un día de estos te devuelvo el golpe.'], leal: ['Contigo comparto botín, {n}.', 'Eres de los pocos de fiar, {n}.'], boss_kill: ['{n} mató a {b}... y el botín seguro era grande.', 'Qué envidia, {n}: ¡{b} dejó buen botín!'],
+    estado_l: ['Aún quedan bolsas por vaciar.', 'Esta partida me ha dejado rico.'], hola_l: ['Hola, {n}. Tienes algo que me interesa.', 'Buenas, {n}. ¿Cuánto llevas encima?'],
+  },
+  mercader: {
+    dg_enter: ['Entro a una mazmorra: ¡hay materiales raros allí abajo! 🔨', 'Subterráneo y botín: el sueño de un forjador.'], dg_win: ['Mazmorra limpia: ahora, a forjar.', 'Gemas, materiales... ¡a la fragua!'], dg_flee: ['Esas criaturas no cuadran con mi presupuesto. Salimos.', 'No compensaba el riesgo; a la forja.'],
+    tn_new: ['Un torneo: ideal para probar mi equipo.', 'Torneo en camino. Mis armas están listas.'], tn_go: ['Mi mejor armado va al torneo: quiero ver cómo rinde.', 'A demostrar de qué está hecho mi equipo.'], tn_win: ['¡Torneo ganado con acero de primera! 🏆', 'Campeón: este equipo se paga solo.'], tn_gz: ['Buen acero el de {n}.', 'Enhorabuena, {n}. Pásate por mi fragua.'],
+    merch_buy: ['¡Un mercader! Compré gemas buenísimas.', 'Trato cerrado con el mercader: material de primera 🔨'], mood_cauto: ['El equipo no me da para más: me centraré en forjar.', 'Voy flojo: más martillo y menos guerra.'], mood_ambicioso: ['Con este equipo ya puedo permitirme ir a por todo.', 'Mi fragua rinde: hora de usar lo forjado.'],
+    rencor: ['Rompiste algo mío, {n}. Y mi martillo no olvida.', '{n}, me debes un buen yunque.'], leal: ['Para ti siempre hay descuento, {n}.', 'Qué gusto comerciar contigo, {n}.'], boss_kill: ['{n} abatió a {b}: ¡menudo material habrá dejado!', 'Qué buen botín el de {b}, {n}.'],
+    estado_l: ['Llevo tantos turnos forjando que ya tengo callos.', 'Mi taller es una joya a estas alturas.'], hola_l: ['Hola, {n}. ¿Necesitas algo de la forja?', 'Buenas, {n}. Siempre hay trabajo en la fragua.'],
+  },
+  cazajefes: {
+    dg_enter: ['Las mazmorras tienen sus propios jefes. ¡A por ellos! 🐉', 'Hay un jefe esperándonos ahí abajo.'], dg_win: ['¡Jefe de mazmorra abatido! Va otro a la lista.', 'Despejada hasta el fondo. Siguiente jefe.'], dg_flee: ['El jefe era más duro de lo que pensaba. Volveré.', 'Retirada. El jefe seguirá ahí cuando regrese.'],
+    tn_new: ['Un torneo no es un jefe, pero servirá de entrenamiento.', 'Torneo... bueno, un calentamiento.'], tn_go: ['Mandaré a dos al torneo, el resto sigue a los jefes.', 'Participo por entrenar para el siguiente jefe.'], tn_win: ['Campeón del torneo. Mi siguiente rival tiene escamas 🏆', 'Un trofeo más. Pero el verdadero premio es un dragón.'], tn_gz: ['Bien, {n}. Ahora ve por un jefe.', 'Felicidades, {n}.'],
+    merch_buy: ['Compré material para el siguiente jefe.', 'El mercader tenía justo lo que me hacía falta.'], mood_cauto: ['Los jefes me han ganado esta ronda. Me preparo mejor.', 'Más entrenamiento antes del próximo jefe.'], mood_ambicioso: ['Voy lanzado: ¡a por el jefe más grande!', 'Tengo la fuerza: ahora, al Dragón.'],
+    rencor: ['Con los jefes me entiendo mejor que contigo, {n}.', 'Me interrumpiste una cacería, {n}.'], leal: ['Si necesitas ayuda con un jefe, {n}, avísame.', 'Contigo cazaría cualquier jefe, {n}.'], boss_kill: ['¡{n} ha abatido a {b}! Me quitaste el jefe, ¡pero bien hecho!', '{b} caído... ¿y si me dejas el siguiente, {n}?'],
+    estado_l: ['Ya pocos jefes quedan por cazar.', 'Mi lista de jefes abatidos crece.'], hola_l: ['Hola, {n}. ¿Sabes dónde hay un jefe por aquí?', 'Buenas, {n}. Estoy tras la pista de uno grande.'],
+  },
+};
+for (const k in MORE) Object.assign(PHRASES[k], MORE[k]);
+
 const norm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 // intención aproximada del mensaje de un jugador
 const INTENTS = [
@@ -264,8 +333,10 @@ function addressed(text, botName) {
   return !!first && first.length >= 3 && new RegExp('(^|[^a-z])' + first.replace(/[^a-z0-9]/g, '') + '([^a-z]|$)').test(t);
 }
 const mentionsBots = text => /\b(bots?|robots?)\b/.test(norm(text));
-function line(pers, key, r, vars) {
-  const tbl = PHRASES[pers] || PHRASES.equilibrado, arr = tbl[key] || tbl.otro;
+function line(pers, key, r, vars, turn) {
+  const tbl = PHRASES[pers] || PHRASES.equilibrado;
+  if (turn >= 40 && tbl[key + '_l'] && r() < 0.5) key += '_l'; // en partidas largas, a veces otra frase
+  const arr = tbl[key] || tbl.otro;
   const s = arr[Math.floor(r() * arr.length) % arr.length];
   return s.replace(/\{(\w)\}/g, (_, k) => (vars && vars[k] !== undefined ? vars[k] : ''));
 }
