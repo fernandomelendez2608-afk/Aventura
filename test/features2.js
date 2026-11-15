@@ -1,4 +1,5 @@
 'use strict';
+require('./seed.js');
 // Pruebas de: personalidades/dificultad, estaciones, élites, hordas, sitios, equipo raro, mejorar/encantar, diplomacia, compatibilidad
 const E = require('../engine.js'), S = require('../shared.js');
 let fails = 0;

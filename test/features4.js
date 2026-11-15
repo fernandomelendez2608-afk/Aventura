@@ -1,4 +1,5 @@
 'use strict';
+require('./seed.js');
 // Pruebas de: ajustes del mundo elegidos por el anfitrión (v1.5)
 const E = require('../engine.js'), S = require('../shared.js');
 let fails = 0;
@@ -197,6 +198,16 @@ console.log('Mago, invocador y nigromante');
   u.cls = 'nigromante'; r = E.cmd(g, first, { a: 'summon', u: u.id, k: 'lobo' }); ok(r.err, 'el nigromante no invoca lobos');
   r = E.cmd(g, first, { a: 'summon', u: u.id, k: 'esqueleto' }); ok(g.units.filter(x => x.o === first && x.sm).length === 2 || r.err, 'el nigromante invoca esqueletos (respeta el máximo de 2)');
   for (const x of g.units.filter(y => y.sm)) E.cmd(g, first, { a: 'dismiss', u: x.id });
+  { // el límite es por invocador, no por jugador (v1.50)
+    const u2 = g.units.find(x => x.o === first && !x.sm && x.id !== u.id), sv = { c1: u.cls, c2: u2.cls, x: u2.x, y: u2.y, h: c.st.m.hueso }; u2.cls = 'invocador'; u2.x = c.x + 1; u2.y = c.y + 1; u.cls = 'invocador'; c.st.m.hueso = 60; E.touch(g);
+    const r1 = E.cmd(g, first, { a: 'summon', u: u.id, k: 'lobo' }), r2 = E.cmd(g, first, { a: 'summon', u: u.id, k: 'lobo' }), r3 = E.cmd(g, first, { a: 'summon', u: u.id, k: 'lobo' });
+    ok(!r1.err && !r2.err && r3.err && /máximo/.test(r3.err), 'un invocador llega a 2 y la tercera se rechaza');
+    const r4 = E.cmd(g, first, { a: 'summon', u: u2.id, k: 'lobo' }), r5 = E.cmd(g, first, { a: 'summon', u: u2.id, k: 'oso' });
+    ok(!r4.err && !r5.err && g.units.filter(x => x.o === first && x.sm).length === 4, 'otro invocador del mismo jugador tiene sus propias 2 (4 en total)');
+    const sn2 = E.snapshot(g, first); ok(sn2.mine.find(x => x.id === u2.id).sc.n === 2 && sn2.mine.find(x => x.id === u.id).sc.n === 2, 'cada ficha muestra su propio contador');
+    for (const x of g.units.filter(y => y.sm)) E.cmd(g, first, { a: 'dismiss', u: x.id });
+    u.cls = sv.c1; u2.cls = sv.c2; u2.x = sv.x; u2.y = sv.y; c.st.m.hueso = sv.h; E.touch(g);
+  }
   c.st.m.hueso = 20; r = E.cmd(g, first, { a: 'summon', u: u.id, k: 'esqueleto' }); ok(!r.err && g.units.some(x => x.sm && x.sm.k === 'esqueleto'), 'esqueleto invocado');
   u.x = c.x + 8; u.y = c.y; r = E.cmd(g, first, { a: 'summon', u: u.id, k: 'esqueleto' }); ok(r.err && /ciudad/.test(r.err), 'lejos de una ciudad no se puede invocar');
   u.x = c.x + 1; u.y = c.y; c.st.m.hueso = 1; r = E.cmd(g, first, { a: 'summon', u: u.id, k: 'esqueleto' }); ok(r.err, 'sin huesos no se puede invocar');
@@ -418,6 +429,7 @@ console.log('Chat de la partida');
     const boss = mk('reylobo'), lobo = mk('lobo'); boss.x = 3 + i; boss.y = 3; lobo.x = 3 + i; lobo.y = 5;
     const b0 = boss.hp, l0 = lobo.hp; E.advanceTurn(g);
     bg = (boss.hp - b0) / E.cstats(boss, g).mhp; lg = (lobo.hp - l0) / E.cstats(lobo, g).mhp;
+    if (boss.hp < b0 || lobo.hp < l0) bg = -1; // alguien recibió daño (p. ej. un ataque en ese turno): se repite, no es lo que se prueba
   }
   ok(bg > 0 && bg <= 0.05, 'el jefe recupera como mucho ~3% por turno (' + Math.round(bg * 100) + '%)');
   ok(lg >= 0.09, 'las criaturas normales siguen recuperando ~10%');
@@ -554,7 +566,7 @@ console.log('Chat de la partida');
   const gg = E.createGame('KS', 'H', 't'); gg.cfg.mode = 'rey'; gg.cfg.sim = true; gg.cfg.idleTurns = 0; for (let i = 0; i < 9; i++) E.addBot(gg, 'azar'); E.startGame(gg);
   let err = null; try { for (let i = 0; i < 60 && gg.status === 'playing'; i++) E.advanceTurn(gg); } catch (e) { err = e; }
   ok(!err, 'partida de 10 jugadores (9 bots) corre sin errores' + (err ? ': ' + err.stack : ''));
-  ok(gg.units.filter(u => u.o === gg.king).every(u => u.bs), 'el bot Rey solo tiene bestias (nunca unidades normales)');
+  ok(gg.units.filter(u => u.o === gg.king && !(u.sm || u.cart || u.bld || u.sg)).every(u => u.bs), 'el bot Rey solo tiene bestias (nunca unidades normales; constructores y carretas no cuentan)');
 }
 
 { // ===== Modo por equipos =====
@@ -588,7 +600,7 @@ console.log('Chat de la partida');
   const g = mks(); const st = () => E.snapshot(g, 0).story;
   ok(g.players.every(a => g.players.every(b => a === b || E.pactOf(g, a.id, b.id) === 'alianza')), 'todos los jugadores empiezan aliados');
   ok(!!E.cmd(g, 0, { a: 'dip', d: 'offer', to: 1, k: 'paz' }).err, 'no hay diplomacia en la historia');
-  ok(st() && st().ch === 0 && st().n === 8 && st().goals.length === 1 && st().title === 'El eco de la ceniza', 'la vista incluye el capítulo 1 y sus objetivos');
+  ok(st() && st().ch === 0 && st().n === 9 && st().goals.length === 1 && st().title === 'El eco de la ceniza', 'la vista incluye el capítulo 1 y sus objetivos');
   ok(g.events.some(l => /La Ceniza del Dragón/.test(l.text)) && g.events.some(l => /Capítulo 1/.test(l.text)), 'se cuenta el prólogo y el capítulo 1');
   const noBoss = () => !g.creatures.some(c => S.CREATURES[c.t].boss && !c.dg);
   for (let i = 0; i < 12; i++) E.advanceTurn(g);
@@ -606,12 +618,13 @@ console.log('Chat de la partida');
   ok(st().ch === 3, 'capítulo 3 (nivel 8 + calidad acero) completado');
   { const cap = g.cities.find(c => c.owner === 0); cap.b = Object.assign(cap.b || {}, { iglesia: 2 }); E.advanceTurn(g); ok(st().ch === 3, 'con la iglesia a nivel 2 no se completa el capítulo del refugio'); cap.b.iglesia = 3; E.advanceTurn(g); ok(st().ch === 4, 'capítulo 4 (iglesia nivel 3) completado'); }
   { E.advanceTurn(g); ok(st().ch === 4, 'sin despejar una mazmorra no se avanza'); g.story.dg = (g.story.dg || 0) + 1; E.advanceTurn(g); ok(st().ch === 5, 'capítulo 5 (despejar una mazmorra) completado'); }
-  const rl = g.creatures.find(c => c.t === 'reylobo'); ok(!!rl && rl.lv >= 5, 'el capítulo 6  hace aparecer al Rey Lobo (nivel ' + (rl && rl.lv) + ')');
+  { const cap = g.cities.find(c => c.owner === 0); cap.b.iglesia = 4; E.advanceTurn(g); ok(st().ch === 5 && /Guardianas/.test(st().txt), 'el capítulo de las Guardianas pide una iglesia de nivel 5'); cap.b.iglesia = 5; E.advanceTurn(g); ok(st().ch === 6, 'capítulo 6 (iglesia nivel 5, desciende el ángel) completado'); }
+  const rl = g.creatures.find(c => c.t === 'reylobo'); ok(!!rl && rl.lv >= 5, 'el capítulo 7 hace aparecer al Rey Lobo (nivel ' + (rl && rl.lv) + ')');
   // si el jefe del capítulo desaparece sin morir, reaparece
   g.creatures.splice(g.creatures.indexOf(rl), 1); E.advanceTurn(g); ok(g.creatures.some(c => c.t === 'reylobo'), 'si el jefe del capítulo desaparece, vuelve a aparecer');
   // matar a los jefes (usa el camino real de muerte)
-  g.story.killed.reylobo = true; E.advanceTurn(g); ok(st().ch === 6 && g.creatures.some(c => c.t === 'liche'), 'matar al Rey Lobo pasa al capítulo 7 y aparece el Liche');
-  g.story.killed.liche = true; E.advanceTurn(g); ok(st().ch === 7 && g.creatures.some(c => c.t === 'dragon'), 'matar al Liche pasa al capítulo 8 y aparece el Dragón');
+  g.story.killed.reylobo = true; E.advanceTurn(g); ok(st().ch === 7 && g.creatures.some(c => c.t === 'liche'), 'matar al Rey Lobo pasa al capítulo 8 y aparece el Liche');
+  g.story.killed.liche = true; E.advanceTurn(g); ok(st().ch === 8 && g.creatures.some(c => c.t === 'dragon'), 'matar al Liche pasa al capítulo 9 y aparece el Dragón');
   g.story.killed.dragon = true; E.advanceTurn(g);
   ok(g.status === 'over' && g.winners.length === g.players.length && g.story.fin && st().fin, '¡victoria compartida al derrotar al Dragón!');
   // derrota: cae todo el grupo
@@ -1048,7 +1061,7 @@ console.log('Mazmorras (v1.29)');
   // tumba y lápida
   const v = g.units.filter(x => x.o === 0 && !x.sm && !x.hero)[0]; v.eq.arma = { k: 'espada', t: 3 }; v.inv.m.hierro = 5; const nm = v.name;
   const cr = E.spawnCreature(g, 'lobo', v.x + 1, v.y, 30); v.hp = 0; E.killUnit(g, v, { creature: cr });
-  const tomb = g.sites.find(q => q.k === 'tumba' && q.nm === nm), gr = (g.graves || []).find(x => x.name === nm);
+  const tomb = g.sites.find(q => q.k === 'tumba' && q.o === 0 && q.x === v.x && q.y === v.y && q.nm === nm), gr = (g.graves || []).filter(x => x.o === 0 && x.name === nm).pop(); // los nombres se repiten entre jugadores: se busca por dueño y posición
   ok(tomb && tomb.loot.eq.length >= 1 && tomb.loot.m.hierro === 5, 'al caer ante una criatura deja una tumba con su equipo y mochila');
   ok(!!gr, 'queda una lápida para resucitarla');
   ok(E.snapshot(g, 0).graves.some(x => x.id === gr.id && x.cost.hueso === 6), 'el estado muestra los caídos y su coste');
@@ -1072,7 +1085,7 @@ console.log('Mazmorras (v1.29)');
   // equilibrio: ninguna clase de combate domina (duelos 1c1)
   const B = require('../tools/balance.js');
   const res = B.aggregate(B.classSpecs(), [[14, 3], [20, 4]]).filter(r => !/^(bardo|invocador|sanador|alquimista|sin clase)/.test(r.name));
-  ok(res[0].win < 0.9 && res[res.length - 1].win > 0.15, 'equilibrio de clases de combate: mejor ' + res[0].name + ' ' + Math.round(res[0].win * 100) + '%, peor ' + res[res.length - 1].name + ' ' + Math.round(res[res.length - 1].win * 100) + '%');
+  ok(res[0].win < 0.8 && res[res.length - 1].win > 0.35, 'equilibrio de clases de combate: mejor ' + res[0].name + ' ' + Math.round(res[0].win * 100) + '%, peor ' + res[res.length - 1].name + ' ' + Math.round(res[res.length - 1].win * 100) + '%');
 }
 
 console.log('Iglesia y ángel guardián (v1.36)');

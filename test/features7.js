@@ -1,4 +1,5 @@
 'use strict';
+require('./seed.js');
 // Pruebas de: historial por turnos (gráficas y crónica) (v1.45)
 const E = require('../engine.js');
 let fails = 0;

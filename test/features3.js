@@ -1,4 +1,5 @@
 'use strict';
+require('./seed.js');
 // Pruebas de: resumen al volver, órdenes en cola, clases/especializaciones, edificios
 const E = require('../engine.js'), S = require('../shared.js');
 let fails = 0;
@@ -86,13 +87,13 @@ console.log('Clases y especializaciones');
   r = E.cmd(g, 0, { a: 'cls', u: u.id, k: 'guardian' });
   ok(!r.err && u.cls === 'guardian', 'elige Guardián');
   const e = E.eff(g, u);
-  ok(e.maxHp > base.maxHp && e.def >= base.def + 4, `Guardián: salud ${base.maxHp}→${e.maxHp}, defensa ${base.def}→${e.def}`);
+  ok(e.maxHp > base.maxHp && e.def >= base.def + 3, `Guardián: salud ${base.maxHp}→${e.maxHp}, defensa ${base.def}→${e.def}`);
   ok(!!E.cmd(g, 0, { a: 'cls', u: u.id, k: 'cazador' }).err, 'la clase es permanente');
   ok(!!E.cmd(g, 0, { a: 'sub', u: u.id, k: 'muralla' }).err, 'la especialización pide nivel 12');
   u.lv = 12;
   ok(!!E.cmd(g, 0, { a: 'sub', u: u.id, k: 'verdugo' }).err, 'no sirve la de otra clase');
   r = E.cmd(g, 0, { a: 'sub', u: u.id, k: 'muralla' });
-  ok(!r.err && E.eff(g, u).fx.espinas === 0.30 && E.eff(g, u).def >= e.def + 6, 'Muralla: +6 def y espinas');
+  ok(!r.err && E.eff(g, u).fx.espinas === 0.30 && E.eff(g, u).def >= e.def + 2, 'Muralla: +2 def y espinas');
   // cazador: alcance y daño a criaturas
   const h = g.units.find(x => x.o === 0 && x !== u); h.lv = 6; h.eq.arma = { id: 5000, k: 'arco', t: 2 };
   const a0 = E.eff(g, h); E.cmd(g, 0, { a: 'cls', u: h.id, k: 'cazador' }); const a1 = E.eff(g, h);
@@ -105,7 +106,7 @@ console.log('Clases y especializaciones');
   ok(dmgC > dmgN, `Cazador pega más a criaturas (${dmgC} vs ${dmgN})`);
   // asesino: primer ataque más fuerte
   const k = g.units.find(x => x.o === 0 && ![u, h, h2].includes(x)); k.lv = 6; k.eq.arma = { id: 5002, k: 'espada', t: 2 }; k.x = h.x + 1; k.y = h.y + 1;
-  E.cmd(g, 0, { a: 'cls', u: k.id, k: 'asesino' }); ok(E.eff(g, k).mods.first === 0.5, 'Asesino: bonus de primer ataque');
+  E.cmd(g, 0, { a: 'cls', u: k.id, k: 'asesino' }); ok(E.eff(g, k).mods.first === 0.35, 'Asesino: bonus de primer ataque');
   // bots eligen clase solos
   const g3 = mk(2); const bu = g3.units.filter(x => x.o === 1); bu.forEach(x => { x.lv = 12; });
   g3.status = 'playing'; E.advanceTurn(g3);

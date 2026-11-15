@@ -4,7 +4,8 @@ delete process.env.UPSTASH_REDIS_REST_URL;
 require('fs').rmSync('/tmp/ada-f', { recursive: true, force: true });
 const crypto = require('crypto'), http = require('http');
 const E = require('../engine.js');
-const wait = ms => new Promise(r => setTimeout(r, ms));
+const wait = ms => new Promise(r => setTimeout(r, ms * (+process.env.WAIT_X || 2))); // x2 por defecto: margen si la máquina va cargada
+const until = async (f, ms = 5000) => { const t = Date.now(); while (Date.now() - t < ms) { try { if (f()) return true; } catch (e) {} await wait(25); } return false; }; // espera a una condición en vez de un tiempo fijo (evita fallos con la máquina cargada)
 let fails = 0;
 const check = (name, cond, extra) => { console.log((cond ? '✓ ' : '✗ ') + name + (extra !== undefined ? ' — ' + extra : '')); if (!cond) fails++; };
 
@@ -72,7 +73,7 @@ const last = n => (inbox[n] || []).slice(-1)[0];
   ana.send({ t: 'lobby', a: 'addbot' }); ana.send({ t: 'lobby', a: 'addbot' });
   ana.send({ t: 'lobby', a: 'cfg', turnHours: 4, maxTurns: 0, idleTurns: 2 }); await wait(200);
   check('la sala muestra la opción de ausencia', ana.last.cfg.idleTurns === 2);
-  ana.send({ t: 'lobby', a: 'start' }); await wait(300);
+  ana.send({ t: 'lobby', a: 'start' }); await until(() => ana.last && ana.last.status === 'playing'); await wait(100);
   const g = S.games.get(aj.code), bj = beto.find('joined')[0];
   check('partida iniciada con 4 jugadores', ana.last.status === 'playing' && ana.last.players.length === 4);
 

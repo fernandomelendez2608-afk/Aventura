@@ -166,7 +166,7 @@ Tres clases nuevas que se eligen a nivel 6 (con especialización a nivel 12), co
 
 **Invocaciones**
 - Solo se invoca a 2 casillas o menos de una ciudad tuya, gastando huesos de su almacén (botón «Invocar» en la ficha).
-- **Máximo 2 invocaciones por jugador** en total (suma de todos sus invocadores y nigromantes).
+- **Máximo 2 invocaciones por invocador/nigromante** (desde v1.50; antes era un límite de 2 por jugador).
 - Son unidades que controlas como las demás, pero no cuentan para el tope de 14/20 unidades, no tienen habilidades ni equipo y no suben de nivel solas: su nivel es el de su invocador (con el tope de la criatura).
 - Si el invocador cae, sus invocaciones desaparecen. Puedes despedirlas desde su ficha.
 - Los bots también eligen estas clases y las usan.
@@ -544,3 +544,36 @@ Todo esto solo en el modo Mundo abierto. Se abre desde el botón **🌍** del ma
 - **🎒 Objeto equipable «Mochila»**: nuevo hueco de equipo que amplía el inventario de la unidad que la lleva. Espacios extra según el material: cuero +6, hierro +10, acero +15, alma +21, dracónica +30. Se forja en la ciudad (3 de material), cae como botín raro y se puede encantar/engastar como el resto. No da defensa y no cuenta para los sets de armadura. No puedes quitártela (ni cambiarla por una peor) si la carga no cabría sin ella.
 - **Prioridad del botín**: los objetos raros van primero, luego los materiales por valor (gemas, escamas, almas, acero…) y al final hierro, hueso y cuero. Si la mochila está llena, se **descarta cuero/hueso (lo más barato)** para hacer sitio a lo valioso en vez de perderlo; lo barato nunca desplaza a lo caro. El mensaje de botín avisa de lo descartado. Vale para criaturas, jefes, cofres/sitios y tumbas.
 - **Mercader**: los precios se calculan con el valor real (recargo ×1,3): los objetos cuestan según su material y efectos (mitad almas, mitad acero), el lote de hueso (que nadie quería) se cambia por lotes útiles, el mapa del tesoro cuesta 8 de hierro y **cada compra encarece un 10 % lo que queda** en el carro.
+
+
+## v1.46.1 — Pruebas estables
+- Las pruebas usan ahora una **semilla fija** (`test/seed.js`): cada ejecución da el mismo resultado. Para cazar fallos raros: `ADA_SEED=7 node test/features4.js`, o `ADA_RANDOM=1` para azar real.
+- Corregidas las causas de fallos intermitentes: tumbas buscadas por nombre (los nombres se repiten entre jugadores), reintento de la prueba de recuperación de criaturas que nunca reintentaba, el Rey Demonio puede contratar constructores (no cuentan como unidades normales) y esperas fijas de la prueba de servidor (ahora con margen y espera por condición).
+- Comprobado con 7 semillas distintas en todos los archivos de pruebas: sin fallos.
+
+
+## v1.47 — Equilibrio de clases y panel «Más»
+- **Equilibrio de clases** (duelos 1c1 con `tools/balance.js`, sin clima y con semilla): antes las clases de combate iban del 21 % al 88 % de victorias; ahora entre ~45 % y ~72 %. Se bajó a berserker, monje, duelista, paladín, guardián y asesino (daño, regeneración, defensa, espinas) y se subió a cazador, nigromante, elementalista, mago/arcano y envenenador. Las descripciones del juego se actualizan solas. Las clases de apoyo/invocación (bardo, sanador, invocador) no se miden en duelos 1c1 porque su valor está en el equipo y las invocaciones.
+- La herramienta de equilibrio ya no depende del clima aleatorio de la arena. La prueba exige que la mejor clase quede por debajo del 80 % y la peor por encima del 35 %.
+- **Panel «Más»** en la barra inferior: sonido, cómo se juega, manual, chat, jugadores, historia, mundo, historial y resumen. Los botones redondos flotantes ya no tapan los «+» de las estadísticas: solo quedan 🏠 y «siguiente unidad», y se ocultan mientras hay una hoja abierta. El aviso rojo de «Más» suma ofertas de jugadores, chat sin leer y avisos del mundo.
+
+
+## v1.48 — Teología de las Guardianas y nuevo ángel
+- **Historia con fe propia:** en este mundo todos adoran a dos ángeles, **Elizabeth** (el Alba que sana) y **Nathaly** (la Vigía que nunca duerme). Hace mil años encadenaron al Dragón de Ceniza y prometieron volver cuando el volcán despertara. El prólogo, los textos de cada capítulo y los finales (victoria y derrota) cuentan esa creencia: altares de dos velas en cada aldea, la plegaria «Elizabeth, enciende el alba; Nathaly, guarda la noche», el Liche como hereje que quiere apagar las velas, el Dragón como el mismo que ellas encadenaron.
+- **Capítulo nuevo (ahora 9): «El milagro de las Guardianas»**, entre «Bajo la tierra» y el Rey Lobo: levantar una iglesia de nivel 5. Al lograrlo desciende el ángel de la ciudad (que ya se llamaba Elizabeth o Nathaly) y se cuenta la escena. Premio: almas, acero, una escama y un objeto raro. Las historias guardadas en curso a partir del capítulo 6 se corren un capítulo.
+- **Nuevo sprite del ángel:** una chica de **rizos negros** (con reflejos para que se vean los rizos) y **ojos marrones**, vestido blanco con cinto dorado, alas y halo.
+
+
+## v1.49 — Trueque de materiales
+- Nueva sección **♻️ Trueque** en la pestaña Almacén de cada ciudad tuya: cambia el sobrante barato por material superior, con pérdida para que no se rompa la economía. Botones ×1, ×10 y «Todo».
+  - 10 cuero → 1 hierro · 10 hueso → 1 hierro
+  - 8 hierro → 1 acero
+  - 6 acero → 1 alma
+  - 8 alma → 1 escama de dragón
+- Con 1000 de cuero y 1000 de hueso salen 200 de hierro, que se pueden cambiar por 25 de acero. Las tasas están en `CONVERT` (`shared.js`) y se pueden ajustar sin tocar el motor.
+- Solo en ciudades propias; la prueba comprueba que cada paso siempre pierde valor.
+
+
+## v1.50 — Invocaciones por unidad
+- El límite de invocaciones ya no es 2 por jugador sino **2 por cada invocador o nigromante**. Con tres invocadores puedes tener hasta 6 invocaciones. Siguen costando huesos, no ocupan puestos del tope de unidades y se desvanecen si su invocador cae.
+- Los bots también lo aplican por unidad.

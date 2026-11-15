@@ -4,7 +4,7 @@
 const E = require('../engine.js'), S = require('../shared.js');
 const K = S.KINDS, SL = ['casco', 'guantes', 'hombreras', 'pechera', 'pantalones', 'botas'];
 function arena() {
-  const g = E.createGame('BAL', 'A', 'bal'); E.addBot(g, 'granjero'); g.cfg.sim = true; E.startGame(g);
+  const g = E.createGame('BAL', 'A', 'bal'); E.addBot(g, 'granjero'); g.cfg.sim = true; g.cfg.events = 'calma'; E.startGame(g); g.wx = null; // sin clima: mide solo las clases
   g.creatures = []; g.sites = []; g.status = 'playing'; E.touch(g);
   return g;
 }

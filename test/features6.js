@@ -1,4 +1,5 @@
 'use strict';
+require('./seed.js');
 // Pruebas de: mundo abierto fase 2 (regiones, protección, jefe mundial, gremios) (v1.44)
 const E = require('../engine.js'), S = require('../shared.js');
 let fails = 0;

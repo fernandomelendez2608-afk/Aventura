@@ -1,4 +1,5 @@
 'use strict';
+require('./seed.js');
 // Pruebas de: mochila 45, objeto Mochila, prioridad de botín y mercader equilibrado (v1.46)
 const E = require('../engine.js'), S = require('../shared.js');
 let fails = 0;

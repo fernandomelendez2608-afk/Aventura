@@ -94,6 +94,12 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:0}
 #nav{position:absolute;right:8px;top:120px;z-index:4;display:flex;flex-direction:column;gap:6px}
 #nav button{width:46px;height:46px;border-radius:50%;border:1px solid var(--line);background:#181c27ee;font-size:20px;position:relative}
 #sheet .chm{padding:5px 8px;margin:4px 0;border-radius:10px;background:#ffffff0d}#sheet .chm.me{background:#e6b45a22}#sheet .chm div{word-break:break-word}
+#nav button:not(#nHome):not(#nNext){display:none} /* el resto de botones viven en el panel «Más» */
+body.sheetopen #nav{display:none} /* con una hoja abierta no tapan los botones + */
+.mgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:8px 0 4px}
+.mgrid button{position:relative;min-height:74px;border-radius:14px;border:1px solid var(--line);background:var(--panel2);font-size:12px;line-height:1.2;padding:8px 4px;color:var(--fg,inherit)}
+.mgrid button span{display:block;font-size:26px;margin-bottom:2px}
+.mgrid button i{position:absolute;top:4px;right:6px;background:var(--red);color:#fff;border-radius:99px;font-size:11px;padding:0 6px;font-style:normal;font-weight:700}
 #nav button small{position:absolute;bottom:-1px;right:-1px;background:var(--gold);color:#1b1608;border-radius:99px;font-size:10px;padding:0 5px;font-weight:700}
 .r0{color:#aab0bd}.r1{color:#5fd38d}.r2{color:#6cb4ff}.r3{color:#c58bff}.r4{color:#ffd24d}.r5{color:#ff6b6b}
 .fxl{display:block;color:var(--dim);font-size:12px;margin-top:1px}
@@ -188,7 +194,7 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:0}
     <button data-ui="units"><span>🛡️</span>Unidades<i class="badge hidden" id="bUnits"></i></button>
     <button data-ui="cities"><span>🏰</span>Ciudades</button>
     <button data-ui="log"><span>📜</span>Registro</button>
-    <button data-ui="players"><span>🏆</span>Jugadores<i class="badge pl hidden" id="bPl"></i></button>
+    <button data-ui="more"><span>⋯</span>Más<i class="badge pl hidden" id="bPl"></i></button>
     <button class="go" id="bGo"><span>⏭️</span>Fin de turno</button>
   </div>
 </section>
@@ -497,7 +503,7 @@ function renderTop() {
   const pending = S.mine.filter(u => u.pts > 0 || classAvail(u)).length;
   $('bUnits').textContent = pending; $('bUnits').classList.toggle('hidden', !pending);
   const offers = (S.props || []).filter(q => q.to === S.you).length;
-  $('bPl').textContent = offers; $('bPl').classList.toggle('hidden', !offers);
+  window._offers = offers; moreBadge();
   const rdy = S.mine.filter(u => (u.mp > 0 || u.at > 0) && !u.ord).length;
   $('nCnt').textContent = rdy; $('nNext').style.opacity = rdy ? 1 : .5;
 }
@@ -515,8 +521,20 @@ const itemHtml = it => { const K = SH.KINDS[it.k]; return `${K.e} <b class="r${i
 const pct = (a, b) => Math.max(0, Math.min(100, Math.round(a / b * 100)));
 const bar = (cls, a, b) => `<div class="bar ${cls}"><i style="width:${pct(a, b)}%"></i></div>`;
 
+function moreItems() { // entradas del panel «Más»: se leen de los botones ocultos para no duplicar su lógica
+  const out = [{ id: 'players', e: '🏆', t: 'Jugadores', b: window._offers || 0, ui: 'players' }];
+  for (const id of ['nStory', 'nWorld', 'nHist', 'nSum', 'nSnd', 'nHelp', 'nMan', 'nChat']) {
+    const b = $(id); if (!b || b.classList.contains('hidden')) continue;
+    const sm = b.querySelector('small'); const t = { nStory: 'Historia', nWorld: 'Mundo', nHist: 'Historial', nSum: 'Resumen', nSnd: sndOn ? 'Sonido: sí' : 'Sonido: no', nHelp: 'Cómo se juega', nMan: 'Manual y avisos', nChat: 'Chat' }[id];
+    out.push({ id, e: b.firstChild ? b.firstChild.textContent : '•', t, b: sm && !sm.classList.contains('hidden') ? (+sm.textContent || 0) : 0, ui: 'mo:' + id });
+  } return out;
+}
+const moreSheet = () => hd('Más opciones') + '<div class="mgrid">' + moreItems().map(m => `<button data-ui="${m.ui}"><span>${m.e}</span>${m.t}${m.b ? `<i>${m.b}</i>` : ''}</button>`).join('') + '</div>';
+function moreBadge() { const n = (window._offers || 0) + (+$('chCnt').textContent || 0) * !$('chCnt').classList.contains('hidden') + (+$('wCnt').textContent || 0) * !$('wCnt').classList.contains('hidden'); $('bPl').textContent = n; $('bPl').classList.toggle('hidden', !n); }
+setInterval(moreBadge, 1000);
 function renderSheet() {
   const el = $('sheet');
+  document.body.classList.toggle('sheetopen', !!(sheet && S && S.status !== 'lobby'));
   if (sheet && sheet.mode === 'chat' && S && S.status !== 'lobby' && $('chList')) { chatRefresh(); return; } // no pisa lo que se está escribiendo
   if (!sheet || !S || S.status === 'lobby') { el.classList.add('hidden'); el.innerHTML = ''; return; }
   let html = '';
@@ -534,6 +552,7 @@ function renderSheet() {
     case 'city': html += citySheet(); break;
     case 'log': html += logSheet(); break;
     case 'manual': html += manualSheet(); break;
+    case 'more': html += moreSheet(); break;
     case 'chat': html += chatSheet(); break;
     case 'players': html += playersSheet(); break;
     case 'hist': html += histSheet(); break;
@@ -599,7 +618,7 @@ function unitSheet(u) {
     }
     if (u.cart) h += `<p class="hint ok">🛒 Carreta: almacén móvil (${u.cap} de capacidad, movilidad ${u.e.mov}). No ataca ni sube de nivel. Es una <b>estación de suministros andante</b>: las unidades pegadas a ella pueden dejar y tomar botín, cambiar de equipo, ganan +${SH.CART.aura} de defensa y se curan un ${Math.round(SH.CART.heal * 100)}% por turno. Llévala a una ciudad para cargar o descargar; si la matan, el enemigo se queda con parte de la carga.</p>`;
     if (u.sm) h += `<p class="hint ok">🔮 Invocación (${SH.CREATURES[u.sm].n}): su fuerza sube con el nivel de su invocador y desaparece si él cae.</p><button class="btn sm red" data-c='${jattr({ a: 'dismiss', u: u.id })}'>Despedir</button>`;
-    if (u.sc) h += `<h3 class="hint" style="margin-top:12px">🔮 Invocar (${u.sc.n}/${u.sc.max} por jugador)</h3>` + (u.sc.near ? '' : '<p class="hint lack">Acércate a 2 casillas o menos de una ciudad tuya.</p>') + `<div class="row" style="flex-wrap:wrap;gap:6px">${u.sc.opts.map(o => `<button class="btn sm gold" ${u.sc.near && u.sc.n < u.sc.max && u.sc.bones >= o.cost.hueso ? '' : 'disabled'} data-c='${jattr({ a: 'summon', u: u.id, k: o.k })}'>${SH.CREATURES[o.k].e} ${SH.CREATURES[o.k].n} · ${SH.MATS.hueso.e}${o.cost.hueso}</button>`).join('')}</div><p class="hint">Huesos en el almacén cercano: ${u.sc.bones}.</p>`;
+    if (u.sc) h += `<h3 class="hint" style="margin-top:12px">🔮 Invocar (${u.sc.n}/${u.sc.max} por esta unidad)</h3>` + (u.sc.near ? '' : '<p class="hint lack">Acércate a 2 casillas o menos de una ciudad tuya.</p>') + `<div class="row" style="flex-wrap:wrap;gap:6px">${u.sc.opts.map(o => `<button class="btn sm gold" ${u.sc.near && u.sc.n < u.sc.max && u.sc.bones >= o.cost.hueso ? '' : 'disabled'} data-c='${jattr({ a: 'summon', u: u.id, k: o.k })}'>${SH.CREATURES[o.k].e} ${SH.CREATURES[o.k].n} · ${SH.MATS.hueso.e}${o.cost.hueso}</button>`).join('')}</div><p class="hint">Huesos en el almacén cercano: ${u.sc.bones}.</p>`;
     if (u.bn) h += `<p class="hint ok">👶 Cría${u.gen ? ' de la generación ' + u.gen : ''}: +${u.bn.hp} salud y +${u.bn.dmg} daño de nacimiento.</p>`;
     if (u.pr) h += u.pr.w ? `<p class="hint ok">💞 Junto a <b>${esc(u.pr.w)}</b> cerca de la ciudad: ${u.pr.n}/${u.pr.need} turnos.</p>` : `<p class="hint">💞 ${u.pr.cd > 0 ? 'Podrá tener otra cría en ' + u.pr.cd + ' turnos.' : 'Para tener una cría: quédate 1 casilla de otra unidad tuya, a 2 casillas de una ciudad tuya, durante ' + u.pr.need + ' turnos.'}</p>`;
     if (e.aura) h += `<p class="hint">Aura de aliado cercano: +${Math.round(e.aura * 100)}% salud y defensa.</p>`;
@@ -654,6 +673,11 @@ function citySheet() {
   if (sheet.tab === 'state') {
     h += `<div>${bldHtml(c.b)}</div><div>${matsHtml(c.st.m)}</div>${c.inc && Object.keys(c.inc).length ? `<p class="hint">🏭 Produce por turno: ${Object.keys(c.inc).map(m => `${SH.MATS[m].e} ${c.inc[m]}`).join(' · ')}</p>` : ''}<h3 class="hint" style="margin-top:10px">Objetos guardados</h3>` + (c.st.it.map(it => `<div class="line"><div class="g">${itemHtml(it)}</div></div>`).join('') || '<p class="dim">Ninguno.</p>');
     h += '<p class="hint">Las unidades junto a la ciudad pueden depositar su botín y equiparse desde su ficha (pestañas Equipo y Mochila).</p>';
+    h += '<div style="margin-top:12px"><b>♻️ Trueque</b></div><p class="hint">¿Te sobra material barato? Cámbialo por uno mejor (con pérdida).</p>' + SH.CONVERT.map(r => {
+      const have = c.st.m[r.from] || 0, mx = Math.floor(have / r.rate), cm = n => jattr({ a: 'conv', c: c.id, from: r.from, n });
+      return `<div class="line" style="flex-wrap:wrap"><div class="g"><b>${SH.MATS[r.from].e} ${r.rate}</b> → <b>${SH.MATS[r.to].e} 1</b> <span class="dim">(${SH.MATS[r.from].n} → ${SH.MATS[r.to].n}; tienes ${have})</span></div>` +
+        `<button class="btn sm" ${mx >= 1 ? '' : 'disabled'} data-c='${cm(1)}'>×1</button> <button class="btn sm" ${mx >= 10 ? '' : 'disabled'} data-c='${cm(10)}'>×10</button> <button class="btn sm gold" ${mx >= 1 ? '' : 'disabled'} data-c='${cm(mx)}'>Todo${mx ? ' (' + mx + ')' : ''}</button></div>`;
+    }).join('');
   } else if (sheet.tab === 'forge') {
     const K = SH.KINDS[forge.k], cost = SH.recipe(forge.k, forge.tr), left = (c.cm || S.craftsMax) - c.crafts;
     h += `<div>${SH.WEAPON_KINDS.concat(SH.GEAR_KINDS).map(k => `<span class="chip btnlike ${forge.k === k ? 'on' : ''}" data-ui="fk:${k}">${SH.KINDS[k].e} ${SH.KINDS[k].n}</span>`).join('')}</div>`;
@@ -916,7 +940,7 @@ const MANUAL = [
   ['⚒️ Equipo y forja', 'La rareza es el número de efectos: común, poco común, raro, épico, legendario y mítico. En la forja fabricas, mejoras, encantas, reforjas y engarzas gemas. Tres piezas de armadura de la misma calidad dan bonos de set.'],
   ['🤝 Diplomacia y comercio', 'En «Jugadores» ofreces paz o alianza y comercias materiales y objetos: lo que ofreces queda en depósito hasta que respondan (5 turnos). La hoja de comercio muestra un valor de referencia; los bots aceptan si das al menos el 90% de lo que piden. Los mercaderes ambulantes venden por tiempo limitado.'],
   ['🌦️ Eventos', 'El clima cambia el combate, los torneos premian a la mejor unidad que esté en la arena y las hordas asaltan ciudades. Se pueden reducir en los ajustes del mundo.'],
-  ['🎮 Modos', 'Normal, Reto de una unidad, Por equipos, Rey Demonio (el rey recluta bestias y produce el doble de huesos), Historia (campaña cooperativa de 8 capítulos) y Mundo abierto (persistente, sin bots).'],
+  ['🎮 Modos', 'Normal, Reto de una unidad, Por equipos, Rey Demonio (el rey recluta bestias y produce el doble de huesos), Historia (campaña cooperativa de 9 capítulos) y Mundo abierto (persistente, sin bots).'],
   ['💡 Consejos', 'Lleva a tus unidades heridas junto a una ciudad o carreta. Pon una iglesia si reclutas o resucitas mucho. Vigila el registro (📜) y filtra por tipo. Activa los avisos para enterarte de tu turno.'],
 ];
 function manualSheet() {
@@ -1019,6 +1043,8 @@ $('sheet').addEventListener('click', e => {
   const b = e.target.closest('[data-ui]'); if (!b) return;
   const [k, v] = b.dataset.ui.split(':');
   if (k === 'close') closeSheet();
+  else if (k === 'players') openSheet('players');
+  else if (k === 'mo') { const bt = $(v); if (!bt) return; if (v === 'nSnd') { bt.click(); renderSheet(); } else { closeSheet(); bt.click(); } }
   else if (k === 'gotocart') { closeSheet(); centerOn(+b.dataset.x, +b.dataset.y); }
   else if (k === 'rename') { const u = S.mine.find(x => x.id === selId); if (!u) return; const nm = prompt('Nuevo nombre para esta unidad (máx. 16 letras):', u.name); if (nm !== null && nm.trim()) send({ t: 'cmd', a: 'rename', u: u.id, name: nm }); }
   else if (k === 'gcreate') { const n = prompt('Nombre del gremio (3-16 letras):', ''); if (n === null || !n.trim()) return; const t = prompt('Etiqueta (2-4 letras o números):', n.trim().slice(0, 3).toUpperCase()); if (t === null || !t.trim()) return; act({ a: 'guild', d: 'create', n, t }); }
@@ -1555,7 +1581,7 @@ $('nNext').onclick = () => {
 };
 /* ---------- pixel art (v1.40): sprites de 16x16 definidos como tablas de letras ---------- */
 const SPR = {};
-const SPR_PAL = { k: '#1b1522', d: '#3a3744', m: '#6b6877', l: '#a9a7b4', w: '#eceaf2', n: '#4a2e1b', b: '#7a4a28', B: '#a8713f', z: '#d2a46a', S: '#f0c096', s: '#c88a62', r: '#d9463e', R: '#8a2430', o: '#ec8a2c', y: '#f4d24f', Y: '#c79a22', e: '#58b04c', E: '#2f7038', c: '#98d95a', u: '#4a7be0', U: '#28458f', a: '#66d0ea', p: '#9a5bd0', P: '#54307e', q: '#e585b8', x: '#f5f0dc', X: '#cfc7a8', g: '#7c8f5a', G: '#59683e' };
+const SPR_PAL = { k: '#1b1522', d: '#3a3744', m: '#6b6877', l: '#a9a7b4', w: '#eceaf2', n: '#4a2e1b', b: '#7a4a28', B: '#a8713f', z: '#d2a46a', S: '#f0c096', s: '#c88a62', r: '#d9463e', R: '#8a2430', o: '#ec8a2c', y: '#f4d24f', Y: '#c79a22', e: '#58b04c', E: '#2f7038', c: '#98d95a', u: '#4a7be0', U: '#28458f', a: '#66d0ea', p: '#9a5bd0', P: '#54307e', q: '#e585b8', K: '#17121c', J: '#44344a', N: '#6b3a1a', x: '#f5f0dc', X: '#cfc7a8', g: '#7c8f5a', G: '#59683e' };
 
 // 16x16, '.' = transparente. Letras: ver SPR_PAL. Dinámicas: T/t equipo, H/h casco, C/D pechera.
 SPR.unit = [
@@ -2101,19 +2127,19 @@ SPR.builder = [
 '....kkkk.kkkk...'
 ];
 SPR.angel = [
-'......kyyk......',
-'.....kyYYyk.....',
-'.....kkkkkk.....',
-'..kk.kSSSSk.kk..',
-'.kwwkkSkkSkkwwk.',
-'kwwwkkSSSSkkwwwk',
-'kwxwwkkSSkkwwxwk',
-'kwxwwkwwwwkwwxwk',
+'.....kyyyyk.....',
+'....kKJKKJKk....',
+'...kJKKJKKJKk...',
+'.kwkKKSSSSKKkwk.',
+'kwwkJSNSSNSJkwwk',
+'kwxkKSSssSSKkxwk',
+'kwxwkJSSSSJkwxwk',
+'kwxwkKJwwJKkwxwk',
 'kwxwkwwwwwwkwxwk',
 '.kwwkwwYYwwkwwk.',
 '..kkkwwwwwwkkk..',
 '...kwwwwwwwwk...',
-'...kwwwwwwwwk...',
+'...kwwxwwxwwk...',
 '....kwwwwwwk....',
 '.....kwwwwk.....',
 '......kkkk......'

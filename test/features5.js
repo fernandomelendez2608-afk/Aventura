@@ -1,4 +1,5 @@
 'use strict';
+require('./seed.js');
 // Pruebas de: asedios, botín de ciudades neutrales y crías con nivel promedio (v1.43)
 const E = require('../engine.js'), S = require('../shared.js');
 let fails = 0;

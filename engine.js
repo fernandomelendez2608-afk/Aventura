@@ -1099,6 +1099,7 @@ function recruitCost(g, pid, city) {
 }
 /* ---------- invocaciones (invocador y nigromante) ---------- */
 const summonsOf = (g, o) => g.units.filter(x => x.o === o && x.sm);
+const summonsBy = (g, u) => g.units.filter(x => x.sm && x.sm.by === u.id); // el límite es por invocador/nigromante, no por jugador
 function summonCity(g, u) {
   let best = null, bd = 99;
   for (const c of g.cities) if (c.owner === u.o) { const d = cheb(u, c); if (d <= S.SUMMON.range && d < bd) { best = c; bd = d; } }
@@ -1108,13 +1109,13 @@ function summonInfo(g, u) {
   const cl = u.cls && S.CLASSES[u.cls];
   if (u.sm || !cl || !cl.summons || g.cfg.mode === 'uno') return null;
   const c = summonCity(g, u);
-  return { n: summonsOf(g, u.o).length, max: S.SUMMON.max, near: !!c, bones: c ? (c.st.m.hueso || 0) : 0, opts: cl.summons.map(k => ({ k, cost: holyCost(c, S.SUMMON.cost[k]) })) };
+  return { n: summonsBy(g, u).length, max: S.SUMMON.max, near: !!c, bones: c ? (c.st.m.hueso || 0) : 0, opts: cl.summons.map(k => ({ k, cost: holyCost(c, S.SUMMON.cost[k]) })) };
 }
 function doSummon(g, u, k) {
   if (g.cfg.mode === 'uno') return 'En el reto de una unidad no se puede invocar';
   const cl = u.cls && S.CLASSES[u.cls];
   if (u.sm || !cl || !cl.summons || !cl.summons.includes(k)) return 'Tu clase no puede invocar eso';
-  if (summonsOf(g, u.o).length >= S.SUMMON.max) return `Ya tienes ${S.SUMMON.max} invocaciones (el máximo por jugador)`;
+  if (summonsBy(g, u).length >= S.SUMMON.max) return `${u.name} ya tiene ${S.SUMMON.max} invocaciones (el máximo por invocador)`;
   const c = summonCity(g, u);
   if (!c) return `Debes estar a ${S.SUMMON.range} casillas o menos de una ciudad tuya`;
   const cost = holyCost(c, S.SUMMON.cost[k]);
@@ -1430,6 +1431,14 @@ function doStation(g, p, u) {
   const linked = g.cities.filter(x => x.owner === p.id && x.nl).length;
   ev(g, `📦 Estación de suministros junto a ${near.name}.` + (linked >= 2 ? ` ${linked} ciudades comparten ahora el inventario.` : ' Levanta otra junto a una segunda ciudad para unir sus inventarios.'), [p.id], 'city');
   return null;
+}
+function doConvert(g, p, c, from, n) { // trueque: N veces (tasa de materiales) → N del material superior
+  const r = S.CONVERT.find(x => x.from === from); if (!r) return 'Ese material no se puede convertir';
+  const have = c.st.m[from] || 0, max = Math.floor(have / r.rate); n = Math.min(Math.max(n | 0, 0), max, 5000);
+  if (n < 1) return `Hacen falta ${r.rate} de ${S.MATS[from].n} para obtener 1 de ${S.MATS[r.to].n}`;
+  c.st.m[from] -= n * r.rate; if (c.st.m[from] <= 0) delete c.st.m[from];
+  c.st.m[r.to] = (c.st.m[r.to] || 0) + n; touch(g);
+  return { n, cost: n * r.rate, from, to: r.to };
 }
 function doRecruit(g, p, c, kind) {
   if (siegeOn(g) && (c.sg || 0) >= 1) return 'La ciudad está en cerco: no se puede reclutar';
@@ -2020,6 +2029,12 @@ function cmd(g, pid, m) {
       const c = cityOf(); if (!c) return { err: 'Ciudad no encontrada' };
       const r = doCraft(g, p, c, m.k, m.tr | 0);
       if (typeof r === 'string') err = r; else msg = `Forjado: ${S.itemName(r)}`;
+      break;
+    }
+    case 'conv': {
+      const c = cityOf(); if (!c) return { err: 'Ciudad no encontrada' };
+      const r = doConvert(g, p, c, m.from, m.n);
+      if (typeof r === 'string') err = r; else msg = `Trueque: ${r.cost} ${S.MATS[r.from].n} → ${r.n} ${S.MATS[r.to].n}`;
       break;
     }
     case 'recruit': {
@@ -2929,7 +2944,7 @@ function botGear(g, p, c, u) {
 }
 function botManage(g, p) {
   for (const u of g.units.filter(x => x.o === p.id && !x.sm && x.cls && S.CLASSES[x.cls].summons)) { // invocadores y nigromantes
-    if (summonsOf(g, p.id).length >= S.SUMMON.max) break;
+    if (summonsBy(g, u).length >= S.SUMMON.max) continue;
     const k = S.CLASSES[u.cls].summons[Math.floor(rng(g) * S.CLASSES[u.cls].summons.length)];
     const c = summonCity(g, u);
     if (c && (c.st.m.hueso || 0) >= holyCost(c, S.SUMMON.cost[k]).hueso + 6) doSummon(g, u, k);
