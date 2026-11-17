@@ -577,3 +577,70 @@ Todo esto solo en el modo Mundo abierto. Se abre desde el botón **🌍** del ma
 ## v1.50 — Invocaciones por unidad
 - El límite de invocaciones ya no es 2 por jugador sino **2 por cada invocador o nigromante**. Con tres invocadores puedes tener hasta 6 invocaciones. Siguen costando huesos, no ocupan puestos del tope de unidades y se desvanecen si su invocador cae.
 - Los bots también lo aplican por unidad.
+
+
+## v1.51 — La campaña pasa a 16 capítulos
+Siete capítulos nuevos para el modo Historia, que ahora usa todos los jefes del juego y sigue contando la fe en Elizabeth y Nathaly:
+- **Peregrinos del alba** (tras «Tierras propias»): despejar los caminos, 25 criaturas más.
+- **El laberinto sellado** (tras el milagro de las Guardianas): jefe **Minotauro del Laberinto**, el guardián que la ceniza enloqueció.
+- **La Hidra de las Ciénagas** (tras el Rey Lobo): jefe **Hidra**, que envenena las fuentes benditas de Nathaly.
+- **La vigilia de las velas**: una unidad de nivel 12 con equipo de calidad Alma o mejor.
+- **El Conde de la noche eterna**: jefe **Conde Vampiro**, que apaga las velas de los altares.
+- **El Coloso caído**: jefe **Coloso de Piedra**, las estatuas de las Guardianas corrompidas.
+- **La víspera del Dragón** (tras el Liche): ciudades del grupo (jugadores + 6) y una unidad de nivel 15.
+Orden completo: eco de la ceniza → tierras propias → peregrinos → acero y leyenda → refugio sagrado → bajo la tierra → milagro de las Guardianas → laberinto → Rey Lobo → Hidra → vigilia → Conde → Coloso → Liche → víspera → Dragón de Ceniza. Cada capítulo da premio (materiales y un objeto raro, mejor cuanto más avanzado). Las historias guardadas en curso conservan el número de capítulo, así que pueden quedar en un capítulo distinto del que tocaba; lo más seguro es empezar una campaña nueva. La prueba de la campaña ahora recorre todos los capítulos según el tipo de objetivo, así que añadir más ya no la rompe.
+
+
+## v1.52 — Mordedura de vampiro 🧛
+- **Contagio:** cuando el **Conde Vampiro** golpea a una unidad tuya y no la mata, hay un **25 %** de que la muerda y se convierta en vampiro. Sigue siendo tuya, conserva su clase, nivel y equipo, y avisa en el registro.
+- **Ventaja racial del vampiro:** +10 % de daño, roba el 20 % de la vida que hace y se regenera un 3 % por turno (se suma a lo que ya tenga por su clase). Se ve con 🧛 junto al nombre y sobre el sprite en el mapa.
+- **Quién se libra:** invocaciones, carretas, constructores, bestias del Rey Demonio, y cualquier unidad que esté a 2 casillas o menos de una ciudad tuya con **iglesia de nivel 2 o más**.
+- **Purificar:** si no quieres el vampirismo, junto a una ciudad tuya con iglesia (cualquier nivel) el botón ✨ Purificar en la ficha de la unidad cuesta 3 almas (la iglesia lo abarata).
+- Los números (probabilidad, ventajas, protección, coste) están en `VAMP` de `shared.js`; la lista `by` permite que otras criaturas contagien en el futuro.
+
+## v1.53 — Cuentas 👤
+
+Opcional: con una cuenta (correo + contraseña) ves las mismas partidas desde cualquier dispositivo. Seguir como invitado funciona igual que antes.
+
+- **Registro** con nombre, correo y contraseña (mín. 8). Se confirma el correo con un **código de 6 dígitos** (caduca en 15 min, 5 intentos).
+- **Entrar** desde otro dispositivo trae tus partidas; las que ya tenías como invitado se añaden a la cuenta al registrarte/entrar.
+- **Olvidé mi contraseña**: código por correo; al cambiarla se cierran las demás sesiones.
+- Contraseñas con scrypt, sesiones de 90 días por dispositivo (solo se guarda su hash), límites de intentos por correo e IP.
+- Código en `accounts.js`; las cuentas se guardan en el mismo almacén que las partidas.
+
+### Lo que necesitas configurar en Render
+1. **Upstash (imprescindible para que las cuentas no se pierdan).** El disco de Render gratis se borra al reiniciar, y con él las cuentas. Crea una base gratis en upstash.com (Redis) y añade en Render → Environment: `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN` (de la pestaña REST API). Tus partidas también se guardarán ahí.
+2. **Correo (para verificación y recuperación)** con Brevo (gratis, ~300 correos/día): crea cuenta en brevo.com → verifica un remitente (tu Gmail sirve para pruebas) → SMTP & API → crea una API key. En Render: `BREVO_API_KEY`, `MAIL_FROM` (el remitente verificado) y opcional `MAIL_FROM_NAME`.
+   - Sin Brevo: las cuentas funcionan **sin verificar el correo y sin recuperar contraseña** (si la olvidas, se pierde el acceso).
+   - Los correos de Gmail pueden caer en spam al principio; para publicar el juego conviene un dominio propio verificado en Brevo.
+
+Pruebas: `test/features11.js` (con un servidor de correo simulado).
+
+## v1.54 — Modo Oleadas 🌊
+
+Modo cooperativo nuevo (modo rápido «Oleadas» en la sala, o *Modo de juego → Oleadas* en los ajustes). Todos los jugadores (y bots) están aliados.
+
+- La primera oleada llega en el turno 3 y luego una cada 3 turnos, hasta **20 oleadas**.
+- Cada oleada marcha sobre algunas ciudades (la mitad de los jugadores, mínimo una). Crece en cantidad, nivel y tipo de criatura (goblins y lobos al principio, trolls y golems al final).
+- Cada **5 oleadas** llega además un jefe (Rey Lobo, Minotauro, Liche, y el Dragón de Ceniza en la 20).
+- Al superar una oleada, cada capital recibe materiales (huesos, cuero, hierro, acero y almas según avanza); al vencer un jefe, además un objeto de botín.
+- Las criaturas que se dispersan sin llegar a la ciudad ya no cuentan. Se gana al derrotar la última oleada y su jefe; se pierde si caen todos los jugadores.
+- En este modo no hay hordas ni jefes al azar, y la diplomacia está fijada.
+- El avance se ve en el botón 🌊 (el mismo que usa la Historia).
+
+Pruebas: `test/features12.js`.
+
+## v1.55 — Modo Laberinto 🕯️
+
+Modo cooperativo nuevo (modo rápido «Laberinto», o *Modo de juego → Laberinto* en los ajustes; el número de pisos se elige en «Pisos del laberinto»: 10, 12, 15, 18 o 20). Todos los jugadores (y bots) están aliados.
+
+- **Sin mundo exterior ni ciudades.** Cada jugador empieza con **2 unidades** en el piso 1.
+- Cada piso es un **laberinto de pasillos** con salas, tesoros 💎 en los callejones sin salida, trampas ocultas ⚠️ y criaturas. Más pisos = criaturas de más nivel y de tiers más duros.
+- **Escaleras:** la de subida está en la sala de inicio y la de bajada al fondo, junto a la sala grande. Una unidad junto a la escalera ve el botón «⬇️ Bajar» / «⬆️ Subir» en su ficha (las invocaciones cercanas la siguen). Desde el piso 1 no hay salida.
+- **Un jefe cada 2 pisos** (y siempre en el último, que es el Dragón de Ceniza). En los pisos con jefe la escalera de bajada está sellada 🔒 hasta vencerlo.
+- **Velas 🕯️ en vez de ciudades:** cada jugador tiene **una vela por piso**, que se enciende junto a la escalera de subida la primera vez que baja a ese piso. Sirven para **forjar, mejorar, guardar botín y revivir** (usa la pestaña «Revivir»), pero **no dan ningún bono**: no curan, no producen, no tienen edificios ni reclutan. Todas las velas de un jugador comparten el mismo almacén.
+- **Victoria:** vencer al jefe del último piso (gana todo el grupo). **Derrota:** si caen todas las unidades y nadie puede revivir.
+- No hay clima, hordas, mercaderes, torneos ni protagonista en este modo. El minimapa muestra el piso que estás viendo y el botón 🏠 te lleva a la vela de tu piso.
+- Los bots avanzan por los pisos, pelean, vuelven a su vela cuando la mochila se llena y bajan por la escalera.
+
+Pruebas: `test/features13.js`.

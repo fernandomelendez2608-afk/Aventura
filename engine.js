@@ -170,6 +170,8 @@ function applyPact(g, a, b, k) {
 function doDip(g, p, m) {
   const d = m.d;
   if (g.cfg.mode === 'historia') return 'En el modo Historia todos los jugadores están aliados contra el mundo';
+  if (g.cfg.mode === 'laberinto') return 'En el Laberinto todos los jugadores están aliados';
+  if (g.cfg.mode === 'oleadas') return 'En el modo Oleadas todos los jugadores están aliados contra las criaturas';
   if (g.cfg.mode === 'equipos') return 'En el modo por equipos las alianzas están fijadas: tus compañeros son aliados y los demás equipos, enemigos';
   if (g.cfg.mode === 'rey') return 'En el reto del Rey Demonio las alianzas están fijadas: el Rey Demonio contra todos los demás';
   if (d === 'accept' || d === 'reject' || d === 'cancel') {
@@ -299,7 +301,7 @@ function tradeTick(g) { // caducidad y respuesta de bots / jugadores ausentes
   }
 }
 function botDiplomacy(g) {
-  if (g.cfg.mode === 'rey' || g.cfg.mode === 'historia' || g.cfg.mode === 'equipos') return;
+  if (g.cfg.mode === 'rey' || g.cfg.mode === 'historia' || g.cfg.mode === 'equipos' || g.cfg.mode === 'oleadas' || g.cfg.mode === 'laberinto') return;
   for (const key of Object.keys(g.brk)) {
     if (g.brk[key] <= g.turn) {
       const [a, b] = key.split('-').map(Number);
@@ -496,7 +498,7 @@ function eff(g, u) {
       else fx[gf.f] = (fx[gf.f] || 0) + gf.v;
     }
   }
-  const cm0 = u.cls ? S.classMods(u) : {};
+  const cm0 = (u.cls || u.vamp) ? S.classMods(u) : {};
   const set = S.armorSet(u.eq), sb = set ? set.b : {};
   const cm = Object.assign({}, cm0, { execute: (cm0.execute || 0) + (fx.ejecutor || 0), vsCre: (cm0.vsCre || 0) + (fx.bestias || 0) });
   def += 2 * u.sk.defensa + aDef + (cm.def || 0) + (sb.def || 0) + wallBonus(g, u);
@@ -709,15 +711,16 @@ function spawnSite(g) {
   }
   return site;
 }
-function spawnHorde(g) {
+function spawnHorde(g, o) {
+  o = o || {};
   const cands = g.cities.filter(c => c.owner !== null && g.players[c.owner].alive);
   if (!cands.length) return null;
-  const city = pick(g, cands), w = g.map.w;
+  const city = o.city || pick(g, cands), w = g.map.w;
   const strong = g.turn > 40;
-  const types = strong ? ['orco', 'esqueleto', 'troll', 'goblin'] : ['goblin', 'lobo', 'esqueleto'];
+  const types = o.types || (strong ? ['orco', 'esqueleto', 'troll', 'goblin'] : ['goblin', 'lobo', 'esqueleto']);
   const winter = S.seasonIdx(g.turn) === 3;
-  const n = 3 + Math.min(3, Math.floor(g.turn / 25)) + (winter ? 1 : 0);
-  const lv = 1 + (strong ? 1 : 0) + Math.floor(g.turn / 18);
+  const n = o.n || 3 + Math.min(3, Math.floor(g.turn / 25)) + (winter ? 1 : 0);
+  const lv = o.lv || 1 + (strong ? 1 : 0) + Math.floor(g.turn / 18);
   let made = 0;
   for (let tries = 0; tries < 80 && made < n; tries++) {
     const ang = rng(g) * Math.PI * 2, r = 7 + Math.floor(rng(g) * 3);
@@ -726,9 +729,10 @@ function spawnHorde(g) {
     const k = y * w + x, ix = idx(g);
     if (ix.U.has(k) || ix.C.has(k) || ix.T.has(k)) continue;
     const c = spawnCreature(g, pick(g, types), x, y, lv);
-    c.tg = city.id; c.ttl = 14; made++;
+    c.tg = city.id; c.ttl = o.ttl || 14; made++; if (o.ids) o.ids.push(c.id);
   }
   if (!made) return null;
+  if (o.quiet) return made;
   ev(g, `🐺 ¡Una horda de ${made} criaturas avanza hacia ${city.name}! Defiende la ciudad con tus unidades.`, [city.owner], 'horde', 'horde');
   const others = g.players.filter(x => x.id !== city.owner).map(x => x.id);
   if (others.length) ev(g, `🐺 Una horda se dirige a ${city.name} (de ${g.players[city.owner].name}).`, others, 'horde');
@@ -796,6 +800,190 @@ function spawnBoss(g, type0, lv0) {
   ev(g, `🐉 Ha aparecido un jefe: ${S.CREATURES[type].n} (nivel ${c.lv}) ${dirText(g, pos)} del mapa.`, null, 'boss');
   botAnyTalk(g, 'boss', { b: S.CREATURES[type].n }, 0.6);
   return c;
+}
+
+
+/* ---------- modo Laberinto ---------- */
+// Sin mundo exterior: cada piso es un laberinto de pasillos con salas, escaleras y un jefe cada 2 pisos. En vez de ciudades hay velas (una por jugador y piso):
+// sirven para forjar, mejorar, guardar y revivir, pero no dan bonos ni producen nada. Todos los jugadores están aliados.
+const isLab = g => g.cfg.mode === 'laberinto';
+const labFloors = g => Math.max(10, Math.min(20, parseInt(g.cfg.floors, 10) || 12));
+function labCarve(g, t, w, ox, oy) {
+  const L = S.LAB, W = L.w, H = L.h, cw = (W - 1) / 2, ch = (H - 1) / 2, open = new Uint8Array(W * H), seen = new Uint8Array(cw * ch);
+  const O = (x, y) => { open[y * W + x] = 1; };
+  const st = [[0, 0]]; seen[0] = 1; O(1, 1);
+  while (st.length) { // laberinto perfecto (recorrido en profundidad)
+    const [cx, cy] = st[st.length - 1];
+    const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => [cx + dx, cy + dy, dx, dy]).filter(([x, y]) => x >= 0 && y >= 0 && x < cw && y < ch && !seen[y * cw + x]);
+    if (!nb.length) { st.pop(); continue; }
+    const [nx, ny, dx, dy] = nb[Math.floor(rng(g) * nb.length)];
+    seen[ny * cw + nx] = 1; O(2 * cx + 1 + dx, 2 * cy + 1 + dy); O(2 * nx + 1, 2 * ny + 1); st.push([nx, ny]);
+  }
+  const room = (x, y, rw, rh) => { for (let j = y; j < y + rh; j++) for (let i = x; i < x + rw; i++) O(i, j); return { x: ox + x, y: oy + y, w: rw, h: rh, cx: ox + x + (rw >> 1), cy: oy + y + (rh >> 1) }; };
+  const rooms = [], start = room(1, 1, 5, 5), boss = room(W - 6, H - 6, 5, 5);
+  start.start = true; boss.boss = true; rooms.push(start);
+  for (let n = 0, tries = 0; n < L.rooms && tries < 80; tries++) { // salas intermedias de 3×3 sobre celdas del laberinto
+    const x = 2 * ri(g, 0, cw - 2) + 1, y = 2 * ri(g, 0, ch - 2) + 1;
+    if (x < 8 && y < 8) continue; if (x > W - 11 && y > H - 11) continue;
+    if (rooms.some(r => Math.abs(r.x - ox - x) < 5 && Math.abs(r.y - oy - y) < 5)) continue;
+    rooms.push(room(x, y, 3, 3)); n++;
+  }
+  rooms.push(boss);
+  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) { // algunos atajos para que no sea un laberinto perfecto
+    if (open[y * W + x] || (x % 2 === y % 2)) continue;
+    const a = x % 2 ? open[(y - 1) * W + x] && open[(y + 1) * W + x] : open[y * W + x - 1] && open[y * W + x + 1];
+    if (a && rng(g) < 0.07) O(x, y);
+  }
+  const inRoom = (x, y) => rooms.some(r => x >= r.x - ox && x < r.x - ox + r.w && y >= r.y - oy && y < r.y - oy + r.h);
+  const dead = [], cor = [];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (open[y * W + x]) {
+    t[(oy + y) * w + ox + x] = 'r';
+    if (inRoom(x, y)) continue;
+    const n = (open[(y - 1) * W + x] || 0) + (open[(y + 1) * W + x] || 0) + (open[y * W + x - 1] || 0) + (open[y * W + x + 1] || 0);
+    if (n === 1) dead.push({ x: ox + x, y: oy + y }); else cor.push({ x: ox + x, y: oy + y });
+  }
+  const vs = [[1, 1], [5, 1], [1, 5], [2, 1], [4, 1], [1, 3], [1, 2], [1, 4], [2, 2], [4, 2]].map(([a, b]) => ({ x: ox + a, y: oy + b }));
+  return { rooms, exit: { x: ox + 3, y: oy + 1 }, down: { x: ox + W - 3, y: oy + H - 3 }, vs, dead, cor };
+}
+function labFill(g, d) {
+  const N = labFloors(g), f = d.floor - 1, T = S.DUNGEON.tiers[d.tier - 1], base = Math.max(1, Math.round(1 + f * 13 / Math.max(1, N - 1)));
+  const mk = (type, pos, lv) => { const c = spawnCreature(g, type, pos.x, pos.y, Math.max(1, lv)); c.dg = d.id; return c; };
+  const lvl = () => Math.max(1, base + ri(g, -1, 0));
+  const free = (p, avoid) => dgFree(g, p.x, p.y) && !g.sites.some(q => q.x === p.x && q.y === p.y) && !(avoid && cheb(p, avoid) < 3) && !(cheb(p, d.exit) < 6);
+  const pickFrom = (arr, avoid) => { for (let i = 0; i < 40; i++) { const p = arr[ri(g, 0, arr.length - 1)]; if (p && free(p, avoid)) return p; } return null; };
+  for (const r of d.rooms) {
+    if (r.start) continue;
+    if (r.boss) {
+      const bt = d.final ? S.LAB.lastBoss : d.boss ? wpick(g, T.boss) : null, pos = dgRoomTile(g, r, d.down) || { x: r.cx, y: r.cy };
+      if (bt) { const bc = mk(bt, pos, base + (d.final ? 5 : 3)); d.bossId = bc.id; bc.bd = true; }
+      for (let i = 0, n = bt ? 2 : 3; i < n; i++) { const p2 = dgRoomTile(g, r, d.down); if (p2) mk(wpick(g, T.pool), p2, base + (bt ? 0 : 2)); }
+      for (let i = 0; i < 2; i++) { const p2 = dgRoomTile(g, r, d.down); if (p2) g.sites.push({ id: g.nid++, x: p2.x, y: p2.y, k: 'tesoro', dg: d.id, t: d.tier }); }
+      continue;
+    }
+    for (let i = 0, n = ri(g, 1, 2) + (f >= 3 ? 1 : 0); i < n; i++) { const pos = dgRoomTile(g, r); if (pos) mk(wpick(g, T.pool), pos, lvl()); }
+    if (rng(g) < 0.5) { const pos = dgRoomTile(g, r); if (pos) g.sites.push({ id: g.nid++, x: pos.x, y: pos.y, k: 'tesoro', dg: d.id, t: d.tier }); }
+  }
+  for (let i = 0, n = 3 + Math.floor(f / 3); i < n; i++) { const p = pickFrom(d.cor); if (p) mk(wpick(g, T.pool), p, lvl()); } // vigilantes en los pasillos
+  for (const p0 of d.dead.slice().sort(() => rng(g) - 0.5).slice(0, 8)) if (free(p0) && rng(g) < 0.7) g.sites.push({ id: g.nid++, x: p0.x, y: p0.y, k: 'tesoro', dg: d.id, t: d.tier }); // los callejones sin salida guardan tesoros
+  for (let i = 0, n = 5 + Math.floor(f / 2); i < n; i++) { const p = pickFrom(d.cor); if (p && !g.sites.some(q => q.x === p.x && q.y === p.y)) g.sites.push({ id: g.nid++, x: p.x, y: p.y, k: 'trampa', dg: d.id, t: d.tier, hid: true }); }
+}
+function labVela(g, p, d) { // la vela de un jugador en un piso (se enciende al llegar)
+  if (g.cities.some(c => c.vela && c.owner === p.id && c.dg === d.id)) return null;
+  const ix = idx(g); let pos = null;
+  for (const s of d.vs) if (!ix.C.has(s.y * g.map.w + s.x) && !ix.U.has(s.y * g.map.w + s.x)) { pos = s; break; }
+  if (!pos) pos = dgSpot(g, d.exit.x, d.exit.y + 2, 'r', 5);
+  if (!pos) return null;
+  const first = !g.cities.some(c => c.vela && c.owner === p.id);
+  const c = { id: g.nid++, x: pos.x, y: pos.y, owner: p.id, name: `Vela de ${p.name} (piso ${d.floor})`, cap: false, vela: true, dg: d.id, st: { m: first ? Object.assign({}, S.LAB.mats) : {}, it: [] }, crafts: 0 };
+  g.cities.push(c); relinkStores(g); touch(g);
+  return c;
+}
+function labStart(g) {
+  const L = S.LAB, N = labFloors(g), w = L.w, H = N * (L.h + L.gap), t = new Array(w * H).fill('k');
+  g.cfg.hero = 'no'; g.cfg.breed = 'apagado'; g.cfg.events = 'calma'; g.cfg.maxTurns = 0; g.ratio = 1;
+  g.map = { w, h: H, h0: H, t: null }; g.cities = []; g.creatures = []; g.sites = []; g.units = []; g.dungeons = []; g.graves = []; g.rv = []; g.starts = [];
+  for (let f = 0; f < N; f++) {
+    const oy = f * (L.h + L.gap), lay = labCarve(g, t, w, 0, oy), tier = Math.min(5, 1 + Math.floor(f * 5 / N));
+    g.dungeons.push({ id: g.nid++, tier, x: -1, y: -1, ox: 0, oy, rooms: lay.rooms, exit: lay.exit, down: lay.down, vs: lay.vs, dead: lay.dead, cor: lay.cor, cleared: 0, bossId: 0, lab: true, floor: f + 1, boss: (f + 1) % L.boss === 0 || f === N - 1, final: f === N - 1 });
+  }
+  g.map.t = t.join('');
+  for (const d of g.dungeons) labFill(g, d);
+  g.lab = { n: N, best: 1 };
+  for (const a of g.players) for (const b of g.players) if (a.id < b.id) g.dip[pkey(a.id, b.id)] = 'alianza';
+  const lvStart = Math.max(1, Math.min(20, g.cfg.startLevel | 0 || 1)), armT = ({ hierro: 2, acero: 3 })[g.cfg.startArmor] || 0, d1 = g.dungeons[0];
+  for (const p of g.players) {
+    p.ex = new Uint8Array(w * H);
+    labVela(g, p, d1);
+    for (let i = 0; i < L.startUnits; i++) {
+      const sp = dgSpot(g, d1.exit.x, d1.exit.y + 2, 'r', 6); if (!sp) break;
+      const nu = newUnit(g, p.id, sp.x, sp.y); nu.dg = d1.id;
+      if (lvStart > 1) { nu.lv = lvStart; nu.pts = lvStart; }
+      if (armT) for (const slot of ['casco', 'guantes', 'hombreras', 'pechera', 'pantalones', 'botas']) nu.eq[slot] = { id: g.nid++, k: slot, t: armT };
+    }
+  }
+  g.status = 'playing'; g.turn = 1; g.wx = null;
+  g.hist = []; g.chron = []; recordHist(g);
+  g.endsAt = Date.now() + g.cfg.turnHours * 3600000;
+  for (const p of g.players) p.ready = false;
+  refreshUnits(g);
+  { const bs = g.players.filter(b => b.bot); for (let i = bs.length - 1; i > 0; i--) { const j = Math.floor(rng(g) * (i + 1)); [bs[i], bs[j]] = [bs[j], bs[i]]; } for (const b of bs.slice(0, 2)) botTalk(g, b, 'start', {}, true); }
+  ev(g, `🕯️ ¡El Laberinto! ${N} pisos bajo tierra, un jefe cada ${L.boss}. Cada uno empieza con ${L.startUnits} unidades junto a su vela. Todos estáis aliados: bajad por las escaleras (⬇️) y llegad al fondo.`, null, 'story');
+  touch(g);
+  return null;
+}
+function doLab(g, p, m, u) {
+  const d = g.dungeons.find(x => x.id === u.dg);
+  if (!d) return 'Esta unidad no está en un piso';
+  if (m.d === 'down') {
+    if (cheb(u, d.down) > 1) return 'Acércate a la escalera de bajada (ⓘ está al fondo del piso)';
+    if (d.final) return 'Este es el último piso: derrota a su jefe para ganar';
+    if (d.boss && !d.cleared) return 'La escalera está sellada hasta que caiga el jefe de este piso';
+    const nx = g.dungeons[d.floor]; if (!nx) return 'No hay más pisos';
+    const spot = dgSpot(g, nx.exit.x, nx.exit.y + 1, 'r', 4); if (!spot) return 'La escalera está bloqueada ahora mismo';
+    const crew = u.sm ? [] : g.units.filter(v => v.sm && v.sm.by === u.id && v.dg === d.id && cheb(v, u) <= 3);
+    u.dg = nx.id; u.x = spot.x; u.y = spot.y; u.mp = 0; u.moved = true; touch(g);
+    for (const v of crew) { const sp = dgSpot(g, nx.exit.x, nx.exit.y + 1, 'r', 5); if (!sp) break; v.dg = nx.id; v.x = sp.x; v.y = sp.y; v.mp = 0; v.moved = true; }
+    const vl = labVela(g, p, nx);
+    if (nx.floor > g.lab.best) { g.lab.best = nx.floor; ev(g, `⬇️ ¡${p.name} llega al piso ${nx.floor} de ${g.lab.n}!${nx.boss ? ' Aquí espera un jefe.' : ''}`, null, 'site'); }
+    else ev(g, `⬇️ ${u.name} baja al piso ${nx.floor}.${vl ? ' Tu vela de este piso está encendida junto a la escalera.' : ''}`, [u.o], 'site');
+    return { msg: `${u.name} baja al piso ${nx.floor}` };
+  }
+  if (m.d === 'leave' || m.d === 'up') {
+    if (cheb(u, d.exit) > 1) return 'Acércate a la escalera de subida (arriba del piso)';
+    if (d.floor === 1) return 'No hay salida: el laberinto no tiene vuelta atrás desde el primer piso';
+    const pv = g.dungeons[d.floor - 2], spot = dgSpot(g, pv.down.x, pv.down.y, 'r', 4); if (!spot) return 'La escalera está bloqueada ahora mismo';
+    const crew = u.sm ? [] : g.units.filter(v => v.sm && v.sm.by === u.id && v.dg === d.id && cheb(v, u) <= 3);
+    u.dg = pv.id; u.x = spot.x; u.y = spot.y; u.mp = 0; u.moved = true; touch(g);
+    for (const v of crew) { const sp = dgSpot(g, pv.down.x, pv.down.y, 'r', 5); if (!sp) break; v.dg = pv.id; v.x = sp.x; v.y = sp.y; v.mp = 0; v.moved = true; }
+    ev(g, `⬆️ ${u.name} sube al piso ${pv.floor}.`, [u.o], 'site');
+    return { msg: `${u.name} sube al piso ${pv.floor}` };
+  }
+  return 'Aquí no hay entradas: baja por la escalera ⬇️ del fondo de cada piso';
+}
+function labTick(g) {
+  if (!isLab(g) || !g.lab || g.status !== 'playing') return;
+  const last = g.dungeons[g.dungeons.length - 1];
+  if (last && last.cleared) {
+    g.status = 'over'; g.lab.fin = true; const alive = g.players.filter(p => p.alive);
+    g.winners = alive.map(p => p.id); g.winner = alive.slice().sort((a, b) => score(g, b) - score(g, a))[0].id; touch(g);
+    ev(g, `🏁 ¡El jefe final del piso ${last.floor} ha caído! El Laberinto ha sido conquistado: victoria de todo el grupo.`, null, 'story');
+    let said = 0; for (const b of alive.filter(x => x.bot)) if (said < 2) { botTalk(g, b, 'win', {}, true); said++; }
+  }
+}
+function labInfo(g) {
+  if (!g.lab) return null;
+  return { n: g.lab.n, best: g.lab.best, fin: !!g.lab.fin, lost: !!g.lab.lost, floors: g.dungeons.map(d => ({ f: d.floor, boss: !!d.boss, cleared: d.cleared ? 1 : 0 })), boss: S.LAB.boss };
+}
+function botLab(g, p, units) {
+  const byF = new Map();
+  for (const u of units) { if (!byF.has(u.dg)) byF.set(u.dg, []); byF.get(u.dg).push(u); }
+  for (const [fid, grp] of byF) {
+    const d = g.dungeons.find(x => x.id === fid); if (!d) continue;
+    const full = grp.some(u => invW(u) + 2 > capOf(u) - 6), vela = g.cities.find(c => c.vela && c.owner === p.id && c.dg === d.id);
+    const cre = g.creatures.filter(c => c.dg === d.id), treas = full ? [] : g.sites.filter(q => q.dg === d.id && q.k === 'tesoro' && !q.used);
+    const hpAvg = grp.reduce((a, u) => a + u.hp / eff(g, u).maxHp, 0) / grp.length, sq = squadPower(g, grp);
+    const cen = { x: Math.round(grp.reduce((a, u) => a + u.x, 0) / grp.length), y: Math.round(grp.reduce((a, u) => a + u.y, 0) / grp.length) };
+    p._ok = new Set(); const ok = [];
+    for (const c of cre) { const cs = cstats(c, g), cd = S.CREATURES[c.t], nd = (cd.boss ? 2.4 : 1.6) * botCfg(g, p).lv.need * botCfg(g, p).pb.cNeed; if (sq.pw >= nd * cs.dmg * ehp(cs.mhp, cs.def)) { p._ok.add(c.id); ok.push(c); } }
+    const adj = cre.some(c => grp.some(u => cheb(u, c) <= 2));
+    const canDown = !d.final && (!d.boss || d.cleared);
+    let tg = null; const near = (arr) => arr.slice().sort((a, b) => cheb(a, cen) - cheb(b, cen))[0];
+    if (hpAvg < 0.55 && !adj) { for (const u of grp) botStrike(g, p, u); continue; } // descansa para curarse
+    if (full && vela && !adj) tg = vela; // mochila casi llena: vuelve a su vela a guardar el botín
+    else if (ok.length) tg = near(ok); else if (treas.length) tg = near(treas);
+    else if (canDown) tg = d.down;
+    else if (cre.length && hpAvg > 0.85) { tg = near(cre); for (const c of cre) p._ok.add(c.id); } // si solo queda lo difícil, ataca igualmente con la salud llena
+    if (!tg && cre.length) { for (const u of grp) botStrike(g, p, u); continue; }
+    const order = { tanque: 0, frontal: 1, arquero: 2, medico: 3 };
+    for (const u of grp.slice().sort((a, b) => (order[a.role] || 1) - (order[b.role] || 1))) {
+      if (!g.units.includes(u)) continue;
+      botStrike(g, p, u);
+      if (g.units.includes(u) && u.at >= eff(g, u).attacks && tg) {
+        if (canDown && !full && !ok.length && !treas.length && cheb(u, d.down) <= 1) { doDungeon(g, p, { d: 'down', u: u.id }); continue; }
+        headTo(g, u, tg.x, tg.y);
+      }
+    }
+  }
 }
 
 /* ---------- mazmorras (v1.29) ---------- */
@@ -869,7 +1057,7 @@ function setupDungeons(g) { // coloca las entradas en el mapa y llena las mazmor
   }
   g.dungeons = g.dungeons.filter(d => !d.off);
 }
-const dgName = d => S.DUNGEON.tiers[d.tier - 1].n;
+const dgName = d => d.lab ? 'Piso ' + d.floor : S.DUNGEON.tiers[d.tier - 1].n;
 function dgSpot(g, cx, cy, wantTerr, maxR) { // casilla libre más cercana
   for (let r = 0; r <= maxR; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
     if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
@@ -883,6 +1071,7 @@ function doDungeon(g, p, m) {
   const u = g.units.find(x => x.id === (m.u | 0) && x.o === p.id);
   if (!u) return 'Unidad no encontrada';
   if (u.cart) return 'La carreta no entra en mazmorras';
+  if (isLab(g)) return doLab(g, p, m, u);
   if (m.d === 'enter') {
     if (u.dg) return 'Esta unidad ya está en una mazmorra';
     const d = g.dungeons.find(x => x.id === (m.id | 0));
@@ -919,7 +1108,7 @@ function springTrap(g, u, st) {
 }
 function dgTick(g) { // las mazmorras despejadas se reabastecen pasado un tiempo si no hay nadie dentro
   for (const d of g.dungeons || []) {
-    if (!d.cleared || g.turn - d.cleared < S.DUNGEON.reset) continue;
+    if (d.lab || !d.cleared || g.turn - d.cleared < S.DUNGEON.reset) continue;
     if (g.units.some(u => u.dg === d.id)) continue;
     fillDungeon(g, d);
   }
@@ -932,13 +1121,15 @@ function dgOnKill(g, c, u) {
   const gems = {}; for (let i = 0; i < 1 + (d.tier >= 3 ? 1 : 0); i++) { const k = rollGem(g, 0.3 + 0.12 * d.tier); gems[k] = (gems[k] || 0) + 1; }
   const item = rareItem(g, { w: [0, 15, 35, 35, 15], t5: d.tier >= 5 ? 0.3 : 0 });
   giveLoot(g, u, gems, item);
-  ev(g, `🏆 ¡${p.name} despeja la ${T.n.toLowerCase()}! ${S.CREATURES[c.t].n} cae. Premio extra: ${fmtMats(gems)} y ${S.itemName(item)}. Se reabastecerá en ${S.DUNGEON.reset} turnos.`, null, 'boss');
+  if (d.lab) ev(g, `🏆 ¡${p.name} vence a ${S.CREATURES[c.t].n}, jefe del piso ${d.floor}! Premio extra: ${fmtMats(gems)} y ${S.itemName(item)}.${d.final ? '' : ' La escalera de bajada se abre para todos.'}`, null, 'boss');
+  else ev(g, `🏆 ¡${p.name} despeja la ${T.n.toLowerCase()}! ${S.CREATURES[c.t].n} cae. Premio extra: ${fmtMats(gems)} y ${S.itemName(item)}. Se reabastecerá en ${S.DUNGEON.reset} turnos.`, null, 'boss');
 }
 
 function startGame(g) {
   if (g.status !== 'lobby') return 'La partida ya empezó';
   if (g.players.length < 2 && g.cfg.mode !== 'mundo') return 'Se necesitan al menos 2 jugadores (agrega bots)';
   if (!g.players.some(p => !p.bot)) return 'Debe haber al menos un jugador humano';
+  if (g.cfg.mode === 'laberinto') return labStart(g);
   genMap(g);
   const w = g.map.w, h = g.map.h;
   if (g.cfg.mode === 'uno') { g.cfg.hero = 'no'; g.cfg.breed = 'apagado'; } // reto: una sola vida, sin protagonista ni crías
@@ -953,6 +1144,7 @@ function startGame(g) {
   if (g.cfg.mode === 'mundo') for (const p of g.players) p.prot = g.turn + S.WORLD.prot; // protección de novato
   if (g.cfg.mode === 'mundo') { g.cfg.maxTurns = 0; g.cfg.idleTurns = 0; if (!g.cfg.breed || g.cfg.breed === 'apagado') g.cfg.breed = 'tres'; } // mundo abierto: sin fin, sin relevo de ausentes, siempre con crías
   if (g.cfg.mode === 'historia') storyStart(g);
+  if (g.cfg.mode === 'oleadas') waveStart(g);
   if (g.cfg.mode === 'rey') { // un jugador al azar es el Rey Demonio; los demás quedan aliados entre sí
     g.king = Math.floor(rng(g) * g.players.length);
     for (const a of g.players) for (const b of g.players) if (a.id < b.id && a.id !== g.king && b.id !== g.king) g.dip[pkey(a.id, b.id)] = 'alianza';
@@ -1392,7 +1584,7 @@ function unlinkCity(g, c) { // la ciudad deja de compartir inventario (si era la
 function relinkStores(g) { // las ciudades de un mismo dueño con estación de suministros comparten un único inventario
   g.nets = g.nets || {}; g.rd = g.rd || {};
   const want = {};
-  for (const c of g.cities) if (c.owner !== null && stationNear(g, c)) (want[c.owner] = want[c.owner] || []).push(c);
+  for (const c of g.cities) if (c.owner !== null && (c.vela || stationNear(g, c))) (want[c.owner] = want[c.owner] || []).push(c); // las velas de un jugador siempre comparten almacén
   for (const c of g.cities) if (c.nl && !(want[c.nl - 1] && want[c.nl - 1].length >= 2 && c.owner === c.nl - 1)) unlinkCity(g, c);
   for (const o in want) {
     const L = want[o]; if (L.length < 2) continue;
@@ -1441,6 +1633,7 @@ function doConvert(g, p, c, from, n) { // trueque: N veces (tasa de materiales) 
   return { n, cost: n * r.rate, from, to: r.to };
 }
 function doRecruit(g, p, c, kind) {
+  if (c.vela) return 'Las velas no reclutan: en el laberinto solo cuentas con tus unidades (puedes revivir a los caídos)';
   if (siegeOn(g) && (c.sg || 0) >= 1) return 'La ciudad está en cerco: no se puede reclutar';
   if (g.cfg.mode === 'mundo') return 'En el mundo abierto no se recluta: las unidades nuevas nacen por reproducción (junto a una ciudad tuya)';
   if (g.cfg.mode === 'uno') return 'En el reto de una unidad no se puede reclutar';
@@ -1813,6 +2006,7 @@ function doSub(u, k) {
   u.sub = k; return null;
 }
 function doBuild(g, p, c, k) {
+  if (c.vela) return 'Las velas no tienen edificios ni dan bonos';
   const B = S.BUILDINGS[k];
   if (!B) return 'Edificio desconocido';
   if (k === 'asedio' && !siegeOn(g)) return 'Los asedios están desactivados en esta partida';
@@ -1924,6 +2118,7 @@ function cmd(g, pid, m) {
   const unitOf = () => { const u = g.units.find(x => x.id === m.u && x.o === pid ); return (u && ((u.sm && SM_NO.includes(m.a)) || (u.cart && CART_NO.includes(m.a)) || (u.bld && BLD_NO.includes(m.a)) || (u.sg && SG_NO.includes(m.a)) || (u.bs && BS_NO.includes(m.a)))) ? null : u; };
   const cityOf = () => g.cities.find(c => c.id === m.c && c.owner === pid);
   let err = null, msg = '';
+  if (isLab(g) && ['recruit', 'build', 'builder', 'cart', 'road', 'station', 'siegeunit', 'siegewall', 'repair', 'ord'].includes(m.a)) return { err: 'Eso no existe en el laberinto: las velas solo sirven para forjar, mejorar, guardar y revivir' };
   switch (m.a) {
     case 'move': {
       const u = unitOf(); if (!u) return { err: 'Unidad no encontrada' };
@@ -1955,6 +2150,14 @@ function cmd(g, pid, m) {
     case 'summon': {
       const u = unitOf(); if (!u) return { err: 'Unidad no encontrada' };
       err = doSummon(g, u, m.k); if (!err) msg = 'Invocación lista (descansa este turno)'; break;
+    }
+    case 'purify': {
+      const u = unitOf(); if (!u) return { err: 'Unidad no encontrada' };
+      if (!u.vamp) return { err: 'Esa unidad no es un vampiro' };
+      const c = g.cities.filter(ct => ct.owner === pid && holyOf(ct) >= 1 && cheb(u, ct) <= 1).sort((a, b) => holyOf(b) - holyOf(a))[0];
+      if (!c) return { err: 'Debe estar en una ciudad tuya con iglesia' };
+      const cost = holyCost(c, S.VAMP.purify); if (!canAfford(c.st.m, cost)) return { err: 'Faltan materiales en el almacén: ' + fmtMats(cost) };
+      spend(c.st.m, cost); delete u.vamp; touch(g); msg = `${u.name} fue purificado (${fmtMats(cost)})`; break;
     }
     case 'dismiss': {
       const u = unitOf(); if (!u) return { err: 'Unidad no encontrada' };
@@ -2226,9 +2429,18 @@ function angelsTurn(g) {
     for (const it of holder.inv.it) c.st.it.push(it);
   }
 }
+function vampBite(g, c, u) { // las criaturas vampiro pueden contagiar a quien muerden (y no matan)
+  if (!S.VAMP.by.includes(c.t) || u.vamp || isAux(u) || u.bs) return;
+  if (g.cities.some(ct => ct.owner === u.o && holyOf(ct) >= S.VAMP.shield && cheb(u, ct) <= 2)) return; // una iglesia de nivel 2 cercana protege
+  if (rng(g) >= S.VAMP.chance) return;
+  u.vamp = 1; touch(g);
+  ev(g, `${S.VAMP.e} ¡${S.CREATURES[c.t].n} muerde a ${u.name}! Se convierte en vampiro: sigue siendo tuyo y gana +10% de daño, roba 20% de vida y se regenera. Una iglesia puede purificarlo.`, [u.o], 'boss');
+}
 function creaturesTurn(g) {
+  const occ = isLab(g) ? new Set(g.units.map(u => u.dg)) : null; // en el laberinto solo se mueven las criaturas de los pisos donde hay alguien
   for (const c of g.creatures.slice()) {
     if (!g.creatures.includes(c)) continue;
+    if (occ && !occ.has(c.dg)) continue;
     bossPhase(g, c);
     const d = S.CREATURES[c.t], cs = cstats(c, g);
     let hcity = null;
@@ -2270,6 +2482,7 @@ function creaturesTurn(g) {
         target.hp -= dmg;
         ev(g, `🩸 ${c.el ? c.el : S.CREATURES[c.t].n} (niv. ${c.lv}) ataca a ${target.name} (−${dmg}).`, [target.o], 'hit', c.tg ? 'raid' : undefined);
         if (target.hp <= 0) { killUnit(g, target, { creature: c }); c.prov = null; continue; }
+        vampBite(g, c, target);
         if (dist === 1 && e.fx.espinas) {
           c.hp -= Math.max(1, Math.round(dmg * e.fx.espinas)); c.hit = true;
           if (c.hp <= 0) { killCreature(g, c, target); continue; }
@@ -2298,6 +2511,7 @@ function creaturesTurn(g) {
 }
 /* ---------- economía: producción pasiva de las ciudades ---------- */
 function cityIncome(g, c) { // materiales por turno (fracciones) según terreno cercano y edificios
+  if (c.vela) return {}; // las velas no producen nada
   const I = S.INCOME, inc = {}, add = (o, k) => { for (const m in o) inc[m] = (inc[m] || 0) + o[m] * (k || 1); };
   add(I.base); if (c.cap) add(I.cap);
   for (let dy = -I.r; dy <= I.r; dy++) for (let dx = -I.r; dx <= I.r; dx++) {
@@ -2321,6 +2535,7 @@ function incomeTick(g) {
   }
 }
 function worldTick(g) {
+  if (isLab(g)) return; // el laberinto no tiene mundo exterior: ni clima, ni mercaderes, ni hordas
   siegeTick(g);
   incomeTick(g);
   for (const u of g.units.slice()) if (u.bld) { const c = g.cities.find(x => x.id === u.bld.c); if (!c || c.owner !== u.o) { g.units.splice(g.units.indexOf(u), 1); touch(g); ev(g, `👷 ${u.name} se queda sin taller y se marcha.`, [u.o], 'city'); } }
@@ -2352,12 +2567,12 @@ function worldTick(g) {
     }
   }
   if (world) { if (g.turn % 3 === 0 && bossCount(g) < Math.floor(mapArea(g) / 4000) + 1) spawnBoss(g); }
-  else if (g.cfg.mode !== 'historia' && g.cfg.victory === 'jefes' && g.turn >= 3 && g.turn % 3 === 0 && bossCount(g) < Math.floor(g.players.length / 2) + 1) spawnBoss(g);
-  else if (g.cfg.mode !== 'historia' && g.turn >= 4 && g.turn % 5 === 0 && bossCount(g) < Math.floor(g.players.length / 3) + 1) spawnBoss(g);
+  else if (g.cfg.mode !== 'historia' && g.cfg.mode !== 'oleadas' && g.cfg.victory === 'jefes' && g.turn >= 3 && g.turn % 3 === 0 && bossCount(g) < Math.floor(g.players.length / 2) + 1) spawnBoss(g);
+  else if (g.cfg.mode !== 'historia' && g.cfg.mode !== 'oleadas' && g.turn >= 4 && g.turn % 5 === 0 && bossCount(g) < Math.floor(g.players.length / 3) + 1) spawnBoss(g);
   const wantSites = siteWant(g);
   if (g.turn % 4 === 0 && g.sites.filter(q => !q.dg).length < wantSites) for (let t = 0; t < 3; t++) if (spawnSite(g)) break;
   const gap = (si === 3 ? 10 : 16) * (g.cfg.fauna === 'pacifica' ? 1.8 : g.cfg.fauna === 'agresiva' ? 0.65 : 1);
-  if (!world && g.turn >= 10 && g.turn - (g.lh || 0) >= gap && rng(g) < 0.4) { if (spawnHorde(g)) g.lh = g.turn; }
+  if (!world && g.cfg.mode !== 'oleadas' && g.turn >= 10 && g.turn - (g.lh || 0) >= gap && rng(g) < 0.4) { if (spawnHorde(g)) g.lh = g.turn; }
 }
 
 /* ---------- inicio de turno ---------- */
@@ -2375,7 +2590,7 @@ function refreshUnits(g) {
     }
     heal += Math.min(mpct, 0.5) * e.maxHp;
     if (e.fx.regen) heal += e.fx.regen * e.maxHp;
-    if (cityNear(g, u)) heal += 0.25 * e.maxHp; else if (cartNear(g, u)) heal += S.CART.heal * e.maxHp;
+    if (cityNear(g, u) && !cityNear(g, u).vela) heal += 0.25 * e.maxHp; else if (cartNear(g, u)) heal += S.CART.heal * e.maxHp;
     if (!u.moved && !u.acted && u.hp < e.maxHp) heal += 0.1 * e.maxHp;
     u.hp = Math.min(e.maxHp, Math.round(u.hp + heal));
     u.mp = e.mov; u.at = e.attacks; u.hits = 0; u.moved = false; u.acted = false;
@@ -2448,6 +2663,61 @@ function storyInfo(g) {
   const st = g.story; if (!st) return null;
   const ch = S.STORY.chapters[Math.min(st.ch, S.STORY.chapters.length - 1)];
   return { n: S.STORY.chapters.length, ch: st.ch, fin: !!st.fin, title: ch.t, txt: ch.txt, goals: storyGoals(g), done: st.done.map(i => ({ t: S.STORY.chapters[i].t, txt: S.STORY.chapters[i].done || S.STORY.outro })), intro: S.STORY.intro, lost: !!st.lost };
+}
+/* ---------- modo Oleadas ---------- */
+function waveStart(g) {
+  for (const a of g.players) for (const b of g.players) if (a.id < b.id) g.dip[pkey(a.id, b.id)] = 'alianza';
+  g.wave = { n: 0, next: S.WAVES.first, ids: [], cleared: 0, boss: null };
+  ev(g, `🌊 Modo Oleadas: resistid ${S.WAVES.total} oleadas de criaturas. La primera llega en el turno ${S.WAVES.first}. Cada ${S.WAVES.boss} oleadas viene un jefe. ¡Todos estáis aliados!`, null, 'story');
+}
+function waveLeft(g) { // cuenta las criaturas de la oleada que siguen atacando (las que se dispersan tras agotar su tiempo dejan de contar; los jefes siempre)
+  const w = g.wave, ids = new Set(w.ids), left = g.creatures.filter(c => ids.has(c.id) && (c.tg || S.CREATURES[c.t].boss));
+  w.ids = left.map(c => c.id); return left.length;
+}
+function waveSpawn(g) {
+  const w = g.wave; w.n++;
+  const n = w.n, lv = 1 + Math.round(n * 1.1), cnt = 3 + Math.floor(n * 0.7);
+  const types = n < 5 ? ['goblin', 'lobo', 'esqueleto'] : n < 10 ? ['goblin', 'orco', 'zombi', 'arana', 'lobo'] : n < 15 ? ['orco', 'troll', 'esqueleto', 'zombi'] : ['troll', 'orco', 'golem', 'esqueleto'];
+  const cities = g.cities.filter(c => c.owner !== null && g.players[c.owner].alive);
+  const hum = g.players.filter(p => p.alive).length, targets = Math.min(cities.length, Math.max(1, Math.ceil(hum / 2)));
+  const picked = []; while (picked.length < targets) { const c = pick(g, cities.filter(x => !picked.includes(x))); picked.push(c); }
+  let made = 0; for (const city of picked) { const m = spawnHorde(g, { city, n: cnt, lv, types, ttl: 40, ids: w.ids, quiet: true }); if (m) made += m; }
+  let boss = '';
+  if (n % S.WAVES.boss === 0) {
+    const bt = S.WAVES.bosses[Math.min(S.WAVES.bosses.length - 1, n / S.WAVES.boss - 1)], c = spawnBoss(g, bt, lv + 3);
+    if (c) { w.ids.push(c.id); boss = ` ¡Y viene un jefe: ${S.CREATURES[bt].n}!`; }
+  }
+  w.cleared = 0; w.next = g.turn + S.WAVES.every; touch(g);
+  ev(g, `🌊 ¡Oleada ${n} de ${S.WAVES.total}! ${made} criaturas de nivel ${lv} marchan sobre ${picked.map(c => c.name).join(', ')}.${boss}`, null, 'horde', 'horde');
+  for (const p of g.players.filter(x => x.alive && x.bot)) botReact(g, 'horda', p, {}, 0.3);
+}
+function waveTick(g) {
+  const w = g.wave; if (!w || g.status !== 'playing') return;
+  if (w.n && !w.cleared && w.ids.length && !waveLeft(g)) { // oleada superada: botín para cada capital
+    w.cleared = w.n; w.ids = [];
+    for (const p of g.players.filter(x => x.alive)) {
+      const c = g.cities.filter(x => x.owner === p.id).sort((a, b) => (b.cap ? 1 : 0) - (a.cap ? 1 : 0))[0]; if (!c) continue;
+      const m = { hueso: 4 + 2 * w.n, cuero: 4 + 2 * w.n, hierro: 2 + w.n }; if (w.n >= 6) m.acero = Math.floor(w.n / 3); if (w.n >= 10) m.alma = Math.floor(w.n / 5);
+      for (const k in m) c.st.m[k] = (c.st.m[k] || 0) + m[k];
+      if (w.n % S.WAVES.boss === 0) c.st.it.push(rareItem(g, {}));
+    }
+    ev(g, `✅ ¡Oleada ${w.n} superada! Cada capital recibe materiales${w.n % S.WAVES.boss === 0 ? ' y un objeto de botín' : ''}.`, null, 'story');
+    touch(g);
+  }
+  if (w.n >= S.WAVES.total) {
+    if (w.cleared >= S.WAVES.total) {
+      g.status = 'over'; w.fin = true; const alive = g.players.filter(p => p.alive);
+      g.winners = alive.map(p => p.id); g.winner = alive.slice().sort((a, b) => score(g, b) - score(g, a))[0].id; touch(g);
+      ev(g, `🏁 ¡Las ${S.WAVES.total} oleadas han sido derrotadas! Las ciudades están a salvo. Victoria de todo el grupo.`, null, 'story');
+      let said = 0; for (const b of alive.filter(x => x.bot)) if (said < 2) { botTalk(g, b, 'win', {}, true); said++; }
+    }
+    return;
+  }
+  if (g.turn >= w.next) waveSpawn(g);
+}
+function waveInfo(g) {
+  const w = g.wave; if (!w) return null;
+  return { n: w.n, total: S.WAVES.total, next: Math.max(0, w.next - g.turn), left: w.ids.length ? waveLeft(g) : 0, boss: S.WAVES.boss, fin: !!w.fin, lost: !!w.lost, cleared: w.cleared || 0, every: S.WAVES.every };
 }
 /* ---------- mundo abierto ---------- */
 function placeUnitsAround(g, c, owner, n, lv, armT) {
@@ -2571,7 +2841,7 @@ function checkEnd(g) {
     if (!p.alive) continue;
     const units = g.units.filter(u => u.o === p.id && !isAux(u)).length;
     const cities = g.cities.filter(c => c.owner === p.id);
-    const canRec = g.cfg.mode !== 'uno' && cities.some(c => isKing(g, p.id) ? Object.keys(S.KING.beasts).some(k => canAfford(c.st.m, beastCost(g, c, k))) : canAfford(c.st.m, recruitCost(g, p.id, c)));
+    const canRec = isLab(g) ? ((g.rv || []).some(r => r.o === p.id) || (g.graves || []).some(gr => gr.o === p.id && cities.some(c => canAfford(c.st.m, reviveCost(gr, c))))) : g.cfg.mode !== 'uno' && cities.some(c => isKing(g, p.id) ? Object.keys(S.KING.beasts).some(k => canAfford(c.st.m, beastCost(g, c, k))) : canAfford(c.st.m, recruitCost(g, p.id, c)));
     if (units === 0 && !canRec) {
       p.alive = false;
       for (const c of cities) { unlinkCity(g, c); c.owner = null; }
@@ -2586,6 +2856,20 @@ function checkEnd(g) {
     const al = g.players.filter(p => p.alive);
     if (!al.length) { g.status = 'over'; g.story.lost = true; g.winner = g.players.slice().sort((a, b) => score(g, b) - score(g, a))[0].id; ev(g, `💀 ${S.STORY.lost}`, null, 'story'); return true; }
     if (!al.some(p => !p.bot) && !g.cfg.sim) { g.status = 'over'; g.story.lost = true; g.winner = al[0].id; ev(g, '🏁 Fin de la partida: no quedan jugadores humanos.', null, 'sys'); return true; }
+    return false;
+  }
+  if (isLab(g) && g.lab) { // laberinto: la victoria llega en labTick; aquí solo la derrota
+    if (g.status === 'over') return true;
+    const al = g.players.filter(p => p.alive);
+    if (!al.length) { g.status = 'over'; g.lab.lost = true; g.winner = g.players.slice().sort((a, b) => score(g, b) - score(g, a))[0].id; ev(g, '💀 Las velas se apagaron: nadie queda con vida en el laberinto.', null, 'story'); return true; }
+    if (!al.some(p => !p.bot) && !g.cfg.sim) { g.status = 'over'; g.lab.lost = true; g.winner = al[0].id; ev(g, '🏁 Fin de la partida: no quedan jugadores humanos.', null, 'sys'); return true; }
+    return false;
+  }
+  if (g.cfg.mode === 'oleadas' && g.wave) { // oleadas: la victoria llega en waveTick; aquí solo la derrota
+    if (g.status === 'over') return true;
+    const al = g.players.filter(p => p.alive);
+    if (!al.length) { g.status = 'over'; g.wave.lost = true; g.winner = g.players.slice().sort((a, b) => score(g, b) - score(g, a))[0].id; ev(g, '💀 Las criaturas han arrasado todas las ciudades. Las oleadas vencieron.', null, 'story'); return true; }
+    if (!al.some(p => !p.bot) && !g.cfg.sim) { g.status = 'over'; g.wave.lost = true; g.winner = al[0].id; ev(g, '🏁 Fin de la partida: no quedan jugadores humanos.', null, 'sys'); return true; }
     return false;
   }
   if (g.cfg.mode === 'equipos' && g.nTeams) { // fin por equipos: gana el último equipo con jugadores vivos
@@ -2845,11 +3129,11 @@ function reviveTick(g) {
       const x = c0.x + dx, y = c0.y + dy;
       if (Math.max(Math.abs(dx), Math.abs(dy)) !== d || !inB(g, x, y)) continue;
       const k = y * g.map.w + x;
-      if (!'gfhd'.includes(terrAt(g, x, y)) || ix.U.has(k) || ix.C.has(k) || ix.T.has(k)) continue;
+      if (!(c0.dg ? 'r' : 'gfhd').includes(terrAt(g, x, y)) || ix.U.has(k) || ix.C.has(k) || ix.T.has(k)) continue;
       spot = { x, y };
     }
     if (!spot) { left.push(r); continue; }
-    const u = newUnit(g, r.o, spot.x, spot.y);
+    const u = newUnit(g, r.o, spot.x, spot.y); if (c0.dg) u.dg = c0.dg;
     if (r.keep) { u.eq = r.keep.eq; u.inv = r.keep.inv; }
     if (r.bs) u.bs = r.bs;
     u.name = r.name; u.hero = r.emb; u.cls = r.cls; u.sub = r.sub; u.bn = r.bn; u.gen = r.gen || 0; u.sk = r.sk; u.lv = r.lv; u.pts = r.pts; u.xp = 0;
@@ -2883,6 +3167,8 @@ function advanceTurn(g) {
   worldTick(g);
   try { breedTick(g); reviveTick(g); } catch (e) { console.error('breed/revive error', e); }
   try { storyTick(g); } catch (e) { console.error('story error', e); }
+  try { waveTick(g); } catch (e) { console.error('wave error', e); }
+  try { labTick(g); } catch (e) { console.error('lab error', e); }
   if (g.cfg.mode === 'mundo') { try { decayTick(g); respawnTick(g); wbTick(g); } catch (e) { console.error('world error', e); } }
   if (checkEnd(g)) { g.dirty = true; return; }
   g.turn++;
@@ -3310,6 +3596,7 @@ function botTurn(g, p) {
   units = g.units.filter(u => u.o === p.id);
   units.forEach((u, i) => { if (!u.role) { u.role = ROLES[i % ROLES.length]; u.pref = u.role === 'arquero' ? 'arco' : u.role === 'medico' ? 'daga' : 'espada'; } });
   botDecay(g, p);
+  if (isLab(g)) { botLab(g, p, units.filter(u => !isAux(u) && u.dg && g.units.includes(u))); return; }
   const outside = units.filter(u => !u.dg), inside = units.filter(u => u.dg);
   const target = botTarget(g, p, outside);
   p._cen = null;
@@ -3353,11 +3640,11 @@ function summary(g) { // resumen de fin de partida: clasificación y premios
   add('🗡️', 'Más victorias contra jugadores', top(r => r.pk), r => `${r.pk} unidades rivales`);
   add('⭐', 'Mejor unidad', top(r => (r.best ? r.best.lv : 0), 2), r => `${r.best.name} (nivel ${r.best.lv})`);
   for (const a of aw) a.txt = a.txt(rows.find(r => r.id === a.id));
-  return { turns: g.turn, mode: g.cfg.mode || 'normal', rows, awards: aw, kills: rows.reduce((a, r) => a + r.kills, 0), story: g.story ? { fin: !!g.story.fin, ch: g.story.ch + 1 } : null };
+  return { turns: g.turn, mode: g.cfg.mode || 'normal', rows, awards: aw, kills: rows.reduce((a, r) => a + r.kills, 0), story: g.story ? { fin: !!g.story.fin, ch: g.story.ch + 1 } : null, wave: g.wave ? { fin: !!g.wave.fin, n: g.wave.n } : null };
 }
 function snapshot(g, pid, now) {
   const base = {
-    code: g.code, status: g.status, turn: g.turn, endsAt: g.endsAt, now: now || Date.now(), hostId: g.hostId, you: pid, cfg: g.cfg, story: storyInfo(g), king: g.king === undefined ? null : g.king, winner: g.winner, winners: g.winners || null,
+    code: g.code, status: g.status, turn: g.turn, endsAt: g.endsAt, now: now || Date.now(), hostId: g.hostId, you: pid, cfg: g.cfg, story: storyInfo(g), wv: waveInfo(g), lab: labInfo(g), king: g.king === undefined ? null : g.king, winner: g.winner, winners: g.winners || null,
     players: g.players.map(p => ({ id: p.id, name: p.name, color: p.color, team: p.team === undefined ? null : p.team, bot: p.bot, pers: p.bot ? (p.pers || 'equilibrado') : undefined, auto: !!p.auto, alive: p.alive, ready: p.ready,
       score: g.status === 'lobby' ? 0 : score(g, p), units: g.units.filter(u => u.o === p.id && !isAux(u)).length, cities: g.cities.filter(c => c.owner === p.id).length,
       kills: p.stats.kills, boss: p.stats.boss, pk: p.stats.pk, hero: heroInfo(g, p), gt: (guildOf(g, p.id) || {}).tag, pr: protLeft(g, p.id) || undefined })),
@@ -3387,10 +3674,10 @@ function snapshot(g, pid, now) {
     if (u.o === pid) {
       const e = eff(g, u);
       mine.push({ id: u.id, o: u.o, name: u.name, x: u.x, y: u.y, dg: u.dg || 0, lv: u.lv, xp: u.xp, xpn: xpNeed(u.lv), hp: u.hp, pts: u.pts, sk: u.sk, eq: u.eq, inv: u.inv, mp: u.mp, at: u.at,
-        e: { maxHp: e.maxHp, def: e.def, dmg: e.dmg, range: e.range, min: e.min, mov: e.mov, attacks: e.attacks, pierce: e.pierce, aura: e.aura, ha: e.ha, fx: e.fx }, pz: u.pz ? 1 : 0, bn: u.bn || null, gen: u.gen || 0, cz: cityZone(g, u), bc: u.bc || 0, pr: pairInfo(g, u), sm: u.sm ? u.sm.k : null, bs: u.bs || null, hr: u.hero || null, cart: u.cart ? 1 : 0, sg: u.sg ? { k: u.sg.k, c: u.sg.c } : null, bld: u.bld ? { c: u.bld.c, bt: u.bt === g.turn ? 1 : 0 } : null, cap: capOf(u), sc: summonInfo(g, u), cls: u.cls || null, sub: u.sub || null, ord: u.ord || null, nearCity: !!cityNear(g, u), nearCart: !!cartNear(g, u) });
+        e: { maxHp: e.maxHp, def: e.def, dmg: e.dmg, range: e.range, min: e.min, mov: e.mov, attacks: e.attacks, pierce: e.pierce, aura: e.aura, ha: e.ha, fx: e.fx }, pz: u.pz ? 1 : 0, bn: u.bn || null, gen: u.gen || 0, cz: cityZone(g, u), bc: u.bc || 0, pr: pairInfo(g, u), sm: u.sm ? u.sm.k : null, bs: u.bs || null, hr: u.hero || null, cart: u.cart ? 1 : 0, sg: u.sg ? { k: u.sg.k, c: u.sg.c } : null, bld: u.bld ? { c: u.bld.c, bt: u.bt === g.turn ? 1 : 0 } : null, cap: capOf(u), sc: summonInfo(g, u), vp: u.vamp ? 1 : 0, cls: u.cls || null, sub: u.sub || null, ord: u.ord || null, nearCity: !!cityNear(g, u), nearCart: !!cartNear(g, u) });
     } else if (vis[u.y * w + u.x]) {
       const e = eff(g, u);
-      others.push({ id: u.id, o: u.o, name: u.name, x: u.x, y: u.y, lv: u.lv, hp: u.hp, mhp: e.maxHp, w: e.kind, def: e.def, dmg: e.dmg, pz: u.pz ? 1 : 0, sm: u.sm ? u.sm.k : null, bs: u.bs || null, hr: u.hero || null, ct: u.cart ? 1 : 0, bl: u.bld ? 1 : 0, sg: u.sg ? u.sg.k : null, ah: u.eq && u.eq.casco ? u.eq.casco.t : 0, ac: u.eq && u.eq.pechera ? u.eq.pechera.t : 0 });
+      others.push({ id: u.id, o: u.o, name: u.name, x: u.x, y: u.y, lv: u.lv, hp: u.hp, mhp: e.maxHp, w: e.kind, def: e.def, dmg: e.dmg, pz: u.pz ? 1 : 0, sm: u.sm ? u.sm.k : null, bs: u.bs || null, hr: u.hero || null, vp: u.vamp ? 1 : 0, ct: u.cart ? 1 : 0, bl: u.bld ? 1 : 0, sg: u.sg ? u.sg.k : null, ah: u.eq && u.eq.casco ? u.eq.casco.t : 0, ac: u.eq && u.eq.pechera ? u.eq.pechera.t : 0 });
     }
   }
   for (const c of g.creatures) if (vis[c.y * w + c.x]) {
@@ -3399,7 +3686,7 @@ function snapshot(g, pid, now) {
   }
   const sites = g.sites.filter(q => vis[q.y * w + q.x] && !q.hid).map(q => ({ id: q.id, x: q.x, y: q.y, k: q.k, t: q.t || 0, used: q.used ? 1 : 0, nm: q.nm || undefined, mine: q.o === pid ? 1 : 0 }));
   const mineDg = new Set(g.units.filter(u => u.o === pid && u.dg).map(u => u.dg));
-  const dungeons = (g.dungeons || []).filter(d => vis[d.y * w + d.x] || mineDg.has(d.id)).map(d => ({ id: d.id, x: d.x, y: d.y, tier: d.tier, name: dgName(d), rec: S.DUNGEON.tiers[d.tier - 1].rec, cleared: d.cleared ? 1 : 0, exit: d.exit, inside: g.units.filter(u => u.o === pid && u.dg === d.id).length }));
+  const dungeons = (g.dungeons || []).filter(d => vis[d.y * w + d.x] || mineDg.has(d.id)).map(d => ({ id: d.id, x: d.x, y: d.y, tier: d.tier, name: dgName(d), rec: S.DUNGEON.tiers[d.tier - 1].rec, cleared: d.cleared ? 1 : 0, exit: d.exit, inside: g.units.filter(u => u.o === pid && u.dg === d.id).length, box: d.lab ? { x: d.ox, y: d.oy, w: S.LAB.w, h: S.LAB.h } : undefined, lab: d.lab ? { f: d.floor, down: d.down, boss: !!d.boss, final: !!d.final, open: !!(d.cleared || !d.boss) } : undefined }));
   const merch = (g.merch || []).filter(m => vis[m.y * w + m.x]).map(m => ({ id: m.id, x: m.x, y: m.y, name: m.name, left: Math.max(0, m.until - g.turn), offers: m.offers.map(o => ({ k: o.k, txt: offerText(o), cost: o.cost, sold: !!o.sold })) }));
   const wxs = wxNow(g) ? { k: g.wx.k, left: g.wx.left } : null, tourn = g.tourn ? { x: g.tourn.x, y: g.tourn.y, left: Math.max(0, g.tourn.end - g.turn) } : null;
   const dip = {};
@@ -3410,8 +3697,8 @@ function snapshot(g, pid, now) {
   for (const k of Object.keys(g.brk)) { const [a, b] = k.split('-').map(Number); if (a === pid) brk[b] = g.brk[k]; else if (b === pid) brk[a] = g.brk[k]; }
   const cities = [];
   for (const c of g.cities) if (ex[c.y * w + c.x]) {
-    const o = { id: c.id, x: c.x, y: c.y, name: c.name, o: c.owner, cap: c.cap, b: c.b || {}, cart: c.cart ? 1 : 0, ang: c.ang ? { x: c.ang.x, y: c.ang.y, n: c.ang.n } : undefined };
-    if (c.owner === pid) { o.st = c.st; o.crafts = c.crafts; o.cm = cityCrafts(c); o.built = c.built || 0; o.inc = (() => { const i = cityIncome(g, c), r = {}; for (const m in i) if (i[m] > 0.005) r[m] = Math.round(i[m] * 100) / 100; return r; })(); o.rc = recruitCost(g, pid, c); if (isKing(g, pid)) { o.rcb = {}; for (const k of Object.keys(S.KING.beasts)) o.rcb[k] = beastCost(g, c, k); } const ca = cartOf(g, c); o.cart = ca ? { id: ca.id, x: ca.x, y: ca.y } : null; const bu = builderOf(g, c); o.bu = bu ? { id: bu.id, x: bu.x, y: bu.y } : null; o.net = c.nl ? 1 : 0; o.st2 = stationNear(g, c) ? 1 : 0; }
+    const o = { id: c.id, x: c.x, y: c.y, name: c.name, o: c.owner, cap: c.cap, vela: c.vela ? 1 : undefined, dgf: c.dg || undefined, b: c.b || {}, cart: c.cart ? 1 : 0, ang: c.ang ? { x: c.ang.x, y: c.ang.y, n: c.ang.n } : undefined };
+    if (c.owner === pid) { o.st = c.st; o.crafts = c.crafts; o.cm = cityCrafts(c); o.built = c.built || 0; o.inc = (() => { const i = cityIncome(g, c), r = {}; for (const m in i) if (i[m] > 0.005) r[m] = Math.round(i[m] * 100) / 100; return r; })(); o.rc = c.vela ? {} : recruitCost(g, pid, c); if (isKing(g, pid)) { o.rcb = {}; for (const k of Object.keys(S.KING.beasts)) o.rcb[k] = beastCost(g, c, k); } const ca = cartOf(g, c); o.cart = ca ? { id: ca.id, x: ca.x, y: ca.y } : null; const bu = builderOf(g, c); o.bu = bu ? { id: bu.id, x: bu.x, y: bu.y } : null; o.net = c.nl ? 1 : 0; o.st2 = stationNear(g, c) ? 1 : 0; }
     Object.assign(o, siegeInfo(g, c));
     cities.push(o);
   }
@@ -3456,5 +3743,5 @@ function deserialize(s) {
 module.exports = {
   rndLvTest: (g, t, x, y) => rndLv(g, t, x, y), createGame, addPlayer, addBot, joinWorld, removePlayer, startGame, cmd, advanceTurn, snapshot, serialize, deserialize,
   refreshUnits, newUnit, doMove, doAttack, score, COLORS, COLOR_NAMES, eff, cstats, idx, touch,
-  chat, chatFor, botMem, botNote, reviveCost, holyCost, cityIncome, relinkStores, stationNear, builderOf, envFor, botMood, spawnCreature, spawnBoss, cstats, fillDungeon, dgName, gainXp, killUnit, killCreature, rareItem, addMats, capOf, invW, merchOffers, markSeen, replaceableSlots, replaceBot, releasePlayer, pactOf,
+  chat, chatFor, botMem, botNote, reviveCost, holyCost, cityIncome, relinkStores, stationNear, builderOf, envFor, botMood, spawnCreature, spawnBoss, cstats, fillDungeon, dgName, gainXp, killUnit, killCreature, rareItem, addMats, capOf, invW, merchOffers, vampBite, markSeen, replaceableSlots, replaceBot, releasePlayer, pactOf,
 };

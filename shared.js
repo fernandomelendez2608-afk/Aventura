@@ -191,6 +191,8 @@
   const SITES = { cofre: { n: 'Cofre', e: '🎁' }, ruina: { n: 'Ruinas antiguas', e: '🏛️' }, tesoro: { n: 'Tesoro de mazmorra', e: '💎' }, trampa: { n: 'Trampa', e: '⚠️' }, tumba: { n: 'Tumba', e: '🪦' } };
   // ---- mazmorras (v1.29): zonas aparte del mapa, aisladas por muros; se entra y se sale por una puerta ----
   // tier 1-5: nivel de las criaturas, nivel recomendado, vida perdida en trampas (% de la vida máxima) y riqueza del tesoro
+  // modo Laberinto: tamaño de cada piso (impar), salas intermedias, un jefe cada `boss` pisos, y lo que lleva cada vela al empezar
+  const LAB = { w: 31, h: 21, gap: 1, rooms: 5, boss: 2, startUnits: 2, mats: { cuero: 10, hueso: 8 }, lastBoss: 'dragon' };
   const DUNGEON = {
     w: 22, h: 15, buf: 8, reset: 20, // tamaño de cada mazmorra, separación con el mapa y turnos hasta reabastecerse tras despejarla
     tiers: [
@@ -288,9 +290,12 @@
   const CART = { e: '🛒', hp: 80, def: 2, mov: 6, cap: 150, aura: 2, heal: 0.12, cost: { cuero: 8, hueso: 8, hierro: 3 } };
   const HERO = { emb: ['👑', '🦅', '🐉', '🦁', '🔥', '⚜️', '🌟', '🛡️'], xp: 1.5, aura: 0.10, range: 2, wait: 3, loss: 2, pickTurn: 1 };
   const SUMMON = { max: 2, range: 2, cost: { lobo: { hueso: 4 }, oso: { hueso: 7 }, esqueleto: { hueso: 4 } } };
+  // vampirismo: el Conde Vampiro puede contagiar a las unidades que muerde; siguen siendo tuyas y ganan ventaja racial
+  const VAMP = { by: ['conde'], chance: 0.25, mods: { vida: 0.20, dmgPct: 0.10, regen: 0.03 }, shield: 2, purify: { alma: 3 }, e: '🧛' };
   function classMods(u) {
     const m = {};
     const add = o => { if (o) for (const k in o) m[k] = (m[k] || 0) + o[k]; };
+    if (u.vamp) add(VAMP.mods);
     const c = u.cls && CLASSES[u.cls];
     if (c) { add(c.mods); if (u.sub && c.sub[u.sub]) add(c.sub[u.sub].mods); }
     return m;
@@ -335,6 +340,8 @@
   const WORLD_OPTS = {
     mode:       { n: 'Modo de juego', def: 'normal', o: { normal: 'Normal', uno: 'Reto de una unidad: cada jugador (y bot) solo tiene 1 unidad y si cae queda eliminado', equipos: 'Por equipos: los jugadores se reparten al azar en equipos aliados (elige 2 o 5 equipos en el ajuste de abajo) y gana el último equipo en pie',
       mundo: 'Mundo abierto: mundo enorme y persistente para jugadores (sin bots). Se entra cuando quieras, no se recluta (solo crías), las ciudades sin tus unidades vuelven a ser neutrales y los monstruos salen de cualquier nivel',
+      oleadas: 'Oleadas: cooperativo, todos aliados. Cada pocos turnos una oleada de criaturas ataca vuestras ciudades, cada vez más fuerte y con jefes; gana el grupo si resiste todas',
+      laberinto: 'Laberinto: sin mundo exterior; todos aliados bajan por los pisos de un laberinto (10–20) con una vela por piso en vez de ciudades y un jefe cada 2 pisos',
       historia: 'Historia: campaña cooperativa de 6 capítulos (todos los jugadores aliados) que termina contra el Dragón de Ceniza',
       rey: 'Reto del Rey Demonio: un jugador al azar es el Rey Demonio (solo recluta bestias) y los demás están aliados contra él' } },
     victory:    { n: 'Tipo de final (modos Normal y Reto de una unidad)', def: 'ultimo', o: {
@@ -347,6 +354,7 @@
     siege:      { n: 'Asedios (taller de asedio, murallas con vida, brechas y cercos)', def: 'si', o: { si: 'Activados: las murallas hay que romperlas con arietes y catapultas', no: 'Desactivados: se conquista como siempre' } },
     income:     { n: 'Producción de las ciudades (materiales por turno según terreno y edificios)', def: 'normal', o: { normal: 'Normal', bajo: 'Baja (la mitad)', apagado: 'Apagada: solo botín' } },
     events:     { n: 'Eventos del mundo', def: 'todo', o: { todo: 'Clima, torneos y mercaderes ambulantes', clima: 'Solo clima', calma: 'Nada: mundo tranquilo' } },
+    floors:     { n: 'Pisos del laberinto (solo en el modo «Laberinto»)', def: '12', o: { 10: '10 pisos', 12: '12 pisos', 15: '15 pisos', 18: '18 pisos', 20: '20 pisos' } },
     teams:      { n: 'Equipos (solo en el modo «Por equipos»)', def: 'dos', o: { dos: '2 equipos', cinco: '5 equipos' } },
     worldSize:  { n: 'Tamaño del mundo (solo Mundo abierto)', def: 'enorme', o: { grande: 'Grande (120 × 120)', enorme: 'Enorme (160 × 160)', gigante: 'Gigante (220 × 220)' } },
     decay:      { n: 'Ciudades sin tus unidades vuelven a ser neutrales (solo Mundo abierto)', def: '24', o: { '12': 'Tras 12 turnos', '24': 'Tras 24 turnos', '48': 'Tras 48 turnos', '96': 'Tras 96 turnos' } },
@@ -365,6 +373,8 @@
 
   // ---- modos rápidos del lobby: cada uno fija el modo, el reloj y los ajustes del mundo (lo que no nombra vuelve a su valor normal) ----
   const VICTORY = { dominio: { pct: 0.5, hold: 4 }, jefes: { n: 2 }, campeon: { lv: 12 }, puntos: { pts: 600 }, tiempo: { turns: 40 } };
+  // modo Oleadas: total de oleadas, cada cuántos turnos llega una, y un jefe cada `boss` oleadas
+  const WAVES = { total: 20, first: 3, every: 3, boss: 5, bosses: ['reylobo', 'minotauro', 'liche', 'dragon'] };
   const PRESETS = [
     { id: 'clasica',  e: '🏛️', n: 'Clásica',  d: 'La partida de siempre: turnos de 4 horas y sin límite de turnos.', cfg: { turnHours: 4, maxTurns: 0 } },
     { id: 'rapida',   e: '⚡', n: 'Rápida',   d: 'Para jugar en una tarde: mapa pequeño, 8 unidades de nivel 3, crías a los 3 turnos, turnos de 15 minutos y 30 turnos como máximo.', cfg: { turnHours: 0.25, maxTurns: 30, mapSize: 'pequeno', startUnits: '8', startLevel: '3', breed: 'tres' } },
@@ -373,6 +383,8 @@
     { id: 'equipos',  e: '🤝', n: 'Equipos',  d: 'Dos equipos al azar, aliados por dentro y enemigos entre sí. Gana el último equipo en pie. Turnos de 1 hora.', cfg: { turnHours: 1, maxTurns: 0, mode: 'equipos', teams: 'dos' } },
     { id: 'rey',      e: '👑', n: 'Rey Demonio', d: 'Un jugador al azar es el Rey Demonio (solo recluta bestias, con un jefe de protagonista) contra todos los demás, aliados. Turnos de 1 hora.', cfg: { turnHours: 1, maxTurns: 0, mode: 'rey' } },
     { id: 'historia', e: '📖', n: 'Historia', d: 'Campaña cooperativa de 6 capítulos contra el Dragón de Ceniza, con todos los jugadores aliados. Turnos de 1 hora.', cfg: { turnHours: 1, maxTurns: 0, mode: 'historia' } },
+    { id: 'oleadas',  e: '🌊', n: 'Oleadas', d: 'Cooperativo: todos aliados defienden sus ciudades de 20 oleadas de criaturas cada vez más fuertes, con un jefe cada 5. Cada oleada superada da botín. Turnos de 1 hora.', cfg: { turnHours: 1, maxTurns: 0, mode: 'oleadas' } },
+    { id: 'laberinto', e: '🕯️', n: 'Laberinto', d: 'Cooperativo: todos aliados bajan por los pisos de un laberinto (12 por defecto, un jefe cada 2) con 2 unidades y una vela por piso en lugar de ciudades. Turnos de 1 hora.', cfg: { turnHours: 1, maxTurns: 0, mode: 'laberinto', floors: '12' } },
     { id: 'mundo',    e: '🌍', n: 'Mundo abierto', d: 'Mundo enorme y siempre abierto para jugadores (sin bots): se entra cuando se quiera, no se recluta y las ciudades abandonadas vuelven a ser neutrales. Turnos de 1 hora.', cfg: { turnHours: 1, maxTurns: 0, mode: 'mundo', worldSize: 'enorme', decay: '24' } },
   ];
 
@@ -405,6 +417,9 @@
       { t: 'Tierras propias', txt: 'Un campamento no basta para resistir. Reclamen las ciudades abandonadas del mapa: necesitamos un refugio por cabeza y algunos más. En cada una sigue en pie el altar de las dos velas, esperando a quien vuelva a rezar.',
         done: 'Las murallas se alzan en cada rincón. Por primera vez en semanas, el humo que se ve en el horizonte es de chimeneas y no de ceniza, y en cada plaza vuelve a arder un altar de dos velas.',
         goals: [{ k: 'cities', extra: 3, txt: 'Ciudades del grupo (jugadores + 3)' }], reward: { m: { hierro: 12, acero: 4, cuero: 8 }, w: [50, 35, 12, 3, 0] } },
+      { t: 'Peregrinos del alba', txt: 'Con las ciudades en pie llegan los peregrinos: familias enteras que caminan de aldea en aldea con una vela en la mano, rezando a Elizabeth y a Nathaly. Los caminos están infestados de bestias. Despejen las rutas: entre todos, derroten a 25 criaturas más.',
+        done: 'Los peregrinos llegan a los altares y cantan hasta el amanecer. Una niña regala una vela a cada uno de ustedes: «Para que Nathaly los encuentre en la oscuridad».',
+        goals: [{ k: 'kills', n: 25, txt: 'Derrotar criaturas en los caminos (entre todos)' }], reward: { m: { cuero: 10, hueso: 10, hierro: 8, alma: 2 }, w: [50, 35, 12, 3, 0] } },
       { t: 'Acero y leyenda', txt: 'Con palos y cuero no se derriba a un jefe. Que la forja no se apague: alguien debe llegar a nivel 8 y vestir equipo de acero o mejor.',
         done: 'El yunque canta y las armaduras brillan. Los herreros graban en cada hoja los nombres de Elizabeth y Nathaly, y los bardos ya inventan canciones sobre ustedes; todavía no saben que son demasiado optimistas.',
         goals: [{ k: 'level', n: 8, txt: 'Una unidad de nivel 8' }, { k: 'tier', n: 3, txt: 'Equipar algo de calidad Acero o mejor' }], reward: { m: { acero: 8, alma: 4 }, w: [30, 35, 25, 9, 1] } },
@@ -417,12 +432,30 @@
       { t: 'El milagro de las Guardianas', txt: 'Los sacerdotes lo enseñan desde siempre: cuando la fe de los vivos sea tan alta como la montaña, una de las Guardianas bajará a responder. Eleven una iglesia hasta el nivel 5 y recen. Elizabeth o Nathaly acudirá.',
         done: 'Una luz dorada rompe la ceniza y una joven alada desciende ante el altar: rizos negros, ojos marrones y una sonrisa tranquila. «Oí sus plegarias», dice. Los aldeanos caen de rodillas; ya no es una leyenda. El ángel velará por la ciudad, pero el Dragón aún no ha caído.',
         goals: [{ k: 'church', n: 5, txt: 'Una iglesia de nivel 5 (el ángel desciende)' }], reward: { m: { alma: 10, acero: 8, escama: 1 }, w: [20, 30, 30, 15, 5] } },
+      { t: 'El laberinto sellado', txt: 'Mientras el ángel vela la ciudad, bajo la montaña se rompe el sello que Elizabeth dejó sobre el Laberinto. Su guardián, el Minotauro, sale furioso a embestir todo lo que encuentra. Está en el mapa: acábenlo antes de que derribe las murallas.',
+        done: 'El Minotauro cae de rodillas y se desploma. De su cuerno cuelga una cadena rota con la marca de las dos velas: alguien lo encadenó para que guardara el laberinto, y la ceniza lo enloqueció.', boss: 'minotauro', lv: [0, 7, 13],
+        goals: [{ k: 'boss', t: 'minotauro', txt: 'Derrotar al Minotauro del Laberinto' }], reward: { m: { alma: 8, acero: 8, escama: 1 }, w: [20, 30, 30, 15, 5] } },
       { t: 'El rey de los lobos', txt: 'El aullido se oye desde las montañas: el Rey Lobo ha bajado a cazar. Está en el mapa. Derrótenlo antes de que su manada arrase las ciudades.',
         done: 'El Rey Lobo cae y su aullido se apaga. Alguien susurra «gracias, Elizabeth» mientras entre sus huesos aparece un colmillo con un símbolo: la marca del Liche.', boss: 'reylobo', lv: [-1, 5, 12],
         goals: [{ k: 'boss', t: 'reylobo', txt: 'Derrotar al Rey Lobo' }], reward: { m: { alma: 6, acero: 8 }, w: [20, 30, 30, 15, 5] } },
+      { t: 'La Hidra de las Ciénagas', txt: 'Las ciénagas hierven y el agua de los pozos se vuelve negra. Una Hidra de mil cabezas bebe de las fuentes benditas de Nathaly y las envenena. Sin agua limpia no hay rezo ni cosecha: derrótenla.',
+        done: 'La última cabeza de la Hidra se hunde en el pantano y el agua vuelve a correr clara. Los aldeanos bautizan la fuente con el nombre de Nathaly y dejan una vela flotando sobre ella.', boss: 'hidra', lv: [0, 8, 14],
+        goals: [{ k: 'boss', t: 'hidra', txt: 'Derrotar a la Hidra de las Ciénagas' }], reward: { m: { alma: 8, acero: 8, escama: 2 }, w: [15, 30, 33, 17, 5] } },
+      { t: 'La vigilia de las velas', txt: 'La fe no basta si los brazos tiemblan. Que un héroe del grupo alcance el nivel 12 y vista armadura de alma o mejor: la vigilia de esta noche se hace con las armas en la mano.',
+        done: 'El héroe ofrece su espada ante el altar y las dos velas se alzan un instante, como si respondieran. Todo el reino lo ve y respira por primera vez en semanas.',
+        goals: [{ k: 'level', n: 12, txt: 'Una unidad de nivel 12' }, { k: 'tier', n: 4, txt: 'Equipar algo de calidad Alma o mejor' }], reward: { m: { acero: 10, alma: 8 }, w: [10, 30, 35, 20, 5] } },
+      { t: 'El Conde de la noche eterna', txt: 'Las velas de los altares se apagan solas, una a una, y los peregrinos se duermen y no despiertan. Un Conde Vampiro se alimenta de la fe de los vivos desde las sombras. Encuentren su guarida y acaben con él antes de que se apague la última vela.',
+        done: 'El Conde se convierte en ceniza con el primer rayo del alba. En todos los altares las velas vuelven a encenderse solas: Elizabeth ha vuelto a encender el alba.', boss: 'conde', lv: [0, 9, 14],
+        goals: [{ k: 'boss', t: 'conde', txt: 'Derrotar al Conde Vampiro' }], reward: { m: { alma: 10, acero: 8, escama: 2 }, w: [10, 25, 35, 22, 8] } },
+      { t: 'El Coloso caído', txt: 'Entre la ceniza, las estatuas que el reino levantó en honor a las Guardianas se agrietan y se alzan, fundidas en un solo Coloso. Camina hacia la ciudad con los ojos vacíos: no es un enemigo, es una plegaria corrompida. Rómpanlo con respeto.',
+        done: 'El Coloso se desploma y, entre los escombros, aparece intacto un pequeño altar de dos velas. Los soldados se quitan el casco en silencio: «Perdónanos, Elizabeth; perdónanos, Nathaly».', boss: 'coloso', lv: [1, 10, 15],
+        goals: [{ k: 'boss', t: 'coloso', txt: 'Derrotar al Coloso de Piedra' }], reward: { m: { alma: 10, acero: 10, escama: 2 }, w: [8, 22, 35, 25, 10] } },
       { t: 'La noche del Liche', txt: 'Una niebla fría cubre el mapa. El Liche, el hereje que juró apagar las velas de las Guardianas, invoca a los muertos desde la distancia: sus hechizos alcanzan lejos. Acorten la distancia, rodéenlo y acaben con él.',
         done: 'El Liche se deshace en polvo con un último susurro: «El Dragón... ya despierta». El suelo tiembla bajo sus pies.', boss: 'liche', lv: [0, 6, 13],
         goals: [{ k: 'boss', t: 'liche', txt: 'Derrotar al Liche' }], reward: { m: { alma: 8, acero: 8, escama: 2 }, w: [10, 25, 35, 22, 8] } },
+      { t: 'La víspera del Dragón', txt: 'El Liche tenía razón: el volcán ruge. El reino entero ha encendido una vela por cada soldado. Reclamen cada ciudad que puedan defender y que alguien alcance el nivel 15: la última batalla no admite ensayos.',
+        done: 'Mil velas arden en las murallas. Elizabeth y Nathaly no pueden pelear por ustedes, pero cada llama es una plegaria que los acompaña. Al amanecer, el cielo se vuelve rojo.',
+        goals: [{ k: 'cities', extra: 6, txt: 'Ciudades del grupo (jugadores + 6)' }, { k: 'level', n: 15, txt: 'Una unidad de nivel 15' }], reward: { m: { alma: 12, acero: 10, escama: 3 }, w: [5, 20, 35, 28, 12] } },
       { t: 'El Dragón de Ceniza', txt: 'El volcán estalla y el cielo se vuelve rojo. El Dragón de Ceniza, el mismo que Elizabeth y Nathaly encadenaron hace mil años, ha despertado. Es la última batalla: reúnan a todos, curen a los heridos y no den un paso atrás. En cada altar del reino, el pueblo reza por ustedes.',
         done: '', boss: 'dragon', lv: [1, 8, 15], goals: [{ k: 'boss', t: 'dragon', txt: 'Derrotar al Dragón de Ceniza' }], reward: null },
     ],
@@ -527,7 +560,7 @@
   return {
     SKILLS, SKILL_ORDER, MATS, MAT_ORDER, TIER_NAMES, WM, AM, KINDS, WEAPON_KINDS, GEAR_KINDS, SLOTS, SLOT_NAMES, PACK,
     recipe, itemValue, MAX_TIER, ENCHANT_STEPS, MAX_FX, REFORGE_COST, SET_BONUS, armorSet, itemName, tierName, RARITY, AFFIX, WEAPON_FX, ARMOR_FX, affixText, upgradeCost, ENCHANT_COST,
-    WORLD, SIEGE, CART, HERO, KING, BOSS_IDS, DUNGEON, TEAM_E, STORY, CONVERT, SUMMON, WORLD_OPTS, PRESETS, VICTORY, GEMS, GEM_IDS, GEM_LV, gemOf, gemFx, gemText, SOCKETS_BY_R, MAX_SOCKETS, SOCKET_STEPS, GEM_UP, CLASS_LV, SUB_LV, CLASSES, classMods, BUILDER, ROAD_COST, MAT_VAL, itemVal, INCOME, BUILDINGS, bMax, CHURCH, ANGEL, CITY_GUARD, BUILD_ORDER, BUILD_MAX, ORDERS,
+    WORLD, WAVES, LAB, SIEGE, CART, HERO, KING, BOSS_IDS, DUNGEON, TEAM_E, STORY, CONVERT, VAMP, SUMMON, WORLD_OPTS, PRESETS, VICTORY, GEMS, GEM_IDS, GEM_LV, gemOf, gemFx, gemText, SOCKETS_BY_R, MAX_SOCKETS, SOCKET_STEPS, GEM_UP, CLASS_LV, SUB_LV, CLASSES, classMods, BUILDER, ROAD_COST, MAT_VAL, itemVal, INCOME, BUILDINGS, bMax, CHURCH, ANGEL, CITY_GUARD, BUILD_ORDER, BUILD_MAX, ORDERS,
     SEASON_LEN, SEASONS, seasonIdx, WEATHER, WEATHER_ORDER, TOURN, MERCH, ELITE_NAMES, SITES, PERS, BOT_LEVELS, PACTS, TERR, CREATURES, DIRS, cheb, reach,
   };
 });

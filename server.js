@@ -9,6 +9,7 @@ const WS = require('./ws-lite.js');
 const S = require('./shared.js');
 const Push = require('./push.js');
 const { makeStores } = require('./store.js');
+const { Accounts, Mailer } = require('./accounts.js');
 
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
@@ -26,6 +27,9 @@ const games = new Map();   // código -> partida
 const conns = new Map();   // conexión -> { code, pid, tok }
 let remoteLoaded = !remote;
 let vapid = null;
+const accStore = remote || local;
+const accounts = new Accounts({ get: k => accStore.getMeta(k), set: (k, v) => accStore.setMeta(k, v) }, new Mailer(process.env), console);
+const accOf = new Map(); // conexión -> { d, sess }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 /* ---------- guardado ---------- */
@@ -103,7 +107,10 @@ const newToken = () => crypto.randomBytes(18).toString('hex');
 const send = (c, o) => { try { c.send(JSON.stringify(o)); } catch (e) { /* conexión cerrada */ } };
 function playerOf(g, token) { return token ? g.players.find(p => p.token === token) : null; }
 function bind(c, g, p) { conns.set(c, { code: g.code, pid: p.id, tok: p.token }); }
-function joined(c, g, p, token) { send(c, { t: 'joined', code: g.code, token, pid: p.id, name: p.name, vapid: vapid ? vapid.pub : null }); }
+function joined(c, g, p, token) {
+  const a = accOf.get(c); if (a) accounts.link(a.d, g.code, token, p.name).catch(() => {});
+  send(c, { t: 'joined', code: g.code, token, pid: p.id, name: p.name, vapid: vapid ? vapid.pub : null });
+}
 function pushState(c) {
   const ci = conns.get(c); if (!ci) return;
   const g = games.get(ci.code); if (!g) return;
@@ -239,9 +246,39 @@ function maybeAdvance(g) {
 }
 
 /* ---------- WebSocket ---------- */
-function onMessage(c, text) {
+/* ---------- cuentas ---------- */
+const gameCheck = (code, tok) => { const g = games.get(code), p = g && playerOf(g, tok); return p ? p.name : null; };
+async function accGames(d, extra) {
+  if (remote && !remoteLoaded) return (d.games || []).map(g => ({ code: g.c, token: g.k, name: g.n })); // la nube aún no responde: no se descarta nada
+  return accounts.syncGames(d, extra, gameCheck);
+}
+async function onAccount(c, m, ip) {
+  const a = String(m.a || ''), reply = o => send(c, Object.assign({ t: 'acc', a }, o));
+  try {
+    let r = null;
+    if (a === 'reg') r = await accounts.register(ip, m.email, m.name, m.pw);
+    else if (a === 'verify') r = await accounts.verify(ip, m.email, m.code);
+    else if (a === 'login') r = await accounts.login(ip, m.email, m.pw);
+    else if (a === 'reset') r = await accounts.reset(ip, m.email, m.code, m.pw);
+    else if (a === 'resume') { const d = await accounts.resume(m.sess); if (!d) return reply({ fail: true }); r = { d, user: accounts.view(d), sess: m.sess }; }
+    else if (a === 'resend') { await accounts.resend(ip, m.email, m.kind === 'reset' ? 'reset' : 'verify'); return reply({ ok: true }); }
+    else if (a === 'forgot') { await accounts.forgot(ip, m.email); return reply({ ok: true }); }
+    else if (a === 'logout') { const x = accOf.get(c); if (x) await accounts.logout(x.d, m.sess); accOf.delete(c); return reply({ ok: true }); }
+    else if (a === 'del') { const x = accOf.get(c); if (!x) return reply({ err: 'Inicia sesión primero' }); await accounts.remove(x.d, m.pw); accOf.delete(c); return reply({ ok: true }); }
+    else if (a === 'unlink') { const x = accOf.get(c); if (x) await accounts.unlink(x.d, m.code); return reply({ ok: true, quiet: true }); }
+    else if (a === 'sync') { const x = accOf.get(c); if (!x) return reply({ fail: true }); return reply({ ok: true, games: await accGames(x.d, m.games) }); }
+    else return;
+    if (r.need) return reply({ need: r.need, email: r.email });
+    accOf.set(c, { d: r.d });
+    const ci = conns.get(c), g = ci && games.get(ci.code); // si ya está en una partida, se liga a la cuenta
+    if (g && g.players[ci.pid] && g.players[ci.pid].token === ci.tok) accounts.link(r.d, g.code, ci.tok, g.players[ci.pid].name).catch(() => {});
+    reply({ ok: true, user: r.user, sess: r.sess, mail: accounts.mail.enabled, games: await accGames(r.d, m.games) });
+  } catch (e) { reply({ err: e.message || 'Error' }); }
+}
+function onMessage(c, text, ip) {
   let m; try { m = JSON.parse(text); } catch (e) { return; }
   if (!m || typeof m.t !== 'string') return;
+  if (m.t === 'acc') { onAccount(c, m, ip || '?'); return; }
   const ci = conns.get(c);
   try {
     if (m.t === 'create') {
@@ -469,9 +506,10 @@ const server = http.createServer(async (req, res) => {
   tryNext(0);
 });
 
-WS.attach(server, c => {
-  c.on('message', t => onMessage(c, t));
-  c.on('close', () => { conns.delete(c); });
+WS.attach(server, (c, req) => {
+  const ip = String((req && req.headers && req.headers['x-forwarded-for']) || (req && req.socket && req.socket.remoteAddress) || '?').split(',')[0].trim();
+  c.on('message', t => onMessage(c, t, ip));
+  c.on('close', () => { conns.delete(c); accOf.delete(c); });
 });
 
 /* ---------- reloj de turnos, guardado y "mantener despierto" ---------- */
