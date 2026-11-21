@@ -115,6 +115,7 @@ body.sheetopen #nav{display:none} /* con una hoja abierta no tapan los botones +
   <div class="wrap">
     <h1 style="margin-top:22px">Aventura de almas</h1>
     <p class="sub">Estrategia por turnos · hasta 10 jugadores <span id="hVer" class="dim" style="opacity:.7"></span></p>
+    <div class="card" id="hAcc"></div>
     <div class="card">
       <h3>Tu nombre</h3>
       <input id="hName" maxlength="14" placeholder="Ej: Fercho" autocomplete="off">
@@ -126,6 +127,10 @@ body.sheetopen #nav{display:none} /* con una hoja abierta no tapan los botones +
       <h3 style="margin-top:16px">Unirse con código</h3>
       <div class="row"><input id="hCode" maxlength="5" placeholder="CÓDIGO" autocapitalize="characters" autocomplete="off" style="text-transform:uppercase;letter-spacing:3px;text-align:center"><button class="btn fix" id="hJoin">Unirme</button></div>
       <div class="err" id="hErr"></div>
+    </div>
+    <div class="card" id="hOff"><h3>📴 Sin conexión</h3>
+      <p class="hint" style="margin-top:0">Juega tú contra bots sin internet (en el bus, de viaje…). La partida corre y se guarda en este celular; no se comparte con amigos. Abre el juego una vez con señal para que quede listo.</p>
+      <button class="btn block" id="hLocal">Crear partida sin conexión</button>
     </div>
     <div class="card hidden" id="hSlots"><h3>Partida en curso</h3>
       <p class="hint" style="margin-top:0">Esta partida ya empezó. Puedes ocupar el lugar de uno de sus bots y seguir con su ejército y sus ciudades:</p>
@@ -200,6 +205,7 @@ body.sheetopen #nav{display:none} /* con una hoja abierta no tapan los botones +
 </section>
 
 <script src="/shared.js"></script>
+<script src="/local.js"></script>
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
@@ -216,41 +222,117 @@ let saved = [], resumed = false, gInfo = {}, gSkew = 0;
 try { saved = JSON.parse(localStorage.getItem('ada_games') || '[]'); } catch (e) { saved = []; }
 const persist = () => { try { localStorage.setItem('ada_games', JSON.stringify(saved)); } catch (e) {} };
 
+
+/* ---------- cuenta ---------- */
+let acct = null, accMode = 'out', accEmail = '', accBusy = false, accMsg = '', accMail = true, accSess = '';
+try { accSess = localStorage.getItem('ada_sess') || ''; } catch (e) {}
+const accSend = (a, o) => { accBusy = true; accMsg = ''; renderAcc(); return send(Object.assign({ t: 'acc', a }, o)) || (accBusy = false, renderAcc(), false); };
+function mergeAccGames(list) {
+  let ch = false;
+  for (const g of list || []) { if (!g.code || !g.token) continue; const i = saved.findIndex(s => s.code === g.code); if (i < 0) { saved.push({ code: g.code, token: g.token, name: g.name }); ch = true; } else if (saved[i].token !== g.token) { saved[i] = { code: g.code, token: g.token, name: g.name }; ch = true; } }
+  if (ch) { saved = saved.slice(0, 40); persist(); }
+  if (!$('home').classList.contains('hidden')) { renderSaved(); askGames(); }
+}
+function accResume() { if (accSess && wsOpen && !acct) { send({ t: 'acc', a: 'resume', sess: accSess, games: saved.map(s => ({ code: s.code, token: s.token, name: s.name })) }); } }
+function onAcc(m) {
+  accBusy = false;
+  if (m.a === 'resume' && m.fail) { accSess = ''; try { localStorage.removeItem('ada_sess'); } catch (e) {} renderAcc(); return; }
+  if (m.a === 'sync' && m.ok) { mergeAccGames(m.games); return; }
+  if (m.quiet) return;
+  if (m.err) { accMsg = m.err; renderAcc(); return; }
+  if (m.need === 'verify') { accEmail = m.email; accMode = 'verify'; accMsg = 'Te enviamos un código de 6 dígitos a ' + m.email; renderAcc(); return; }
+  if (m.a === 'forgot') { accMode = 'reset'; accMsg = 'Si ese correo tiene cuenta, te llegó un código de 6 dígitos'; renderAcc(); return; }
+  if (m.a === 'resend') { accMsg = 'Código enviado, revisa tu correo (y la carpeta de spam)'; renderAcc(); return; }
+  if (m.a === 'logout' || m.a === 'del') { acct = null; accSess = ''; accMode = 'out'; try { localStorage.removeItem('ada_sess'); } catch (e) {} renderAcc(); if (m.a === 'del') toast('Cuenta eliminada. Tus partidas siguen en este dispositivo.'); return; }
+  if (m.ok && m.user) {
+    acct = m.user; accSess = m.sess; accMail = m.mail !== false; accMode = 'in'; accMsg = '';
+    try { localStorage.setItem('ada_sess', accSess); } catch (e) {}
+    if (!$('hName').value.trim()) $('hName').value = acct.name;
+    mergeAccGames(m.games); renderAcc();
+  }
+}
+const accIn = (id, ph, type, extra) => `<input id="${id}" type="${type || 'text'}" placeholder="${ph}" autocomplete="${type === 'password' ? (accMode === 'login' ? 'current-password' : 'new-password') : type === 'email' ? 'email' : 'off'}" ${extra || ''} style="margin-bottom:8px">`;
+function renderAcc() {
+  const el = $('hAcc'); if (!el) return;
+  const msg = accMsg ? `<p class="hint" style="color:var(--gold);margin:6px 0">${esc(accMsg)}</p>` : '', dis = accBusy ? ' disabled' : '';
+  let h = '';
+  if (acct) {
+    h = `<h3>👤 ${esc(acct.name)}</h3><p class="hint" style="margin-top:0">${esc(acct.email)} · tus partidas te siguen en cualquier dispositivo donde entres con esta cuenta.</p>${msg}<div class="row"><button class="btn sm" data-acc="logout"${dis}>Cerrar sesión</button><button class="btn sm" data-acc="del"${dis}>Eliminar cuenta</button></div>`;
+  } else if (accMode === 'out') {
+    h = `<h3>👤 Cuenta</h3><p class="hint" style="margin-top:0">Opcional. Con una cuenta ves las mismas partidas desde tu celular, tablet o PC.</p>${msg}<div class="row"><button class="btn sm gold" data-acc="m-login">Entrar</button><button class="btn sm" data-acc="m-reg">Crear cuenta</button></div>`;
+  } else if (accMode === 'login') {
+    h = `<h3>Entrar</h3>${accIn('aEmail', 'Correo', 'email', 'value="' + esc(accEmail) + '"')}${accIn('aPw', 'Contraseña', 'password')}${msg}<div class="row"><button class="btn sm gold" data-acc="login"${dis}>Entrar</button><button class="btn sm" data-acc="m-out">Cancelar</button></div>${accMail ? '<p class="hint"><a href="#" data-acc="m-forgot">Olvidé mi contraseña</a></p>' : ''}`;
+  } else if (accMode === 'reg') {
+    h = `<h3>Crear cuenta</h3>${accIn('aName', 'Tu nombre (2–14 letras)', 'text', 'maxlength="14"')}${accIn('aEmail', 'Correo', 'email', 'value="' + esc(accEmail) + '"')}${accIn('aPw', 'Contraseña (mínimo 8 caracteres)', 'password')}${msg}<div class="row"><button class="btn sm gold" data-acc="reg"${dis}>Crear</button><button class="btn sm" data-acc="m-out">Cancelar</button></div><p class="hint">Las partidas que ya tienes en este dispositivo se añadirán a tu cuenta.</p>`;
+  } else if (accMode === 'verify') {
+    h = `<h3>Confirma tu correo</h3>${msg}${accIn('aCode', 'Código de 6 dígitos', 'text', 'inputmode="numeric" maxlength="6"')}<div class="row"><button class="btn sm gold" data-acc="verify"${dis}>Confirmar</button><button class="btn sm" data-acc="resend">Reenviar código</button><button class="btn sm" data-acc="m-out">Cancelar</button></div>`;
+  } else if (accMode === 'forgot') {
+    h = `<h3>Recuperar contraseña</h3>${accIn('aEmail', 'Correo de tu cuenta', 'email', 'value="' + esc(accEmail) + '"')}${msg}<div class="row"><button class="btn sm gold" data-acc="forgot"${dis}>Enviar código</button><button class="btn sm" data-acc="m-login">Volver</button></div>`;
+  } else if (accMode === 'reset') {
+    h = `<h3>Nueva contraseña</h3>${msg}${accIn('aCode', 'Código de 6 dígitos', 'text', 'inputmode="numeric" maxlength="6"')}${accIn('aPw', 'Nueva contraseña (mínimo 8)', 'password')}<div class="row"><button class="btn sm gold" data-acc="reset"${dis}>Cambiar</button><button class="btn sm" data-acc="m-out">Cancelar</button></div>`;
+  }
+  const keep = {}; for (const id of ['aEmail', 'aName', 'aPw', 'aCode']) { const i = $(id); if (i) keep[id] = i.value; }
+  el.innerHTML = h;
+  for (const id in keep) { const i = $(id); if (i && !i.value) i.value = keep[id]; }
+}
+$('hAcc').addEventListener('click', e => {
+  const b = e.target.closest('[data-acc]'); if (!b) return; e.preventDefault();
+  const k = b.dataset.acc, v = id => { const i = $(id); return i ? i.value.trim() : ''; }, em = v('aEmail') || accEmail;
+  if (k.startsWith('m-')) { if (v('aEmail')) accEmail = v('aEmail'); accMode = k.slice(2); accMsg = ''; return renderAcc(); }
+  const games = saved.map(s => ({ code: s.code, token: s.token, name: s.name }));
+  if (k === 'login') { accEmail = em; accSend('login', { email: em, pw: $('aPw').value, games }); }
+  else if (k === 'reg') { accEmail = em; accSend('reg', { email: em, name: v('aName') || $('hName').value.trim(), pw: $('aPw').value, games }); }
+  else if (k === 'verify') accSend('verify', { email: accEmail, code: v('aCode'), games });
+  else if (k === 'resend') accSend('resend', { email: accEmail, kind: 'verify' });
+  else if (k === 'forgot') { accEmail = em; accSend('forgot', { email: em }); }
+  else if (k === 'reset') accSend('reset', { email: accEmail, code: v('aCode'), pw: $('aPw').value, games });
+  else if (k === 'logout') accSend('logout', { sess: accSess });
+  else if (k === 'del') { const pw = prompt('Para eliminar tu cuenta escribe tu contraseña.\nTus partidas siguen en este dispositivo.'); if (pw) accSend('del', { pw }); }
+});
+
 /* ---------- red ---------- */
 function connect() {
   ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
   ws.onopen = () => {
     wsOpen = true; retry = 0; setConn(true);
-    if (cur) send({ t: 'auth', code: cur.code, token: cur.token });
+    if (cur && cur.local) { /* partida sin conexión: no depende del servidor */ }
+    else if (cur) send({ t: 'auth', code: cur.code, token: cur.token });
     else if (!resumed) { // al recargar la página vuelve a la última partida abierta
       resumed = true; let last = null; try { last = localStorage.getItem('ada_last'); } catch (e) {}
       const s = saved.find(x => x.code === last);
-      if (s) { cur = { code: s.code, token: s.token, pid: 0, name: s.name }; send({ t: 'auth', code: s.code, token: s.token }); }
+      if (s && !s.local) { cur = { code: s.code, token: s.token, pid: 0, name: s.name }; send({ t: 'auth', code: s.code, token: s.token }); }
     }
-    askGames();
+    accResume(); askGames();
   };
   ws.onclose = () => { wsOpen = false; setConn(false); setTimeout(connect, Math.min(8000, 800 + retry++ * 800)); };
   ws.onerror = () => { try { ws.close(); } catch (e) {} };
   ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch (x) { return; } onMsg(m); };
 }
-function send(o) { if (ws && wsOpen) { ws.send(JSON.stringify(o)); return true; } toast('Sin conexión con el servidor…', true); return false; }
+const isLocalCode = c => saved.some(s => s.code === c && s.local);
+function lsend(o) { // modo sin conexión: el motor corre en este celular
+  if (!window.LS) { toast('El modo sin conexión no está disponible', true); return false; }
+  LS.ensure().then(() => { for (const m of LS.handle(o)) onMsg(m); }).catch(() => toast('No se pudo cargar el modo sin conexión. Ábrelo una vez con señal.', true));
+  return true;
+}
+function send(o) { if (o._l || (cur && cur.local)) return lsend(o); if (ws && wsOpen) { ws.send(JSON.stringify(o)); return true; } toast('Sin conexión con el servidor…', true); return false; }
+function rawSend(o) { if (cur && cur.local) return lsend(o); if (ws && wsOpen) { try { ws.send(JSON.stringify(o)); } catch (e) {} return true; } return false; }
 function setConn(on) {
-  $('hConn').className = 'conn' + (on ? ' on' : ''); $('hConnT').textContent = on ? 'Conectado al servidor' : 'Conectando… (el servidor puede tardar ~1 min en despertar)';
+  $('hConn').className = 'conn' + (on ? ' on' : ''); $('hConnT').textContent = on ? 'Conectado al servidor' : 'Conectando… (puede tardar ~1 min) · sin señal, usa «Sin conexión»';
   $('gConn').className = 'conn' + (on ? ' on' : '');
 }
 setInterval(() => { if (wsOpen) send({ t: 'ping' }); }, 25000);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) return;
   document.title = 'Aventura de almas';
-  if (cur && wsOpen) { send({ t: 'auth', code: cur.code, token: cur.token }); lastSeenTurn = -1; }
+  if (cur && (wsOpen || cur.local)) { send({ t: 'auth', code: cur.code, token: cur.token }); lastSeenTurn = -1; }
 });
-function sendSeen() { if (S && S.status === 'playing' && !document.hidden && wsOpen && S.turn !== lastSeenTurn) { lastSeenTurn = S.turn; ws.send(JSON.stringify({ t: 'seen' })); } }
+function sendSeen() { if (S && S.status === 'playing' && !document.hidden && (wsOpen || (cur && cur.local)) && S.turn !== lastSeenTurn) { lastSeenTurn = S.turn; rawSend({ t: 'seen' }); } }
 setInterval(() => { if (!document.hidden && S && S.status === 'playing') { lastSeenTurn = -1; sendSeen(); } }, 5 * 60 * 1000);
 
 function onMsg(m) {
   if (m.t === 'joined') {
-    cur = { code: m.code, token: m.token, pid: m.pid, name: m.name };
-    saved = saved.filter(s => s.code !== m.code); saved.unshift({ code: m.code, token: m.token, name: m.name }); saved = saved.slice(0, 20); persist(); try { localStorage.setItem('ada_last', m.code); } catch (e) {}
+    cur = { code: m.code, token: m.token, pid: m.pid, name: m.name, local: !!m.local };
+    saved = saved.filter(s => s.code !== m.code); saved.unshift({ code: m.code, token: m.token, name: m.name, local: !!m.local || undefined }); saved = saved.slice(0, 20); persist(); try { localStorage.setItem('ada_last', m.code); } catch (e) {}
     try { localStorage.setItem('ada_name', m.name); } catch (e) {}
     vapidKey = m.vapid || null; $('hSlots').classList.add('hidden'); pendingJoin = null; lastSeenTurn = -1; syncPush(); renderPushBar();
   } else if (m.t === 's') {
@@ -260,17 +342,22 @@ function onMsg(m) {
     toast(m.m, true); $('hErr').textContent = m.m; $('lErr').textContent = m.m;
   } else if (m.t === 'msg') toast(m.m);
   else if (m.t === 'slots') showSlots(m.slots, m.code);
-  else if (m.t === 'mygames') { gSkew = m.now - Date.now(); gInfo = {}; for (const g of m.games) gInfo[g.code] = g; if (!$('home').classList.contains('hidden')) renderSaved(); }
+  else if (m.t === 'mygames') { gSkew = m.now - Date.now(); for (const k of Object.keys(gInfo)) if (!!isLocalCode(k) === !!m.local) delete gInfo[k]; for (const g of m.games) gInfo[g.code] = g; if (!$('home').classList.contains('hidden')) renderSaved(); }
+  else if (m.t === 'acc') onAcc(m);
   else if (m.t === 'push') { renderPushBar(); if (!$('sheet').classList.contains('hidden')) renderSheet(); }
   else if (m.t === 'authfail') { leave(); toast('No se encontró esa partida en el servidor. Si acaba de despertar, espera un momento y reintenta; si no, quítala de la lista con ✕.', true); }
   else if (m.t === 'kicked') { leave(); toast('El anfitrión te sacó de la sala', true); }
 }
 function leave() {
-  if (ws && wsOpen) { try { ws.send(JSON.stringify({ t: 'leave' })); } catch (e) {} }
+  rawSend({ t: 'leave' });
   try { localStorage.removeItem('ada_last'); } catch (e) {}
   cur = null; S = null; selId = null; sheet = null; firstState = true; show('home'); renderSaved(); askGames();
 }
-function askGames() { if (saved.length && wsOpen) ws.send(JSON.stringify({ t: 'mygames', games: saved.map(s => ({ code: s.code, token: s.token })) })); }
+function askGames() {
+  const on = saved.filter(s => !s.local), off = saved.filter(s => s.local);
+  if (on.length && wsOpen) ws.send(JSON.stringify({ t: 'mygames', games: on.map(s => ({ code: s.code, token: s.token })) }));
+  if (off.length) lsend({ t: 'mygames', games: off.map(s => ({ code: s.code, token: s.token })), _l: 1 });
+}
 setInterval(() => { if (!document.hidden && !$('home').classList.contains('hidden')) askGames(); }, 20000);
 $('gMenu').onclick = () => { leave(); toast('Tu partida sigue en marcha. Vuelve a entrar desde «Tus partidas».'); };
 function act(o) { return send(Object.assign({ t: 'cmd' }, o)); }
@@ -289,27 +376,30 @@ function renderSaved() {
   $('hList').innerHTML = saved.map(s => {
     const i = gInfo[s.code]; let st = '<span class="dim">Consultando…</span>';
     if (i) {
-      if (!i.ok) st = '<span class="lack">No se encontró en el servidor (quizá se borró)</span>';
+      if (!i.ok) st = '<span class="lack">No se encontró' + (s.local ? ' en este celular' : ' en el servidor (quizá se borró)') + '</span>';
       else if (i.status === 'lobby') st = `🕓 En sala de espera · ${i.n} ${i.n === 1 ? 'jugador' : 'jugadores'}${i.host ? ' · eres el anfitrión' : ''}`;
       else if (i.status === 'over') st = '🏁 Terminada' + (i.winner === i.you ? ' · ¡ganaste!' : '');
-      else st = `Turno ${i.turn} · ` + (!i.alive ? '☠️ eliminado' : i.auto ? '🤖 un bot juega por ti' : i.ready ? '✔ ya terminaste tu turno' : '<b style="color:var(--gold)">⏳ te toca jugar</b>') + ' · ' + fmtLeft(i.endsAt - (Date.now() + gSkew));
+      else st = `Turno ${i.turn} · ` + (!i.alive ? '☠️ eliminado' : i.auto ? '🤖 un bot juega por ti' : i.ready ? '✔ ya terminaste tu turno' : '<b style="color:var(--gold)">⏳ te toca jugar</b>') + (s.local ? '' : ' · ' + fmtLeft(i.endsAt - (Date.now() + gSkew)));
     }
-    return `<div class="line"><div class="g"><b>${esc(s.code)}</b> <span class="dim">· ${esc(s.name)}</span><div class="hint" style="margin:2px 0 0">${st}</div></div><button class="btn sm gold fix" data-ui="resume:${esc(s.code)}">Entrar</button><button class="btn sm fix" data-ui="forget:${esc(s.code)}" title="Quitar de la lista" aria-label="Quitar de la lista">✕</button></div>`;
+    return `<div class="line"><div class="g"><b>${s.local ? '📴 ' : ''}${esc(s.code)}</b> <span class="dim">· ${esc(s.name)}</span><div class="hint" style="margin:2px 0 0">${st}</div></div><button class="btn sm gold fix" data-ui="resume:${esc(s.code)}">Entrar</button><button class="btn sm fix" data-ui="forget:${esc(s.code)}" title="Quitar de la lista" aria-label="Quitar de la lista">✕</button></div>`;
   }).join('') + (saved.some(x => gInfo[x.code] && !gInfo[x.code].ok) ? '<button class="btn sm block" style="margin-top:10px" data-ui="clean:x">🧹 Quitar las que ya no existen</button>' : '');
 }
 $('hList').addEventListener('click', e => {
   const b = e.target.closest('[data-ui]'); if (!b) return;
-  if (b.dataset.ui === 'clean:x') { saved = saved.filter(x => !gInfo[x.code] || gInfo[x.code].ok); persist(); renderSaved(); return; }
+  if (b.dataset.ui === 'clean:x') { if (acct) for (const x of saved) if (gInfo[x.code] && !gInfo[x.code].ok) send({ t: 'acc', a: 'unlink', code: x.code }); saved = saved.filter(x => !gInfo[x.code] || gInfo[x.code].ok); persist(); renderSaved(); return; }
   const [k, code] = b.dataset.ui.split(':'); const s = saved.find(x => x.code === code); if (!s) return;
   if (k === 'forget') {
     const i = gInfo[code];
-    if ((i && !i.ok) || confirm('¿Quitar la partida ' + code + ' de tu lista?\nLa partida sigue en el servidor; si te ausentas un bot jugará por ti. Para volver necesitarás el código y ocupar el lugar de un bot.')) { saved = saved.filter(x => x.code !== code); persist(); renderSaved(); }
+    if (s.local) { if (confirm('¿Borrar la partida sin conexión ' + code + '?\nSe elimina de este celular y no se puede recuperar.')) { if (window.LS) LS.ensure().then(() => LS.remove(code)); saved = saved.filter(x => x.code !== code); persist(); renderSaved(); } return; }
+    if ((i && !i.ok) || confirm('¿Quitar la partida ' + code + ' de tu lista?\nLa partida sigue en el servidor; si te ausentas un bot jugará por ti. Para volver necesitarás el código y ocupar el lugar de un bot.')) { saved = saved.filter(x => x.code !== code); persist(); renderSaved(); if (acct) send({ t: 'acc', a: 'unlink', code }); }
     return;
   }
-  cur = { code: s.code, token: s.token, pid: 0, name: s.name }; send({ t: 'auth', code: s.code, token: s.token });
+  cur = { code: s.code, token: s.token, pid: 0, name: s.name, local: !!s.local }; send({ t: 'auth', code: s.code, token: s.token });
 });
 $('hName').value = localStorage.getItem('ada_name') || '';
+renderAcc();
 $('hCreate').onclick = () => { const n = $('hName').value.trim(); if (!n) return ($('hErr').textContent = 'Escribe tu nombre'); $('hErr').textContent = ''; send({ t: 'create', name: n }); };
+$('hLocal').onclick = () => { const n = $('hName').value.trim(); if (!n) return ($('hErr').textContent = 'Escribe tu nombre'); $('hErr').textContent = ''; $('hLocal').disabled = true; lsend({ t: 'create', name: n, _l: 1 }); setTimeout(() => { $('hLocal').disabled = false; }, 1500); };
 $('hJoin').onclick = () => { const n = $('hName').value.trim(), c = $('hCode').value.trim().toUpperCase(); if (!n) return ($('hErr').textContent = 'Escribe tu nombre'); if (c.length < 4) return ($('hErr').textContent = 'Escribe el código'); $('hErr').textContent = ''; pendingJoin = { code: c, name: n }; send({ t: 'join', code: c, name: n }); };
 
 function showSlots(slots, code) {
@@ -325,6 +415,7 @@ const botTag = p => p.bot ? `<span class="tag">bot${p.pers && SH.PERS[p.pers] ? 
 function renderLobby() {
   const host = S.you === S.hostId;
   $('lCode').textContent = S.code; $('lCount').textContent = S.players.length;
+  { const loc = !!S.cfg.local; for (const el of [$('lCode'), $('lCopy').parentNode, $('lTurn'), $('lTurn').previousElementSibling, $('lIdle'), $('lIdle').previousElementSibling]) el.classList.toggle('hidden', loc); document.querySelector('#lobby .sub').textContent = loc ? '📴 Partida sin conexión: tú contra bots, guardada en este celular' : 'Comparte este código con tus amigos'; }
   $('lPlayers').innerHTML = S.players.map(p => `<div class="it"><span class="sw" style="background:${p.color}"></span><b>${esc(p.name)}</b>${p.id === S.hostId ? '<span class="tag">anfitrión</span>' : ''}${botTag(p)}${p.id === S.you ? '<span class="tag">tú</span>' : ''}<span style="flex:1"></span>${host && p.id !== S.hostId ? `<button class="btn sm red fix" data-ui="rm:${p.id}">Quitar</button>` : ''}</div>`).join('');
   $('lAdd').classList.toggle('hidden', !host || S.cfg.mode === 'mundo'); if (host) renderPresets(); $('lCfg').classList.toggle('hidden', !host); $('lWait').classList.toggle('hidden', host);
   if (host) { $('lTurn').value = String(S.cfg.turnHours); if ($('lTurn').value !== String(S.cfg.turnHours)) $('lTurn').value = '4'; $('lMax').value = String(S.cfg.maxTurns); $('lIdle').value = String(S.cfg.idleTurns === undefined ? 2 : S.cfg.idleTurns); $('lLevel').value = S.cfg.botLevel || 'normal'; for (const k in SH.WORLD_OPTS) $('w_' + k).value = String(S.cfg[k] !== undefined ? S.cfg[k] : SH.WORLD_OPTS[k].def); }
@@ -417,13 +508,13 @@ function onState() {
   const wasHidden = $('game').classList.contains('hidden');
   show('game');
   { const dm = {}; for (const u of S.mine) dm[u.id] = u.dg || 0; const pv = window._dgMap || {}; for (const id in dm) if (id in pv && pv[id] !== dm[id]) { const u = S.mine.find(x => x.id == id); if (u) { selId = u.id; centerOn(u.x, u.y); } } window._dgMap = dm; }
-  $('nStory').classList.toggle('hidden', !S.story);
+  $('nStory').classList.toggle('hidden', !(S.story || S.wv || S.lab || S.ct));
   $('nHist').classList.toggle('hidden', !(S.hist && S.status !== 'lobby'));
   { const wd = S.cfg && S.cfg.mode === 'mundo' && S.status === 'playing'; $('nWorld').classList.toggle('hidden', !wd); const wc = $('wCnt'); if (wd) { const n = (S.ginv ? S.ginv.length : 0) + (S.wb && S.wb.id ? 1 : 0); wc.textContent = S.prot ? '🛡️' : n; wc.classList.toggle('hidden', !(S.prot || n)); } }
   $('nSum').classList.toggle('hidden', !(S.status === 'over' && S.sum));
   if (S.status === 'over' && S.sum && window._sumShown !== S.code) { window._sumShown = S.code; openSheet('summary'); }
   if (S.status === 'playing' && !window._tutAsked) { window._tutAsked = true; if (!tutSeen()) tutOpen(); }
-  { const sg = S.story ? S.story.ch + ':' + S.story.done.length : null; if (sg !== window._storySig) { const first = window._storySig === undefined; window._storySig = sg; if (S.story && sheet == null && S.status === 'playing' && (!first || S.turn <= 1)) openSheet('story'); } }
+  { const sg = S.story ? S.story.ch + ':' + S.story.done.length : S.wv ? 'w' + S.wv.n + ':' + S.wv.cleared : S.lab ? 'l' + S.lab.best : S.ct ? 'c' + S.ct.w.n + ':' + S.ct.w.cleared : null; if (sg !== window._storySig) { const first = window._storySig === undefined; window._storySig = sg; if ((S.story || S.wv || S.lab) && sheet == null && S.status === 'playing' && (!first || S.turn <= 1)) openSheet('story'); } }
   const prevChat = chatPrev; chatPrev = S.chat && S.chat.length ? S.chat[S.chat.length - 1].id : 0;
   maps = { mine: new Map(), cre: new Map(), oth: new Map(), city: new Map(), road: new Map() };
   for (const r of S.roads || []) maps.road.set(r[0], r[1]);
@@ -454,7 +545,7 @@ function onState() {
   computeReach(); renderTop(); renderSheet(); dirty = true; sendSeen(); renderPushBar();
 }
 const classAvail = u => !u.sm && !u.bs && ((!u.cls && u.lv >= SH.CLASS_LV) || (u.cls && !u.sub && u.lv >= SH.SUB_LV));
-const clsTag = u => u.cls ? SH.CLASSES[u.cls].e + (u.sub ? SH.CLASSES[u.cls].sub[u.sub].e : '') : '';
+const clsTag = u => (u.vp ? SH.VAMP.e : '') + (u.cls ? SH.CLASSES[u.cls].e + (u.sub ? SH.CLASSES[u.cls].sub[u.sub].e : '') : '');
 const bldHtml = b => SH.BUILD_ORDER.filter(k => b && b[k]).map(k => `<span class="chip">${SH.BUILDINGS[k].e}${b[k] > 1 ? ' ' + b[k] : ''}</span>`).join('');
 let gotoMode = null, recapKey = null, lastTurnClient = null;
 const ORD_E = { goto: '📍', home: '🏠', guard: '🛡️' };
@@ -492,7 +583,7 @@ function fmtTime(ms) {
 function renderTop() {
   if (!S || S.status === 'lobby') return;
   $('gTurn').textContent = S.status === 'over' ? 'Partida terminada' : 'Turno ' + S.turn + (S.cfg.maxTurns ? ' / ' + S.cfg.maxTurns : '') + (S.season ? ' ' + SH.SEASONS[S.season.i].e : '') + (S.wx && SH.WEATHER[S.wx.k] ? SH.WEATHER[S.wx.k].e : '');
-  $('gTimer').textContent = S.status === 'over' ? '🏁' : fmtTime(S.endsAt - (Date.now() + skew));
+  $('gTimer').textContent = S.status === 'over' ? '🏁' : S.cfg.local ? '📴 sin conexión' : fmtTime(S.endsAt - (Date.now() + skew));
   const humans = S.players.filter(p => p.alive && !p.bot && !p.auto);
   const world = S.cfg.mode === 'mundo';
   $('gReady').textContent = world ? '🌍 ' + S.players.length : '✔ ' + humans.filter(p => p.ready).length + '/' + humans.length;
@@ -508,7 +599,7 @@ function renderTop() {
   $('nCnt').textContent = rdy; $('nNext').style.opacity = rdy ? 1 : .5;
 }
 setInterval(renderTop, 1000);
-$('bGo').onclick = () => { const me = S.players[S.you]; if (S.status !== 'playing') return; if (!me.ready && S.mine.some(u => u.pts > 0 || u.at > 0) && !confirmEnd) { confirmEnd = true; toast('Aún tienes unidades con acciones. Pulsa otra vez para terminar el turno.'); setTimeout(() => confirmEnd = false, 3500); return; } confirmEnd = false; act({ a: 'ready', v: !me.ready }); };
+$('bGo').onclick = () => { const me = S.players[S.you]; if (S.status !== 'playing') return; if (!me.ready && S.mine.some(u => u.pts > 0 || (u.at > 0 && !u.au)) && !confirmEnd) { confirmEnd = true; toast('Aún tienes unidades con acciones. Pulsa otra vez para terminar el turno.'); setTimeout(() => confirmEnd = false, 3500); return; } confirmEnd = false; act({ a: 'ready', v: !me.ready }); };
 let confirmEnd = false;
 
 /* ---------- hojas inferiores ---------- */
@@ -523,15 +614,242 @@ const bar = (cls, a, b) => `<div class="bar ${cls}"><i style="width:${pct(a, b)}
 
 function moreItems() { // entradas del panel «Más»: se leen de los botones ocultos para no duplicar su lógica
   const out = [{ id: 'players', e: '🏆', t: 'Jugadores', b: window._offers || 0, ui: 'players' }];
+  if (S && S.status === 'playing' && S.mine.some(u => !u.sm && !u.cart && !u.bld && !u.sg && !u.bs)) { const n = S.mine.filter(u => u.au).length; out.push({ id: 'auto', e: '🤖', t: 'Automatizar', b: n, ui: 'auto' }); }
   for (const id of ['nStory', 'nWorld', 'nHist', 'nSum', 'nSnd', 'nHelp', 'nMan', 'nChat']) {
     const b = $(id); if (!b || b.classList.contains('hidden')) continue;
-    const sm = b.querySelector('small'); const t = { nStory: 'Historia', nWorld: 'Mundo', nHist: 'Historial', nSum: 'Resumen', nSnd: sndOn ? 'Sonido: sí' : 'Sonido: no', nHelp: 'Cómo se juega', nMan: 'Manual y avisos', nChat: 'Chat' }[id];
+    const sm = b.querySelector('small'); const t = { nStory: S.ct ? 'Ciudadela' : 'Historia', nWorld: 'Mundo', nHist: 'Historial', nSum: 'Resumen', nSnd: sndOn ? 'Sonido: sí' : 'Sonido: no', nHelp: 'Cómo se juega', nMan: 'Manual y avisos', nChat: 'Chat' }[id];
     out.push({ id, e: b.firstChild ? b.firstChild.textContent : '•', t, b: sm && !sm.classList.contains('hidden') ? (+sm.textContent || 0) : 0, ui: 'mo:' + id });
   } return out;
 }
 const moreSheet = () => hd('Más opciones') + '<div class="mgrid">' + moreItems().map(m => `<button data-ui="${m.ui}"><span>${m.e}</span>${m.t}${m.b ? `<i>${m.b}</i>` : ''}</button>`).join('') + '</div>';
 function moreBadge() { const n = (window._offers || 0) + (+$('chCnt').textContent || 0) * !$('chCnt').classList.contains('hidden') + (+$('wCnt').textContent || 0) * !$('wCnt').classList.contains('hidden'); $('bPl').textContent = n; $('bPl').classList.toggle('hidden', !n); }
 setInterval(moreBadge, 1000);
+/* ---------- Ciudadela: muralla, calles, lotes de edificios y hoja de escuadras ---------- */
+const citLots = () => S.ct._lots || (S.ct._lots = S.ct.lots.map(l => ({ k: l.k, n: l.n, x: S.ct.plaza.x + l.dx, y: S.ct.plaza.y + l.dy })));
+function citRoadAt(x, y) { // 'q' plaza empedrada, 'p' camino de tierra, null = hierba
+  const ct = S.ct; if (!ct) return null; const P = ct.plaza, r = ct.r;
+  if (Math.abs(x - P.x) <= 3 && Math.abs(y - P.y) <= 3) return 'q';
+  for (const gt of ct.gates) {
+    if (gt.k === 'S' && x === gt.x && y >= P.y && y <= r.y1 + 12) return 'p'; if (gt.k === 'S' && y === P.y && x >= P.x && x <= gt.x) return 'p';
+    if (gt.k === 'N' && x === gt.x && y >= r.y0 - 12 && y <= P.y) return 'p'; if (gt.k === 'N' && y === P.y && x >= gt.x && x <= P.x) return 'p';
+    if (gt.k === 'E' && y === gt.y && x >= P.x && x <= r.x1 + 12) return 'p';
+  }
+  // calles secundarias del barrio (callejuelas hacia el oeste y entre manzanas)
+  if (y === P.y + 8 && x >= r.x0 && x <= r.x1) return 'p';
+  if (x === P.x - 8 && y >= r.y0 && y <= r.y1) return 'p';
+  if (x === P.x + 11 && y >= P.y + 7 && y <= r.y1) return 'p';
+  return null;
+}
+const citLotAt = (x, y) => citLots().find(l => Math.abs(x - l.x) <= 1 && Math.abs(y - l.y) <= 1);
+function citPop(c) { const b = (c && c.b) || {}; let n = 0; for (const k in b) n += b[k] | 0; return n; }
+function citHouseAt(x, y, dens) { // casas del barrio: crecen con las mejoras de la ciudad (deterministas)
+  const ct = S.ct; if (!ct || citRoadAt(x, y) || citLotAt(x, y)) return false;
+  if (citLots().some(l => Math.abs(x - l.x) <= 2 && Math.abs(y - l.y) <= 2)) return false;
+  const r = ct.r; if (x < r.x0 + 1 || x > r.x1 - 1 || y < r.y0 + 1 || y > r.y1 - 1) return false;
+  if (Math.abs(x - ct.plaza.x) <= 5 && Math.abs(y - ct.plaza.y) <= 5) return false;
+  if (y >= ct.plaza.y + 6 && y <= ct.plaza.y + 9) return false; // calle del mercado
+  if ((x + (y & 1)) % 2) return false; // en hileras, sin pegarse
+  return (tileVar(x, y) >> 6) % 100 < dens;
+}
+function citTreeAt(x, y) { const ct = S.ct, r = ct.r; if (citRoadAt(x, y) || citLotAt(x, y) || x < r.x0 || x > r.x1 || y < r.y0 || y > r.y1) return false; if (Math.abs(x - ct.plaza.x) <= 4 && Math.abs(y - ct.plaza.y) <= 4) return false; if (citLots().some(l => Math.abs(x - l.x) <= 2 && Math.abs(y - l.y) <= 2)) return false; return (tileVar(x, y) >> 9) % 23 === 0; }
+function drawCitadelTiles(t, x, y, px, py, z, k) { // devuelve true si dibujó la casilla
+  const ct = S.ct; if (!ct) return false;
+  const cc = S.cities.find(q => q.cit), mur = (cc && cc.b && cc.b.muralla) || 0, Z = z + .5;
+  if (t === 'W' || t === 'O') {
+    ctx.imageSmoothingEnabled = false; ctx.drawImage(tileImg(t === 'W' ? 'W' : 'p', (tileVar(x, y) >> 4) % 3, 0), px, py, Z, Z);
+    const T = S.terr, W = S.w, isW = i => T[i] === 'W' || T[i] === 'O';
+    if (t === 'W') {
+      const up = !isW(k - W), dn = !isW(k + W), lf = !isW(k - 1), rt = !isW(k + 1), r = ct.r;
+      const tint = mur >= 3 ? 'rgba(230,190,90,.20)' : mur >= 2 ? 'rgba(130,160,220,.20)' : null; if (tint) { ctx.fillStyle = tint; ctx.fillRect(px, py, Z, Z); }
+      // camino de ronda y almenas por el lado exterior; sombra por el interior
+      const outer = y < r.y0 ? 'u' : y > r.y1 ? 'd' : x < r.x0 ? 'l' : 'r', inn = { u: 'd', d: 'u', l: 'r', r: 'l' }[outer], s = z * .26;
+      ctx.fillStyle = 'rgba(0,0,0,.28)'; if (inn === 'd') ctx.fillRect(px, py + z - s, Z, s); else if (inn === 'u') ctx.fillRect(px, py, Z, s); else if (inn === 'r') ctx.fillRect(px + z - s, py, s, Z); else ctx.fillRect(px, py, s, Z);
+      ctx.fillStyle = '#c9cfdc'; const m = z * .3, gap = z * .2;
+      if (outer === 'u') { for (let i = 0; i < 2; i++) ctx.fillRect(px + z * (.05 + i * .5), py - z * .22, m, z * .3); ctx.fillStyle = '#b4bac7'; ctx.fillRect(px, py + z * .08, Z, z * .1); }
+      else if (outer === 'd') { for (let i = 0; i < 2; i++) ctx.fillRect(px + z * (.05 + i * .5), py + z * .92, m, z * .3); ctx.fillStyle = '#b4bac7'; ctx.fillRect(px, py + z * .82, Z, z * .1); }
+      else if (outer === 'l') { for (let i = 0; i < 2; i++) ctx.fillRect(px - z * .22, py + z * (.05 + i * .5), z * .3, m); ctx.fillStyle = '#b4bac7'; ctx.fillRect(px + z * .08, py, z * .1, Z); }
+      else { for (let i = 0; i < 2; i++) ctx.fillRect(px + z * .92, py + z * (.05 + i * .5), z * .3, m); ctx.fillStyle = '#b4bac7'; ctx.fillRect(px + z * .82, py, z * .1, Z); }
+      if (mur >= 3) { ctx.fillStyle = '#e6b450'; if (outer === 'u' || outer === 'd') ctx.fillRect(px, py + (outer === 'u' ? z * .32 : z * .62), Z, Math.max(1, z * .06)); else ctx.fillRect(px + (outer === 'l' ? z * .32 : z * .62), py, Math.max(1, z * .06), Z); }
+      if (z >= 12 && ((x + y) % 6 === 0)) { ctx.fillStyle = 'rgba(0,0,0,.22)'; if (inn === 'd') ctx.fillRect(px + z * .2, py + z * .7, z * .6, z * .45); else if (inn === 'u') ctx.fillRect(px + z * .2, py - z * .15, z * .6, z * .45); else if (inn === 'r') ctx.fillRect(px + z * .7, py + z * .2, z * .45, z * .6); else ctx.fillRect(px - z * .15, py + z * .2, z * .45, z * .6); } // contrafuertes
+      if (z >= 14 && (tileVar(x, y) >> 8) % 7 === 0) { ctx.fillStyle = '#3d4150'; if (outer === 'u' || outer === 'd') ctx.fillRect(px + z * .42, py + z * .4, z * .16, z * .26); else ctx.fillRect(px + z * .4, py + z * .42, z * .26, z * .16); } // aspillera
+      return true;
+    }
+    if (z >= 8) { // puerta: arco de piedra, hojas de madera, rastrillo y antorchas
+      const horiz = isW(k - 1) && isW(k + 1), tm = Date.now() / 120;
+      ctx.fillStyle = '#6a7080'; ctx.fillRect(px, py, Z, Z); ctx.fillStyle = '#3a2412'; ctx.fillRect(px + z * .12, py + z * .12, z * .76, z * .76);
+      ctx.fillStyle = '#5a3a1e'; if (horiz) { ctx.fillRect(px + z * .16, py + z * .16, z * .3, z * .68); ctx.fillRect(px + z * .54, py + z * .16, z * .3, z * .68); } else { ctx.fillRect(px + z * .16, py + z * .16, z * .68, z * .3); ctx.fillRect(px + z * .16, py + z * .54, z * .68, z * .3); }
+      ctx.strokeStyle = '#9aa0ad'; ctx.lineWidth = Math.max(1, z * .05); ctx.beginPath(); if (horiz) for (let i = 1; i < 4; i++) { ctx.moveTo(px + z * (.12 + i * .19), py + z * .12); ctx.lineTo(px + z * (.12 + i * .19), py + z * .5); } else for (let i = 1; i < 4; i++) { ctx.moveTo(px + z * .12, py + z * (.12 + i * .19)); ctx.lineTo(px + z * .5, py + z * (.12 + i * .19)); } ctx.stroke();
+      if ((cc && cc.b && cc.b.atalaya) || mur) for (const s of [.1, .9]) { const fx = horiz ? px + z * s : px + z * .5, fy = horiz ? py + z * .5 : py + z * s, fl = 1 + .25 * Math.sin(tm + x * 3 + y); ctx.fillStyle = 'rgba(255,170,60,.28)'; ctx.beginPath(); ctx.arc(fx, fy, z * .5 * fl, 0, 7); ctx.fill(); ctx.fillStyle = '#ffd36a'; ctx.beginPath(); ctx.arc(fx, fy, z * .1 * fl, 0, 7); ctx.fill(); }
+    }
+    return true;
+  }
+  if (t === 'g' || t === 'f' || t === 'h') {
+    const rd = citRoadAt(x, y);
+    if (rd) { ctx.imageSmoothingEnabled = false; ctx.drawImage(tileImg(rd, (tileVar(x, y) >> 4) % 3, 0), px, py, Z, Z); if (rd === 'p' && z >= 12 && (x + y) % 4 === 0) { ctx.fillStyle = 'rgba(60,40,20,.22)'; ctx.fillRect(px + z * .15, py + z * .4, z * .3, z * .1); ctx.fillRect(px + z * .55, py + z * .7, z * .3, z * .1); } return true; }
+  }
+  return false;
+}
+const P0x = ct => ct.plaza.x, P0y = ct => ct.plaza.y;
+function citLamp(x, y, z, now, sd) { const fl = .85 + .15 * Math.sin(now / 160 + sd * 2); ctx.fillStyle = '#4a3a2a'; ctx.fillRect(x - z * .03, y - z * .5, Math.max(1, z * .06), z * .5); ctx.fillStyle = 'rgba(255,190,80,' + (.2 * fl) + ')'; ctx.beginPath(); ctx.arc(x, y - z * .55, z * .5 * fl, 0, 7); ctx.fill(); ctx.fillStyle = '#ffd98a'; ctx.fillRect(x - z * .07, y - z * .62, z * .14, z * .14); }
+function drawArena(ct, X, Y, z, now) { // coliseo fuera de la puerta este
+  const A = ct.arena, cx = X(A.x + .5), cy = Y(A.y + .5), R = z * 3.1, open = ct.ar && ct.ar.open;
+  ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.beginPath(); ctx.ellipse(cx, cy + z * .35, R * 1.04, R * .8, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#7d7466'; ctx.beginPath(); ctx.ellipse(cx, cy, R, R * .78, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#a39a88'; ctx.beginPath(); ctx.ellipse(cx, cy, R * .9, R * .68, 0, 0, 7); ctx.fill();
+  const cols = ['#c9503d', '#3d7ac9', '#d1a53a', '#e0dccb', '#5fa05a'];
+  for (let i = 0; i < 34; i++) { const a = i / 34 * 6.283, rr = .8 + (i % 2) * .05, px = cx + Math.cos(a) * R * rr * .98, py = cy + Math.sin(a) * R * rr * .76, jump = open ? Math.abs(Math.sin(now / 140 + i)) * z * .09 : 0; ctx.fillStyle = cols[i % 5]; ctx.fillRect(px - z * .08, py - z * .12 - jump, z * .16, z * .16); ctx.fillStyle = '#e8c9a0'; ctx.fillRect(px - z * .05, py - z * .22 - jump, z * .1, z * .1); }
+  ctx.fillStyle = '#6d6556'; ctx.beginPath(); ctx.ellipse(cx, cy, R * .62, R * .46, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#d9c28a'; ctx.beginPath(); ctx.ellipse(cx, cy, R * .56, R * .41, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = 'rgba(120,95,50,.5)'; ctx.lineWidth = Math.max(1, z * .04); ctx.beginPath(); ctx.ellipse(cx, cy, R * .3, R * .22, 0, 0, 7); ctx.stroke();
+  ctx.fillStyle = '#2b1a0c'; ctx.fillRect(cx - z * .35, cy + R * .7 - z * .45, z * .7, z * .6); ctx.fillStyle = '#5a3a1e'; ctx.fillRect(cx - z * .28, cy + R * .7 - z * .38, z * .56, z * .5);
+  for (const sg of [-1, 1]) { const bx = cx + sg * R * .95, by = cy - R * .12, wv = Math.sin(now / 200 + sg) * z * .1; ctx.fillStyle = '#d8d0b8'; ctx.fillRect(bx, by - z * 1.1, Math.max(1, z * .05), z * 1.2); ctx.fillStyle = sg > 0 ? '#c9503d' : '#3d7ac9'; ctx.beginPath(); ctx.moveTo(bx + z * .05, by - z * 1.1); ctx.lineTo(bx + z * .6 + wv, by - z * .95); ctx.lineTo(bx + z * .05, by - z * .7); ctx.fill(); }
+  if (open) { const g1 = ctx.createRadialGradient(cx, cy, 1, cx, cy, R); g1.addColorStop(0, 'rgba(255,230,140,' + (.28 + .1 * Math.sin(now / 250)) + ')'); g1.addColorStop(1, 'rgba(255,230,140,0)'); ctx.fillStyle = g1; ctx.fillRect(cx - R, cy - R, R * 2, R * 2); }
+  citLabel(open ? '🏟️ Torneo abierto · ' + ct.ar.left + ' t.' : 'Arena', cx, cy - R * .78 - z * .35, z);
+}
+function citLabel(txt, cx, cy, z) {
+  if (z < 16) return; const fs = Math.max(9, Math.min(13, z * .42)); ctx.font = 'bold ' + fs + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const w = ctx.measureText(txt).width + 8; ctx.fillStyle = 'rgba(30,20,10,.78)'; ctx.fillRect(cx - w / 2, cy - fs * .8, w, fs * 1.6); ctx.fillStyle = '#f2e3bd'; ctx.fillText(txt, cx, cy + 1); ctx.textBaseline = 'alphabetic';
+}
+function drawCitadel(c, ox, oy, z) {
+  const ct = S.ct, b = c.b || {}, r = ct.r, X = x => ox + x * z, Y = y => oy + y * z;
+  // casas decorativas
+  const dens = Math.min(100, 28 + 7 * citPop(c)), now = Date.now();
+  for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++) {
+    if (citHouseAt(x, y, dens)) {
+      const sd = tileVar(x, y); drawHouse(X(x) - z * .1, Y(y) - z * .05, z * 1.15, z * .95, (sd >>> 3) % 1024, false);
+      if (z >= 10 && (sd >> 5) % 3 === 0) for (let i = 0; i < 3; i++) { const ph = ((now / 1400 + i / 3 + (sd % 7) / 7) % 1); ctx.fillStyle = 'rgba(225,225,230,' + (.5 * (1 - ph)) + ')'; ctx.beginPath(); ctx.arc(X(x) + z * (.75 + ph * .2), Y(y) - z * (.1 + ph * .7), z * (.07 + ph * .1), 0, 7); ctx.fill(); } // humo de chimenea
+    } else if (z >= 9 && citTreeAt(x, y)) { const tx = X(x + .5), ty = Y(y + .9), v = tileVar(x, y) >> 10; ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(tx, ty, z * .32, z * .1, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#5a3a1e'; ctx.fillRect(tx - z * .05, ty - z * .4, z * .1, z * .4); ctx.fillStyle = v % 2 ? '#2f7a3a' : '#3f8f45'; ctx.beginPath(); ctx.arc(tx, ty - z * .6, z * .32, 0, 7); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.13)'; ctx.beginPath(); ctx.arc(tx - z * .1, ty - z * .7, z * .14, 0, 7); ctx.fill(); }
+  }
+  // farolas a lo largo de las calles y huertos/cajas junto a los talleres
+  if (z >= 10) {
+    for (const [lx, ly] of [[P0x(ct) - 3, P0y(ct) - 4], [P0x(ct) + 3, P0y(ct) - 4], [P0x(ct) - 3, P0y(ct) + 4], [P0x(ct) + 3, P0y(ct) + 4]]) citLamp(X(lx + .5), Y(ly + .9), z, now, lx + ly);
+    for (let i = 5; i <= 12; i += 3) { citLamp(X(ct.plaza.x + .1), Y(ct.plaza.y + i + .9), z, now, i); citLamp(X(ct.plaza.x - 7 + .5), Y(ct.plaza.y - 1 + i - 4 + .9), z, now, i + 2); }
+    ctx.fillStyle = '#7a5230'; for (const l of citLots()) if (l.k === 'herreria' || l.k === 'establo') { ctx.fillRect(X(l.x + 1.3), Y(l.y + 1.1), z * .3, z * .3); ctx.fillRect(X(l.x + 1.65), Y(l.y + 1.2), z * .25, z * .22); ctx.fillStyle = '#c9a15a'; ctx.fillRect(X(l.x + 1.3), Y(l.y + 1.1), z * .3, z * .08); ctx.fillStyle = '#7a5230'; }
+  }
+  // plaza del mercado: estatua y puestos
+  const P = ct.plaza, pcx = X(P.x + .5), pcy = Y(P.y + .5);
+  ctx.fillStyle = '#7d8290'; ctx.beginPath(); ctx.ellipse(pcx, pcy + z * .15, z * .85, z * .5, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#3f8fd0'; ctx.beginPath(); ctx.ellipse(pcx, pcy + z * .15, z * .7, z * .38, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.35)'; for (let i = 0; i < 3; i++) { const a = now / 600 + i * 2.1; ctx.beginPath(); ctx.ellipse(pcx + Math.cos(a) * z * .35, pcy + z * .15 + Math.sin(a) * z * .18, z * .1, z * .04, 0, 0, 7); ctx.fill(); }
+  ctx.fillStyle = '#9aa0ad'; ctx.fillRect(pcx - z * .12, pcy - z * .1, z * .24, z * .3); ctx.fillStyle = '#c3c9d6'; ctx.fillRect(pcx - z * .2, pcy - z * .5, z * .4, z * .12); ctx.fillRect(pcx - z * .06, pcy - z * .75, z * .12, z * .3);
+  ctx.fillStyle = 'rgba(160,215,255,.8)'; for (let i = 0; i < 4; i++) { const ph = (now / 500 + i / 4) % 1; ctx.fillRect(pcx + (i - 1.5) * z * .1, pcy - z * .4 + ph * z * .45, Math.max(1, z * .04), Math.max(1, z * .07)); }
+  for (const [dx, dy, col] of [[-2.3, -1.6, '#c9503d'], [2.3, -1.6, '#3d7ac9'], [-2.3, 1.7, '#d1a53a'], [2.3, 1.7, '#c9503d']]) { const sx = X(P.x + .5 + dx), sy = Y(P.y + .5 + dy); ctx.fillStyle = col; ctx.fillRect(sx - z * .38, sy - z * .3, z * .76, z * .2); ctx.fillStyle = '#6b4a2a'; ctx.fillRect(sx - z * .33, sy - z * .1, z * .66, z * .3); }
+  // lotes de edificios
+  const kk = z * .17;
+  for (const l of citLots()) {
+    const lv = l.k === 'establo' ? (c.cart ? 1 : 0) : l.k === 'taberna' ? 1 : (b[l.k] || 0), cx = X(l.x + .5), by = Y(l.y + 1.9), zz = z * 4.6;
+    ctx.fillStyle = lv ? 'rgba(120,100,70,.35)' : 'rgba(0,0,0,.12)'; ctx.fillRect(X(l.x - 1), Y(l.y - 1), 3 * z, 3 * z);
+    if (!lv) { ctx.setLineDash([4, 4]); ctx.strokeStyle = 'rgba(240,225,180,.55)'; ctx.lineWidth = 1.5; ctx.strokeRect(X(l.x - 1) + 2, Y(l.y - 1) + 2, 3 * z - 4, 3 * z - 4); ctx.setLineDash([]); if (z >= 14) { ctx.font = Math.round(z * .8) + 'px ' + EMO; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.fillText(SH.BUILDINGS[l.k] ? SH.BUILDINGS[l.k].e : '🏠', cx, Y(l.y + .5)); ctx.textBaseline = 'alphabetic'; } }
+    else if (l.k === 'herreria') { drawPx('forge', cx, by, kk, Object.assign(lv > 1 ? dynRoof('#4a4f5c', '#30333c') : dynRoof('#7a3f2c', '#562a1c'), lv > 1 ? dynWall('#7a5a42', '#5a4030') : dynWall('#9a7a58', '#7a5c3e'))); for (let i = 0; i < 2; i++) { ctx.fillStyle = 'rgba(210,210,215,' + (.5 - i * .18) + ')'; ctx.fillRect(cx - z * .55 + i * z * .2, Y(l.y - .6) - i * z * .35 - (Date.now() / 90 % 8) * z * .02, z * .3, z * .3); } }
+    else if (l.k === 'cuartel') { drawPx('barracks', cx, by, kk, { T: '#c9503d', t: '#8a2f24', V: lv > 1 ? '#9a958d' : '#b08a60', v: lv > 1 ? '#74706a' : '#8a6a45' }); }
+    else if (l.k === 'taller') drawWorkshop(cx, by - z * .1, zz, lv);
+    else if (l.k === 'asedio') drawPx('siegeshop', cx, by, z * .15, Object.assign(lv > 1 ? dynRoof('#4a4f5c', '#30333c') : dynRoof('#6b4a2a', '#4a3018'), dynWall('#a8865a', '#826440')));
+    else if (l.k === 'iglesia') drawChurch(cx, by - z * .1, zz, lv);
+    else if (l.k === 'establo') drawPx('stable', cx, by, kk, null);
+    else if (l.k === 'taberna') { drawPx('house', cx, by + z * .15, z * .27, Object.assign(dynRoof('#7a3f2c', '#562a1c'), dynWall('#c9a56a', '#a3824a'))); const fl = .8 + .2 * Math.sin(now / 170); ctx.fillStyle = 'rgba(255,190,80,' + (.35 * fl) + ')'; ctx.beginPath(); ctx.arc(cx, by - z * .9, z * 1.1, 0, 7); ctx.fill(); ctx.fillStyle = '#5a3a1e'; ctx.fillRect(cx + z * 1.0, Y(l.y + .1), Math.max(1, z * .05), z * .6); ctx.fillStyle = '#d1a53a'; ctx.fillRect(cx + z * .65, Y(l.y + .1), z * .55, z * .35); if (z >= 12) { ctx.font = Math.round(z * .4) + 'px ' + EMO; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🍺', cx + z * .93, Y(l.y + .3)); ctx.textBaseline = 'alphabetic'; } }
+    citLabel(l.n + (lv ? ' ' + (l.k !== 'taberna' && (lv > 1 || l.k === 'iglesia' || l.k === 'taller' || l.k === 'asedio') ? 'Nv' + lv : '') : ''), cx, Y(l.y + 1.9) + z * .15, z);
+  }
+  // calle del mercado: puestos con toldo (ocupados por los vendedores que llegan)
+  { const M = ct.market, mcols = ['#c9503d', '#3d7ac9', '#d1a53a', '#5fa05a', '#a05fc0'];
+    M.dx.forEach((dx, i) => { const sx = X(P.x + dx), sy = Y(P.y + M.dy), busy = (S.merch || []).some(m => m.x === P.x + dx && m.y === P.y + M.dy), col = mcols[i % 5];
+      ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(sx - z * .1, sy + z * .55, z * 1.2, z * .25);
+      ctx.fillStyle = '#6b4a2a'; ctx.fillRect(sx, sy + z * .35, z, z * .4); ctx.fillStyle = busy ? '#e8d3a0' : '#8a6a45'; ctx.fillRect(sx + z * .08, sy + z * .4, z * .84, z * .12);
+      for (let q = 0; q < 5; q++) { ctx.fillStyle = q % 2 ? '#f2ead8' : col; ctx.fillRect(sx - z * .08 + q * z * .24, sy - z * .05, z * .24, z * .38); }
+      ctx.fillStyle = '#4a3018'; ctx.fillRect(sx - z * .05, sy + z * .3, Math.max(1, z * .06), z * .45); ctx.fillRect(sx + z * 1.0, sy + z * .3, Math.max(1, z * .06), z * .45);
+      if (busy && z >= 12) { ctx.fillStyle = '#ffd36a'; ctx.beginPath(); ctx.arc(sx + z * .5, sy - z * .25, z * .08 * (1 + .3 * Math.sin(now / 180 + i)), 0, 7); ctx.fill(); } });
+    citLabel('Calle del Mercado', X(P.x + .5), Y(P.y + M.dy + 1.9), z); }
+  drawArena(ct, X, Y, z, now);
+  // torres de las esquinas y de las puertas (la atalaya las mejora)
+  const ta = b.atalaya || 0;
+  for (const [tx, ty] of [[r.x0 - 1, r.y0 - 1], [r.x1 + 1, r.y0 - 1], [r.x0 - 1, r.y1 + 1], [r.x1 + 1, r.y1 + 1]]) drawTower(X(tx + .5), Y(ty + .5), z * 3.2, Math.max(1, ta));
+  for (const gt of ct.gates) { const horiz = gt.k !== 'E'; for (const s of [-1, 1]) drawTower(X(gt.x + .5 + (horiz ? s * 1.4 : 0)), Y(gt.y + .5 + (horiz ? 0 : s * 1.4)), z * 2.6, Math.max(1, ta)); citLabel('Puerta ' + ({ N: 'norte', S: 'sur', E: 'este' })[gt.k], X(gt.x + .5), Y(gt.y + (gt.k === 'N' ? -1.3 : 1.7)), z); }
+  citLabel('Plaza del Mercado', pcx, Y(P.y + 3.9), z); citLabel('Muralla' + (b.muralla ? ' Nv' + b.muralla : ''), X(r.x0 + 4), Y(r.y0 - 1.5), z);
+  // aldeanos que van y vienen por las calles (más gente cuanto más se mejora la ciudad)
+  if (z >= 9) {
+    const nv = Math.min(26, 6 + 2 * citPop(c)), segs = [[P.x, P.y + 1, ct.gates.find(q => q.k === 'S').x, r.y1], [P.x, P.y - 1, ct.gates.find(q => q.k === 'N').x, r.y0], [P.x + 1, P.y, r.x1, ct.gates.find(q => q.k === 'E').y], [P.x - 8, r.y0 + 1, P.x - 8, r.y1 - 1], [r.x0 + 1, P.y + 8, r.x1 - 1, P.y + 8]], cols = ['#c9503d', '#3d7ac9', '#d1a53a', '#5fa05a', '#a05fc0', '#e0dccb'];
+    for (let i = 0; i < nv; i++) {
+      const sg = segs[i % segs.length], sp = 5000 + (i * 977) % 4000, ph = ((now / sp + i * .173) % 2), u = ph < 1 ? ph : 2 - ph, wx = sg[0] + (sg[2] - sg[0]) * u, wy = sg[1] + (sg[3] - sg[1]) * u, bob = Math.abs(Math.sin(now / 130 + i)) * z * .06, vx = X(wx + .5 + (sg[0] === sg[2] ? (i % 2 ? .18 : -.18) : 0)), vy = Y(wy + .85 + (sg[1] === sg[3] ? (i % 2 ? .12 : -.1) : 0)) - bob;
+      ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fillRect(vx - z * .1, vy, z * .2, z * .05); ctx.fillStyle = cols[i % cols.length]; ctx.fillRect(vx - z * .08, vy - z * .25, z * .16, z * .2); ctx.fillStyle = '#e8c9a0'; ctx.fillRect(vx - z * .06, vy - z * .38, z * .12, z * .12);
+    }
+  }
+  // estandartes ondeando en las torres de las puertas
+  if (z >= 9) for (const gt of ct.gates) for (const sg of [-1, 1]) { const bx = X(gt.x + .5 + (gt.k !== 'E' ? sg * 1.4 : 0)), by2 = Y(gt.y + .5 + (gt.k === 'E' ? sg * 1.4 : 0)) - z * 1.9, wv = Math.sin(now / 200 + gt.x + sg) * z * .08; ctx.fillStyle = '#d8d0b8'; ctx.fillRect(bx, by2, Math.max(1, z * .05), z * .8); ctx.fillStyle = sg > 0 ? '#c9503d' : '#3d7ac9'; ctx.beginPath(); ctx.moveTo(bx + z * .05, by2); ctx.lineTo(bx + z * .55 + wv, by2 + z * .12 + wv * .4); ctx.lineTo(bx + z * .05, by2 + z * .34); ctx.fill(); }
+  // barra de integridad sobre la plaza
+  if (z >= 12) { const w = z * 3, pct = ct.hp / ct.max; ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(pcx - w / 2, Y(P.y - 1.7), w, z * .22); ctx.fillStyle = pct > .5 ? '#5fd36b' : pct > .25 ? '#e6b450' : '#ff5252'; ctx.fillRect(pcx - w / 2, Y(P.y - 1.7), w * pct, z * .22); }
+}
+const SQ_ORD = { free: ['✋', 'Libre'], guard: ['🛡️', 'Defender'], hunt: ['⚔️', 'Cazar'], city: ['🏠', 'A la ciudad'], raid: ['🕳️', 'Invadir mazmorra'] };
+let citTab = 'war';
+const citSt = () => ((S.cities.find(c => c.cit) || {}).st || { m: {} }).m || {};
+const skTxt = sk => { const L = { dano: '⚔️', salud: '❤️', movilidad: '👟', medico: '✚', doble: '⚡', defensa: '🛡️', general: '🎖️' }; return Object.keys(sk || {}).filter(k => sk[k] > 0).map(k => L[k] + sk[k]).join(' '); };
+const costChips = (cost, pool) => SH.MAT_ORDER.filter(k => cost[k]).map(k => `<span class="chip ${(pool[k] || 0) >= cost[k] ? 'ok' : 'lack'}">${SH.MATS[k].e} ${cost[k]}</span>`).join(' ');
+const clsTxt = (c, sub) => c && SH.CLASSES[c] ? SH.CLASSES[c].e + ' ' + SH.CLASSES[c].n + (sub && SH.CLASSES[c].sub[sub] ? ' · ' + SH.CLASSES[c].sub[sub].n : '') : '';
+function citSheet() {
+  const tabs = [['war', '⚔️ Defensa'], ['bar', '🍺 Taberna'], ['arena', '🏟️ Arena'], ['mkt', '🛒 Mercado']];
+  return hd('🏰 La Ciudadela') + `<div class="row" style="flex-wrap:wrap;gap:4px;margin:6px 0">${tabs.map(([k, t]) => `<button class="btn sm ${citTab === k ? 'gold' : ''}" data-cittab="${k}">${t}</button>`).join('')}</div>` + (citTab === 'bar' ? citBarHtml() : citTab === 'arena' ? citArenaHtml() : citTab === 'mkt' ? citMktHtml() : citWarHtml());
+}
+function citBarHtml() {
+  const bar0 = S.ct.bar, st = citSt(); if (!bar0) return '<p class="dim">La taberna aún no abre.</p>';
+  let h = `<p class="hint" style="margin-top:0">🍺 En la taberna hay clientes con atributos al azar. <b>Cada 30 turnos</b> se renuevan (próxima renovación en <b>${bar0.left}</b> turnos). Pagas con el almacén de la ciudad. Cuanto más avanza la partida, mejores clientes: ¡a veces llega un <b style="color:#ffc300">Legendario</b>, y esos son <b>vampiros</b>! ${SH.VAMP.e}</p>`;
+  h += bar0.c.map(c => { const R = SH.BAR.rar[c.rar], can = !c.taken && SH.MAT_ORDER.every(k => !c.cost[k] || (st[k] || 0) >= c.cost[k]);
+    return `<div class="card" style="border-left:4px solid ${R[1]}"><div class="line"><div class="g"><b>${esc(c.name)}</b> <span style="color:${R[1]};font-weight:700">${R[0]}</span> <span class="dim">· nivel ${c.lv}</span>${c.vamp ? ' <span class="chip">' + SH.VAMP.e + ' Vampiro</span>' : ''}</div></div>${clsTxt(c.cls, c.sub) ? `<div class="dim">${clsTxt(c.cls, c.sub)}</div>` : ''}<div style="margin:3px 0">${skTxt(c.sk)}</div><div>${costChips(c.cost, st)}</div>${c.taken ? '<div class="dim" style="margin-top:4px">Ya reclutado</div>' : `<button class="btn sm gold" style="margin-top:4px" data-c='${jattr({ a: 'bar', id: c.id })}' ${can ? '' : 'disabled'}>Reclutar</button>`}</div>`; }).join('');
+  return h;
+}
+function citArenaHtml() {
+  const ar = S.ct.ar, r = S.ct.r, st = citSt();
+  let h = `<p class="hint" style="margin-top:0">🏟️ Cada cierto tiempo se abre el torneo de la arena (fuera de la puerta este). Tu unidad se enfrenta a <b>${ar.rounds}</b> gladiadores seguidos, cada vez más fuertes. <b>Si cae, solo sale de la arena: no pierdes nada.</b> Cada ronda ganada da experiencia y materiales al almacén; ganar las ${ar.rounds} da gemas y un objeto raro.</p>`;
+  if (ar.last) h += `<div class="line"><div class="g">Último combatiente: <b>${esc(ar.last.name)}</b> (${esc(ar.last.p)}) ganó <b>${ar.last.won}/${ar.last.rounds}</b> rondas</div></div>`;
+  if (!ar.open) return h + `<p class="dim">El torneo está cerrado. Próxima apertura en <b>${ar.next}</b> turno(s).</p>`;
+  h += `<p><b>¡Torneo abierto!</b> Se cierra en ${ar.left} turno(s).</p>`;
+  const us = S.mine.filter(u => !u.sm && !u.cart && !u.bld && !u.sg && !u.bs && !u.dg && u.x >= r.x0 && u.x <= r.x1 && u.y >= r.y0 && u.y <= r.y1);
+  if (!us.length) return h + '<p class="dim">Ninguna de tus unidades está dentro de las murallas.</p>';
+  return h + us.map(u => { const done = ar.ent.includes(u.id); return `<div class="line"><div class="g"><b>${esc(u.name)}</b> <span class="dim">nivel ${u.lv} · ${u.hp}/${u.e ? u.e.maxHp : '?'} ❤️</span></div>${done ? '<span class="dim">ya compitió</span>' : `<button class="btn sm gold" data-c='${jattr({ a: 'arena', u: u.id })}'>⚔️ Enviar a la arena</button>`}</div>`; }).join('');
+}
+function citMktHtml() {
+  const ms = S.merch || [];
+  let h = '<p class="hint" style="margin-top:0">🛒 En la calle del mercado, al sur de la plaza, los vendedores ambulantes montan su puesto unos días. <b>Compras con el almacén de la ciudad</b> (cualquier unidad dentro de las murallas vale).</p>';
+  if (!ms.length) return h + '<p class="dim">Ahora mismo no hay ningún vendedor. Llegan cada pocos turnos.</p>';
+  return h + ms.map(m => `<div class="line"><div class="g">🛒 <b>${esc(m.name)}</b> <span class="dim">· se marcha en ${m.left} turno(s)</span></div><button class="btn sm gold" data-minfo="${m.id}">Ver</button></div>`).join('');
+}
+function citWarHtml() {
+  const ct = S.ct, w = ct.w, free = S.mine.filter(u => !u.sm && !u.cart && !u.bld && !u.sg && !u.bs && !u.sq);
+  let h = '';
+  h += `<p class="hint">${w.fin ? '¡Victoria! La Ciudadela resistió todas las oleadas' : w.lost ? 'La Ciudadela cayó' : w.n ? 'Oleada ' + w.n + ' de ' + w.total : 'Se acerca la primera oleada'}</p>` + bar('xp', w.cleared, w.total);
+  h += `<div class="line"><div class="g">🏰 Integridad de la plaza <b>${ct.hp}/${ct.max}</b></div></div>` + bar(ct.hp / ct.max > .4 ? 'hp' : 'hp low', ct.hp, ct.max);
+  if (!w.fin && !w.lost) {
+    h += `<div class="line"><div class="g">${w.left ? '⚔️ Quedan <b>' + w.left + '</b> de ' + w.cnt + ' enemigos de la oleada' : w.n ? '✅ Oleada superada: ¡mejora, recluta y recoge recursos!' : '⏳ Aún no ha llegado ninguna'}</div></div>`;
+    if (w.n < w.total && !w.left) h += `<div class="line"><div class="g">🌊 Próxima oleada (${w.n + 1}) en <b>${w.next}</b> ${w.next === 1 ? 'turno' : 'turnos'}${(w.n + 1) % w.boss === 0 ? ' · ¡con jefe!' : ''}</div></div>`;
+  }
+  h += `<p class="hint">Todos sois dueños de la ciudad: el almacén, los edificios y las mejoras son de todos. Estar dentro de las murallas cuenta como estar en la ciudad. Los enemigos entran por las puertas 🚪 y, si llegan a la plaza, dañan su integridad.</p>`;
+  { const pv = ct.pv, cn = t => (SH.CREATURES[t] || {}).n || t, ce = t => (SH.CREATURES[t] || {}).e || '';
+    h += hd('🕳️ Mazmorras') + `<p class="hint" style="margin-top:0">Hay 3 entradas fuera de las murallas. Dentro solo puedes tener <b>${ct.raid}</b> unidades a la vez (ahora: <b>${ct.inDg}/${ct.raid}</b>). Al entrar <b>exploras</b> y ves qué trae la próxima oleada; vencer al jefe de una mazmorra hace la oleada un 10% más pequeña (hasta −30%). Se renuevan en cada oleada y suben de nivel.</p>`;
+    if (pv) h += `<div class="card"><div class="line"><div class="g">🔭 <b>Próxima oleada (${pv.n})</b>: <b>${pv.cnt}</b> enemigos de nivel ${pv.lv}</div></div><div class="row" style="flex-wrap:wrap;gap:4px">${pv.types.map(t => `<span class="chip">${ce(t)} ${esc(cn(t))}</span>`).join('')}${pv.boss ? `<span class="chip">👑 Jefe: ${esc(cn(pv.boss))}</span>` : ''}</div></div>`;
+    else if (!w.fin && !w.lost) h += `<div class="line"><div class="g dim">🔭 Aún no has explorado: entra en una mazmorra para ver la próxima oleada.</div></div>`;
+    if (ct.weak) h += `<div class="line"><div class="g">⚔️ Mazmorras vencidas: la próxima oleada será un <b>${10 * ct.weak}%</b> más pequeña.</div></div>`; }
+  h += hd('🛡️ Escuadras') + `<p class="hint" style="margin-top:0">Agrupa unidades y dales una <b>orden permanente</b>: se cumple al terminar el turno (y con «Ejecutar ahora»). Seguirás pudiendo tocar cada unidad.</p>`;
+  for (const s of ct.sq) {
+    const gname = s.g === 'P' ? 'la plaza' : s.g ? 'la puerta ' + ({ N: 'norte', S: 'sur', E: 'este' })[s.g] : 'un punto';
+    h += `<div class="card"><div class="line"><div class="g"><b>${esc(s.n)}</b> <span class="dim">· ${s.c} ${s.c === 1 ? 'unidad' : 'unidades'}</span></div><button class="btn sm" data-sq='${jattr({ d: 'del', id: s.id })}'>✕</button></div>`;
+    h += `<div class="row" style="flex-wrap:wrap;gap:4px;margin:4px 0">${Object.keys(SQ_ORD).map(k => `<button class="btn sm ${s.k === k ? 'gold' : ''}" data-sq='${jattr({ d: 'ord', id: s.id, k })}'>${SQ_ORD[k][0]} ${SQ_ORD[k][1]}</button>`).join('')}</div>`;
+    if (s.k === 'guard') h += `<div class="row" style="flex-wrap:wrap;gap:4px;margin:4px 0"><span class="dim">Defender:</span>${[['N', 'Puerta N'], ['S', 'Puerta S'], ['E', 'Puerta E'], ['P', 'Plaza']].map(([k, t]) => `<button class="btn sm ${s.g === k ? 'gold' : ''}" data-sq='${jattr({ d: 'ord', id: s.id, k: 'guard', g: k })}'>${t}</button>`).join('')}<button class="btn sm" data-sqpt="${s.id}">📍 Punto…</button></div><div class="dim" style="font-size:12px">Vigila ${gname}</div>`;
+    if (s.k === 'hunt') h += '<div class="dim" style="font-size:12px">Salen a cazar lo que puedan vencer y vuelven a la ciudad si se hieren o llenan la mochila.</div>';
+    if (s.k === 'raid') h += '<div class="dim" style="font-size:12px">Hasta 5 entran en la mazmorra con enemigos, luchan, recogen tesoros y salen si se hieren o la limpian. El resto espera en la ciudad.</div>';
+    if (s.k === 'city') h += '<div class="dim" style="font-size:12px">Vuelven a la plaza, se equipan y guardan el botín.</div>';
+    if (free.length) h += `<button class="btn sm" data-sq='${jattr({ d: 'fill', id: s.id })}'>➕ Añadir las ${free.length} sin escuadra</button>`;
+    h += '</div>';
+  }
+  if (ct.sq.length < 8) h += `<button class="btn block" data-sq='${jattr({ d: 'new', n: 'Escuadra ' + (ct.sq.length + 1), ids: free.map(u => u.id) })}'>➕ Nueva escuadra${free.length ? ' con las ' + free.length + ' unidades sin escuadra' : ''}</button>`;
+  if (ct.sq.length) h += `<button class="btn block gold" style="margin-top:6px" data-c='${jattr({ a: 'sqrun' })}'>▶ Ejecutar órdenes ahora</button>`;
+  return h;
+}
+
+const AUTO_T = ['✋ Manual', '⚔️ Moverse y atacar', '🎒 Equiparse', '🤖 Todo'];
+function autoSheet() {
+  const us = S.mine.filter(u => !u.sm && !u.cart && !u.bld && !u.sg && !u.bs), n = us.filter(u => u.au).length;
+  let h = hd('🤖 Automatizar') + `<p class="hint" style="margin-top:0">Las unidades en automático actúan solas <b>al terminar el turno</b> (y cuando pulses «Ejecutar ahora»): <b>⚔️ Moverse y atacar</b> cazan criaturas que puedan vencer, curan a aliados si llevan el báculo del sanador, vuelven a casa si están heridas o con la mochila llena. <b>🎒 Equiparse</b> se ponen lo mejor que tengan en la mochila o en el almacén de la ciudad junto a la que estén. Nunca atacan a otros jugadores.</p>`;
+  h += `<div class="line"><div class="g"><b>Todas mis unidades</b> <span class="dim">(${n}/${us.length} en automático)</span></div></div><div class="row" style="flex-wrap:wrap;gap:6px;margin:6px 0">${AUTO_T.map((t, i) => `<button class="btn sm ${us.length && us.every(u => (u.au || 0) === i) ? 'gold' : ''}" data-c='${jattr({ a: 'auto', all: 1, m: i })}'>${t}</button>`).join('')}</div>`;
+  h += `<button class="btn block gold" data-c='${jattr({ a: 'autorun' })}' ${n ? '' : 'disabled'}>▶ Ejecutar ahora</button>`;
+  h += '<div style="margin-top:10px">' + us.map(u => `<div class="line"><div class="g"><b>${esc(u.name)}</b> <span class="dim">niv. ${u.lv}</span></div><div class="row" style="gap:4px">${[0, 1, 2, 3].map(i => `<button class="btn sm ${(u.au || 0) === i ? 'gold' : ''}" title="${AUTO_T[i]}" data-c='${jattr({ a: 'auto', u: u.id, m: i })}'>${['✋', '⚔️', '🎒', '🤖'][i]}</button>`).join('')}</div></div>`).join('') + '</div>';
+  return h;
+}
 function renderSheet() {
   const el = $('sheet');
   document.body.classList.toggle('sheetopen', !!(sheet && S && S.status !== 'lobby'));
@@ -555,6 +873,7 @@ function renderSheet() {
     case 'more': html += moreSheet(); break;
     case 'chat': html += chatSheet(); break;
     case 'players': html += playersSheet(); break;
+    case 'auto': html += autoSheet(); break;
     case 'hist': html += histSheet(); break;
     case 'world': html += worldSheet(); break;
     case 'trade': html += sheet.tr ? tradeSheet() : ''; break;
@@ -589,10 +908,13 @@ function unitSheet(u) {
     const w = u.eq.arma;
     h += `<div style="display:flex;justify-content:space-between"><span>❤️ Salud</span><span>${u.hp}/${e.maxHp}</span></div>${bar('hp', u.hp, e.maxHp)}`;
     h += `<div style="display:flex;justify-content:space-between;margin-top:8px"><span>✨ Experiencia</span><span>${u.xp}/${u.xpn}</span></div>${bar('xp', u.xp, u.xpn)}`;
+    if (S.ct && !u.sm && !u.bld && !u.sg && !u.cart) h += `<div class="row" style="flex-wrap:wrap;gap:4px;margin-top:8px"><span class="dim">Escuadra:</span><button class="btn sm ${!u.sq ? 'gold' : ''}" data-sq='${jattr({ d: 'unit', u: u.id, id: 0 })}'>Ninguna</button>${S.ct.sq.map(q => `<button class="btn sm ${u.sq === q.id ? 'gold' : ''}" data-sq='${jattr({ d: 'unit', u: u.id, id: q.id })}'>${esc(q.n)}</button>`).join('')}</div>`;
     h += `<div class="grid" style="margin-top:10px">
-      <div class="stat"><small>Daño</small>${e.dmg}${e.attacks > 1 ? ' ×2' : ''}</div><div class="stat"><small>Defensa</small>${e.def}</div>
+      <div class="stat"><small>Daño</small>${e.dmg}${e.attacks > 1 ? ' ×' + e.attacks : ''}</div><div class="stat"><small>Defensa</small>${e.def}</div>
       <div class="stat"><small>Alcance</small>${e.min === e.range ? e.range : e.min + '–' + e.range}</div><div class="stat"><small>Movimiento</small>${Math.round(u.mp * 10) / 10}/${e.mov}</div>
       <div class="stat"><small>Ataques</small>${u.at}/${e.attacks}</div><div class="stat"><small>Arma</small>${w ? SH.KINDS[w.k].e + ' ' + SH.itemName(w) : u.bs ? '🐾 Garras' : '✊ Puños'}</div></div>`;
+    if (e.heal) h += `<p class="hint ok">✚ <b>Cura ${e.heal}</b> de salud a un aliado a distancia ${e.range} (gasta un ataque). Con este báculo equipado, toca a un aliado herido para curarlo.</p>`;
+    if (!u.sm && !u.cart && !u.bld && !u.sg && !u.bs) h += `<div class="row" style="gap:4px;align-items:center;margin:8px 0"><span class="dim">🤖 Automático:</span>${[0, 1, 2, 3].map(i => `<button class="btn sm ${(u.au || 0) === i ? 'gold' : ''}" title="${AUTO_T[i]}" data-c='${jattr({ a: 'auto', u: u.id, m: i })}'>${['✋', '⚔️', '🎒', '🤖'][i]}</button>`).join('')}<button class="btn sm fix" data-ui="auto" style="margin-left:auto">Todas…</button></div>`;
     h += dgUnitHtml(u);
     if (S.cfg && S.cfg.mode === 'mundo' && !u.dg) { const R = SH.WORLD.regions[regionAt(u.x, u.y)]; h += `<p class="hint">${R.e} <b>${R.n}</b>: monstruos hasta ~${Math.round(R.lv * 100)}% de su nivel máximo y botín ×${R.loot}.</p>`; }
     if (u.bs) h += `<p class="hint ok">${SH.CREATURES[u.bs].e} Bestia del Rey Demonio: su fuerza viene de su especie y su nivel; no usa equipo ni clases, pero sí gasta puntos de habilidad y carga botín.</p>`;
@@ -601,6 +923,7 @@ function unitSheet(u) {
       if (S.turn <= SH.HERO.pickTurn) h += `<div class="row" style="flex-wrap:wrap;gap:6px;margin:6px 0">${u.hr ? SH.HERO.emb.map(em => `<button class="btn sm ${em === u.hr ? 'gold' : ''}" data-c='${jattr({ a: 'hero', u: u.id, emb: em })}'>${em}</button>`).join('') : `<button class="btn sm gold" data-c='${jattr({ a: 'hero', u: u.id })}'>👑 Elegir como protagonista</button>`}</div><p class="hint">Solo se puede elegir y cambiar en el turno 1; después queda fijo.</p>`;
     }
     if (u.bs && u.hr) h += `<p class="hint ok">${u.hr} <b>Protagonista del Rey Demonio</b>: +50% de experiencia y +${Math.round(SH.HERO.aura * 100)}% de daño y defensa a tus bestias a ${SH.HERO.range} casillas. Si cae, vuelve a tu ciudad en ${SH.HERO.wait} turnos con ${SH.HERO.loss} niveles menos.</p>`;
+    if (u.vp) h += `<p class="hint ok">${SH.VAMP.e} <b>Vampiro</b>: +${Math.round(SH.VAMP.mods.dmgPct * 100)}% de daño, roba ${Math.round(SH.VAMP.mods.vida * 100)}% de la vida que hace y se regenera ${Math.round(SH.VAMP.mods.regen * 100)}% por turno. Sigue siendo tuyo. Una iglesia lo purifica (junto a la ciudad, cuesta ${SH.fmtCost ? SH.fmtCost(SH.VAMP.purify) : SH.VAMP.purify.alma + ' almas'}).</p><button class="btn sm" data-c='${jattr({ a: 'purify', u: u.id })}'>✨ Purificar</button>`;
     if (u.e && u.e.ha) h += `<p class="hint ok">👑 Cerca de tu protagonista: +${Math.round(u.e.ha * 100)}% de daño y defensa.</p>`;
     if (u.bld) {
       const hc = S.cities.find(c => c.id === u.bld.c), L = hc && hc.b ? hc.b.taller || 0 : 0, rd = S.roads.find(r => r[0] === u.y * S.w + u.x), here = rd ? rd[1] : 0;
@@ -668,9 +991,10 @@ function classTab(u) {
 }
 function citySheet() {
   const c = myCity(sheet.cityId); if (!c) return hd('Ciudad') + '<p class="dim">Ya no controlas esta ciudad.</p>';
-  const tabs = [['state', 'Almacén'], ['forge', 'Forjar'], ['up', 'Mejorar'], ['build', 'Construir'], ['recruit', 'Reclutar']];
-  let h = `<div class="hd"><b>🏰 ${esc(c.name)}</b><button class="x" data-ui="close">✕</button></div><div class="tabs">${tabs.map(t => `<button class="tab ${sheet.tab === t[0] ? 'on' : ''}" data-ui="tab:${t[0]}">${t[1]}</button>`).join('')}</div>`;
+  const tabs = c.vela ? [['state', 'Almacén'], ['forge', 'Forjar'], ['up', 'Mejorar'], ['recruit', 'Revivir']] : [['state', 'Almacén'], ['forge', 'Forjar'], ['up', 'Mejorar'], ['build', 'Construir'], ['recruit', 'Reclutar']];
+  let h = `<div class="hd"><b>${c.vela ? '🕯️' : '🏰'} ${esc(c.name)}</b><button class="x" data-ui="close">✕</button></div><div class="tabs">${tabs.map(t => `<button class="tab ${sheet.tab === t[0] ? 'on' : ''}" data-ui="tab:${t[0]}">${t[1]}</button>`).join('')}</div>`;
   if (sheet.tab === 'state') {
+    if (c.vela) h += '<p class="hint">🕯️ Tus velas comparten un único almacén. No dan bonos ni producen: sirven para guardar, forjar, mejorar y revivir. Cada piso tiene una vela tuya junto a la escalera de subida.</p>';
     h += `<div>${bldHtml(c.b)}</div><div>${matsHtml(c.st.m)}</div>${c.inc && Object.keys(c.inc).length ? `<p class="hint">🏭 Produce por turno: ${Object.keys(c.inc).map(m => `${SH.MATS[m].e} ${c.inc[m]}`).join(' · ')}</p>` : ''}<h3 class="hint" style="margin-top:10px">Objetos guardados</h3>` + (c.st.it.map(it => `<div class="line"><div class="g">${itemHtml(it)}</div></div>`).join('') || '<p class="dim">Ninguno.</p>');
     h += '<p class="hint">Las unidades junto a la ciudad pueden depositar su botín y equiparse desde su ficha (pestañas Equipo y Mochila).</p>';
     h += '<div style="margin-top:12px"><b>♻️ Trueque</b></div><p class="hint">¿Te sobra material barato? Cámbialo por uno mejor (con pérdida).</p>' + SH.CONVERT.map(r => {
@@ -698,7 +1022,7 @@ function citySheet() {
       h += `<div class="line" style="flex-wrap:wrap"><div class="g" style="flex-basis:100%"><b>${ct.e} Carreta</b> <span class="pips">${cc ? '●' : '○'}</span><div class="hint" style="margin:2px 0 0">Estación de suministros andante: las unidades junto a ella guardan y toman objetos, cambian de equipo, ganan +${SH.CART.aura} defensa y se curan ${Math.round(SH.CART.heal * 100)}%/turno. Carga hasta ${ct.cap} (una mochila normal lleva ${S.invCap}), movilidad ${ct.mov}, no ataca y no cuenta como unidad. Máximo una por ciudad.</div></div>` +
         (S.cfg.mode === 'uno' ? '<div class="hint lack">No disponible en el reto de una unidad.</div>' : cc ? `<div class="hint ok">Activa en (${cc.x}, ${cc.y})</div><button class="btn sm" data-ui="gotocart" data-x="${cc.x}" data-y="${cc.y}">Ver</button>` : `<div>${SH.MAT_ORDER.filter(m => ct.cost[m]).map(m => `<span class="chip ${(c.st.m[m] || 0) >= ct.cost[m] ? 'ok' : 'lack'}">${SH.MATS[m].e} ${c.st.m[m] || 0}/${ct.cost[m]}</span>`).join('')}</div><button class="btn sm ${okc ? 'gold' : ''}" ${okc ? '' : 'disabled'} data-c='${jattr({ a: 'cart', c: c.id })}'>Construir</button>`) + '</div>'; }
     if (S.cfg.siege === 'si') {
-      if (c.wm) { const okr = c.wh < c.wm, rc = {}; for (const k in SH.SIEGE.repair) rc[k] = SH.SIEGE.repair[k] * c.b.muralla, okR = okr && SH.MAT_ORDER.every(m => !rc[m] || (c.st.m[m] || 0) >= rc[m]);
+      if (c.wm) { const okr = c.wh < c.wm, rc = {}; for (const k in SH.SIEGE.repair) rc[k] = SH.SIEGE.repair[k] * c.b.muralla; const okR = okr && SH.MAT_ORDER.every(m => !rc[m] || (c.st.m[m] || 0) >= rc[m]);
         h += `<div class="line" style="flex-wrap:wrap"><div class="g" style="flex-basis:100%"><b>🧱 Muralla</b> ${c.wh}/${c.wm}${c.wh <= 0 ? ' <span class="lack">¡BRECHA!</span>' : ''}<div class="hint" style="margin:2px 0 0">Con la muralla en pie, nadie puede entrar a la ciudad. Los arietes y catapultas la rompen. Reparar devuelve la mitad de su vida (1 vez por turno). Se regenera sola ${Math.round(SH.SIEGE.regen * 100)}% por turno si no hay cerco (pero no sale de una brecha sin reparar).</div></div><div>${SH.MAT_ORDER.filter(m => rc[m]).map(m => `<span class="chip ${(c.st.m[m] || 0) >= rc[m] ? 'ok' : 'lack'}">${SH.MATS[m].e} ${c.st.m[m] || 0}/${rc[m]}</span>`).join('')}</div><button class="btn sm ${okR ? 'gold' : ''}" ${okR ? '' : 'disabled'} data-c='${jattr({ a: 'repair', c: c.id })}'>Reparar</button></div>`; }
       if (c.sg > 0) h += `<p class="hint lack">🔒 Ciudad en cerco (${c.sg} turnos): no produce ni recluta${c.sg >= SH.SIEGE.hunger ? ', y las unidades dentro pasan hambre. Una carreta tuya cerca frena el cerco' : '. Una carreta tuya cerca frena el cerco'}.</p>`;
       if (c.b && c.b.asedio) for (const k of ['ram', 'cata']) { const D = SH.SIEGE[k], have = S.mine.filter(x => x.sg && x.sg.c === c.id), has = have.length, okm = c.b.asedio >= D.lv && has < SH.SIEGE.maxPerCity && !(c.sg > 0) && S.cfg.mode !== 'uno' && SH.MAT_ORDER.every(m => !D.cost[m] || (c.st.m[m] || 0) >= D.cost[m]);
@@ -737,6 +1061,8 @@ function citySheet() {
       }
       return `<div class="line" style="flex-wrap:wrap"><div class="g" style="flex-basis:100%">${itemHtml(it)}</div><div>${b || '<span class="dim">Ya está al máximo</span>'}</div>${ch}</div>`;
     }).join('') : '<p class="dim">No hay objetos en el almacén. Forja uno o lleva botín raro de criaturas élite, jefes, cofres y ruinas.</p>';
+  } else if (c.vela) {
+    h += `<p class="hint">En el laberinto no se recluta: solo cuentas con tus unidades. Aquí puedes <b>revivir</b> a las que caigan (cuesta almas y huesos del almacén).</p>`;
   } else {
     const cost = c.rc, n = S.mine.filter(x => !x.sm && !x.cart && !x.bld && !x.sg).length, ok = SH.MAT_ORDER.every(m => !cost[m] || (c.st.m[m] || 0) >= cost[m]) && n < S.maxUnits;
     h += `<p>Unidades: <b>${n}/${S.maxUnits}</b></p><div>Coste: ${SH.MAT_ORDER.filter(m => cost[m]).map(m => `<span class="chip ${(c.st.m[m] || 0) >= cost[m] ? 'ok' : 'lack'}">${SH.MATS[m].e} ${c.st.m[m] || 0}/${cost[m]}</span>`).join('')}</div>`;
@@ -745,6 +1071,7 @@ function citySheet() {
     else if (S.cfg.mode === 'uno') h += '<p class="hint lack">🎯 Reto de una unidad: aquí no se puede reclutar.</p>'; else h += `<button class="btn gold block" style="margin-top:10px" ${ok ? '' : 'disabled'} data-c='${jattr({ a: 'recruit', c: c.id })}'>Reclutar unidad</button><p class="hint">La nueva unidad empieza en nivel 1 y descansa el turno en que llega. Cada reclutamiento cuesta más.</p>`;
   }
   if (S.graves && S.graves.length) {
+    const n = S.mine.filter(x => !x.sm && !x.cart && !x.bld && !x.sg).length;
     h += `<h3 class="hint" style="margin-top:12px">🪦 Caídos</h3>` + S.graves.map(gr => {
       const hl = (c.b && c.b.iglesia) || 0, gc = {}; for (const m in gr.cost) gc[m] = (m === 'hueso' || m === 'alma') && hl ? Math.max(1, Math.ceil(gr.cost[m] * (1 - SH.CHURCH.disc * hl))) : gr.cost[m];
       const okr = SH.MAT_ORDER.every(m => !gc[m] || (c.st.m[m] || 0) >= gc[m]) && n < S.maxUnits;
@@ -770,6 +1097,8 @@ function tutSteps() {
   ];
   const m = c.mode;
   if (m === 'mundo') st.push({ e: '🌍', t: 'Mundo abierto', p: 'Aquí no hay «Fin de turno»: el mundo avanza solo con el reloj y entras cuando quieras. No se recluta (solo crías). Si una ciudad pasa mucho tiempo sin unidades tuyas cerca, <b>vuelve a ser neutral</b>. Los monstruos pueden ser de cualquier nivel: ¡cuidado!' });
+  else if (m === 'oleadas') st.push({ e: '🌊', t: 'Modo Oleadas', p: 'Todos están aliados. Cada pocos turnos llega una <b>oleada</b> de criaturas que marcha sobre vuestras ciudades, cada vez más fuerte, y cada 5 viene un jefe. Toca 🌊/📖 para ver el avance. Superar una oleada da materiales a cada capital. ¡Resistid las 20!' });
+  else if (m === 'laberinto') st.push({ e: '🕯️', t: 'Modo Laberinto', p: 'No hay ciudades: cada jugador tiene una <b>vela</b> por piso para guardar, forjar, mejorar y revivir (sin bonos). Todos están aliados. Busca la escalera ⬇️ de cada piso; cada 2 pisos un jefe sella la bajada. Vence al del último piso para ganar. Toca 🕯️/📖 para ver el avance.' });
   else if (m === 'historia') st.push({ e: '📖', t: 'Modo Historia', p: 'Todos están aliados contra el mundo. Toca 📖 para ver el capítulo y los objetivos. Al cumplirlos, cada capital recibe materiales y botín, y aparece el siguiente reto hasta el Dragón de Ceniza.' });
   else if (m === 'rey') st.push({ e: '👑', t: 'Reto del Rey Demonio', p: S.king === S.you ? 'Eres el <b>Rey Demonio</b>: solo reclutas bestias y tu protagonista es un jefe. Todos los demás están aliados contra ti: ¡destrúyelos!' : 'El Rey Demonio es <b>' + esc(S.players[S.king] ? S.players[S.king].name : '?') + '</b>. Todos los demás están aliados contra él. ¡Derrótenlo entre todos!' });
   else if (m === 'equipos') { const me = S.players[S.you]; st.push({ e: '🤝', t: 'Por equipos', p: 'Estás en el equipo ' + (me && me.team !== null && me.team !== undefined ? SH.TEAM_E[me.team] + ' ' + (me.team + 1) : '') + '. Tus compañeros son aliados y los otros equipos, enemigos. Gana el último equipo en pie.' }); }
@@ -806,7 +1135,30 @@ function summarySheet() {
   return h;
 }
 
+function waveSheet() {
+  const w = S.wv; let h = hd('🌊 Oleadas');
+  h += `<p class="hint">${w.fin ? '¡Victoria! Resististeis todas las oleadas' : w.lost ? 'Las oleadas vencieron' : w.n ? 'Oleada ' + w.n + ' de ' + w.total : 'Se acerca la primera oleada'}</p>`;
+  h += bar('xp', w.cleared, w.total);
+  if (!w.fin && !w.lost) {
+    h += `<div class="line"><div class="g">${w.left ? '⚔️ Quedan <b>' + w.left + '</b> criaturas de la oleada actual' : w.n ? '✅ La oleada actual está superada' : '⏳ Aún no ha llegado ninguna'}</div></div>`;
+    if (w.n < w.total) h += `<div class="line"><div class="g">🌊 Próxima oleada (${w.n + 1}) en <b>${w.next}</b> ${w.next === 1 ? 'turno' : 'turnos'}${(w.n + 1) % w.boss === 0 ? ' · ¡con jefe!' : ''}</div></div>`;
+    else h += '<div class="line"><div class="g">Última oleada en marcha: derrota a todas las criaturas (y al jefe) para ganar.</div></div>';
+  }
+  h += '<p class="hint">Todos los jugadores están aliados. Cada oleada marcha sobre algunas ciudades: defiéndelas con tus unidades. Al superar una oleada, cada capital recibe materiales; cada ' + w.boss + ' oleadas llega un jefe y, al vencerlo, un objeto de botín. Ganáis si superáis las ' + w.total + '.</p>';
+  return h;
+}
+function labSheet() {
+  const L = S.lab; let h = hd('🕯️ Laberinto');
+  h += `<p class="hint">${L.fin ? '¡Victoria! El laberinto fue conquistado' : L.lost ? 'El laberinto venció' : 'Piso más profundo alcanzado: ' + L.best + ' de ' + L.n}</p>` + bar('xp', L.best, L.n);
+  h += '<div style="margin:8px 0">' + L.floors.map(f => `<span class="chip ${f.cleared ? 'ok' : f.f <= L.best ? 'on' : ''}" title="Piso ${f.f}">${f.f}${f.boss ? (f.cleared ? '✅' : '👹') : ''}</span>`).join(' ') + '</div>';
+  h += '<p class="hint">Todos los jugadores están aliados. Cada piso es un laberinto: busca la escalera ⬇️ del fondo (junto a la sala grande). Cada ' + L.boss + ' pisos hay un jefe y la escalera está sellada (🔒) hasta vencerlo. En los callejones sin salida hay 💎 tesoros; cuidado con las ⚠️ trampas ocultas.</p>';
+  h += '<p class="hint">🕯️ En cada piso tienes una vela junto a la escalera de subida: guarda botín, forja, mejora y revive. Todas tus velas comparten almacén y no dan ningún bono. Vence al jefe del último piso para ganar.</p>';
+  return h;
+}
 function storySheet() {
+  if (S.ct && !S.story) return citSheet();
+  if (S.lab && !S.story) return labSheet();
+  if (S.wv && !S.story) return waveSheet();
   const st = S.story; if (!st) return hd('Historia') + '<p class="dim">Esta partida no tiene historia.</p>';
   let h = hd('📖 ' + esc(SH.STORY.title));
   h += `<p class="hint">${st.fin ? 'Campaña completada' : st.lost ? 'La historia terminó' : 'Capítulo ' + (st.ch + 1) + ' de ' + st.n}</p>`;
@@ -940,7 +1292,7 @@ const MANUAL = [
   ['⚒️ Equipo y forja', 'La rareza es el número de efectos: común, poco común, raro, épico, legendario y mítico. En la forja fabricas, mejoras, encantas, reforjas y engarzas gemas. Tres piezas de armadura de la misma calidad dan bonos de set.'],
   ['🤝 Diplomacia y comercio', 'En «Jugadores» ofreces paz o alianza y comercias materiales y objetos: lo que ofreces queda en depósito hasta que respondan (5 turnos). La hoja de comercio muestra un valor de referencia; los bots aceptan si das al menos el 90% de lo que piden. Los mercaderes ambulantes venden por tiempo limitado.'],
   ['🌦️ Eventos', 'El clima cambia el combate, los torneos premian a la mejor unidad que esté en la arena y las hordas asaltan ciudades. Se pueden reducir en los ajustes del mundo.'],
-  ['🎮 Modos', 'Normal, Reto de una unidad, Por equipos, Rey Demonio (el rey recluta bestias y produce el doble de huesos), Historia (campaña cooperativa de 9 capítulos) y Mundo abierto (persistente, sin bots).'],
+  ['🎮 Modos', 'Normal, Reto de una unidad, Por equipos, Rey Demonio (el rey recluta bestias y produce el doble de huesos), Historia (campaña cooperativa de 16 capítulos) y Mundo abierto (persistente, sin bots).'],
   ['💡 Consejos', 'Lleva a tus unidades heridas junto a una ciudad o carreta. Pon una iglesia si reclutas o resucitas mucho. Vigila el registro (📜) y filtra por tipo. Activa los avisos para enterarte de tu turno.'],
 ];
 function manualSheet() {
@@ -954,12 +1306,13 @@ function manualSheet() {
 }
 function dgOf(u) { // qué puede hacer una unidad respecto a las mazmorras
   const cb = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
-  if (u.dg) { const d = (S.dungeons || []).find(x => x.id === u.dg); return d ? (cb(u, d.exit) <= 1 ? { leave: d } : { inside: d }) : null; }
+  if (u.dg) { const d = (S.dungeons || []).find(x => x.id === u.dg); if (d && d.lab) return cb(u, d.lab.down) <= 1 ? { down: d } : cb(u, d.exit) <= 1 && d.lab.f > 1 ? { leave: d } : { inside: d }; return d ? (cb(u, d.exit) <= 1 ? { leave: d } : { inside: d }) : null; }
   const d = (S.dungeons || []).find(x => x.x >= 0 && cb(u, x) <= 1); return d ? { enter: d } : null;
 }
 function dgBtn(u, n) {
   if (n.enter) return `<button class="btn gold sm" data-c='${jattr({ a: 'dungeon', d: 'enter', u: u.id, id: n.enter.id })}'>Entrar con ${esc(u.name)}</button>`;
-  if (n.leave) return `<button class="btn sm" data-c='${jattr({ a: 'dungeon', d: 'leave', u: u.id })}'>🚪 Salir con ${esc(u.name)}</button>`;
+  if (n.down) return n.down.lab.final ? '<div class="hint">Último piso: derrota al jefe para ganar.</div>' : n.down.lab.open ? `<button class="btn gold sm" data-c='${jattr({ a: 'dungeon', d: 'down', u: u.id })}'>⬇️ Bajar con ${esc(u.name)}</button>` : '<div class="hint lack">🔒 Escalera sellada hasta vencer al jefe del piso.</div>';
+  if (n.leave) return n.leave.lab ? `<button class="btn sm" data-c='${jattr({ a: 'dungeon', d: 'leave', u: u.id })}'>⬆️ Subir con ${esc(u.name)}</button>` : `<button class="btn sm" data-c='${jattr({ a: 'dungeon', d: 'leave', u: u.id })}'>🚪 Salir con ${esc(u.name)}</button>`;
   return '';
 }
 function dgUnitHtml(u) {
@@ -1023,9 +1376,21 @@ function infoSheet() {
     return h;
   }
   if (i.t === 't') { if (!S.tourn) return hd('Torneo') + '<p class="dim">El torneo ya terminó.</p>'; return hd('🏟️ Torneo') + `<p>Arena en (${S.tourn.x}, ${S.tourn.y}). Quedan <b>${S.tourn.left}</b> turno(s). Al terminar gana la mejor unidad (nivel, daño, defensa y salud) que esté en la arena o en las casillas pegadas. Premio: 2 gemas, un objeto raro y experiencia. ¡Ojo: los rivales también pueden ir!</p>`; }
+  if (i.t === 'npc') {
+    const n = ((S.ct && S.ct.npcs) || []).find(x => x.id === i.id); if (!n) return hd('Viajero') + '<p class="dim">Ya no está a la vista.</p>';
+    const near = S.mine.filter(u => !u.sm && Math.max(Math.abs(u.x - n.x), Math.abs(u.y - n.y)) <= 1), u0 = near.find(u => u.id === selId) || near[0], st = citSt(), K = SH.NPC.kinds[n.k];
+    let h = hd(K.e + ' ' + esc(n.name) + ' <span class="dim">· ' + K.n + '</span>') + `<p class="hint" style="margin-top:0">Se marcha en ${n.left} turno(s) y deambula por el mundo exterior. Pagas con el <b>almacén de la ciudad</b>.${u0 ? '' : ' <b class="lack">Pon una de tus unidades a su lado.</b>'}</p>`;
+    const btn = (label, can, cmd) => u0 ? `<button class="btn gold block" data-c='${jattr(Object.assign({ a: 'npc', id: n.id, u: u0.id }, cmd || {}))}' ${can ? '' : 'disabled'}>${label}</button>` : '';
+    if (n.k === 'recluta') h += `<div class="card"><div><b>Nivel ${n.lv}</b> ${clsTxt(n.cls) ? '· ' + clsTxt(n.cls) : ''}</div><div style="margin:3px 0">${skTxt(n.sk)}</div><div>${costChips(n.cost, st)}</div></div>` + btn('Reclutar', SH.MAT_ORDER.every(k => !n.cost[k] || (st[k] || 0) >= n.cost[k]));
+    else if (n.k === 'sanador') h += '<p>Cura <b>por completo</b> a tus unidades que estén a 4 casillas o menos (gratis, hasta 3 veces).</p>' + btn('✚ Curar a mis unidades cercanas', true);
+    else h += `<p>Entrena a la unidad de al lado: <b>+2 puntos de habilidad</b>.</p><div>${costChips(SH.NPC.teach, st)}</div>` + btn('📖 Entrenar', SH.MAT_ORDER.every(k => !SH.NPC.teach[k] || (st[k] || 0) >= SH.NPC.teach[k]));
+    return h;
+  }
   if (i.t === 'm') {
     const m = (S.merch || []).find(x => x.id === i.id); if (!m) return hd('Mercader') + '<p class="dim">Ya no está a la vista.</p>';
-    const near = S.mine.filter(u => Math.max(Math.abs(u.x - m.x), Math.abs(u.y - m.y)) <= 1), u0 = near.find(u => u.id === selId) || near[0];
+    const cr = S.ct && S.ct.r, near = S.mine.filter(u => cr ? (u.x >= cr.x0 && u.x <= cr.x1 && u.y >= cr.y0 && u.y <= cr.y1 && !u.dg) : Math.max(Math.abs(u.x - m.x), Math.abs(u.y - m.y)) <= 1), u0 = near.find(u => u.id === selId) || near[0];
+    if (S.ct) { const st = citSt(); let h = hd('🛒 ' + esc(m.name)) + `<p class="hint" style="margin-top:0">Puesto del mercado: se marcha en ${m.left} turno(s). Pagas con el <b>almacén de la ciudad</b>.${u0 ? '' : ' <b class="lack">Necesitas una unidad dentro de las murallas.</b>'}</p>`;
+      return h + m.offers.map((o, n) => { const ok = !!u0 && !o.sold && SH.MAT_ORDER.every(k => !o.cost[k] || (st[k] || 0) >= o.cost[k]); return `<div class="line" style="flex-wrap:wrap"><div class="g"><b>${esc(o.txt)}</b><div>${costChips(o.cost, st)}</div></div>${o.sold ? '<span class="dim">vendido</span>' : `<button class="btn sm gold" data-c='${jattr({ a: 'merch', id: m.id, i: n, u: u0 ? u0.id : 0 })}' ${ok ? '' : 'disabled'}>Comprar</button>`}</div>`; }).join(''); }
     let h = hd('🛒 ' + esc(m.name)) + `<p class="hint">Mercader ambulante: se marcha en ${m.left} turno(s) y deambula. ${u0 ? 'Pagas con lo que lleva <b>' + esc(u0.name) + '</b> en la mochila.' : '<b class="lack">Pon una de tus unidades a su lado para comprar.</b>'}</p>`;
     h += m.offers.map((o, n) => { const ok = !!u0 && !o.sold && SH.MAT_ORDER.every(k => !o.cost[k] || (u0.inv.m[k] || 0) >= o.cost[k]);
       return `<div class="line" style="flex-wrap:wrap"><div class="g"><b>${esc(o.txt)}</b><div>${SH.MAT_ORDER.filter(k => o.cost[k]).map(k => `<span class="chip ${u0 && (u0.inv.m[k] || 0) >= o.cost[k] ? 'ok' : 'lack'}">${SH.MATS[k].e} ${u0 ? (u0.inv.m[k] || 0) : 0}/${o.cost[k]}</span>`).join('')}</div></div>${o.sold ? '<span class="dim">Vendido</span>' : `<button class="btn sm ${ok ? 'gold' : ''}" ${ok ? '' : 'disabled'} data-ui="mb:${m.id},${n},${u0 ? u0.id : 0}">Comprar</button>`}</div>`; }).join('');
@@ -1040,10 +1405,15 @@ function infoSheet() {
 $('sheet').addEventListener('click', e => {
   const c = e.target.closest('[data-c]');
   if (c) { act(JSON.parse(c.dataset.c)); return; }
+  const ctb = e.target.closest('[data-cittab]'); if (ctb) { citTab = ctb.dataset.cittab; renderSheet(); return; }
+  const mib = e.target.closest('[data-minfo]'); if (mib) { openSheet('info', { info: { t: 'm', id: +mib.dataset.minfo } }); return; }
+  const sqb = e.target.closest('[data-sq]'); if (sqb) { act(Object.assign({ a: 'sq' }, JSON.parse(sqb.dataset.sq))); return; }
+  const sqp = e.target.closest('[data-sqpt]'); if (sqp) { sqPtMode = +sqp.dataset.sqpt; closeSheet(); toast('Toca el mapa donde vigilarán'); return; }
   const b = e.target.closest('[data-ui]'); if (!b) return;
   const [k, v] = b.dataset.ui.split(':');
   if (k === 'close') closeSheet();
   else if (k === 'players') openSheet('players');
+  else if (k === 'auto') openSheet('auto');
   else if (k === 'mo') { const bt = $(v); if (!bt) return; if (v === 'nSnd') { bt.click(); renderSheet(); } else { closeSheet(); bt.click(); } }
   else if (k === 'gotocart') { closeSheet(); centerOn(+b.dataset.x, +b.dataset.y); }
   else if (k === 'rename') { const u = S.mine.find(x => x.id === selId); if (!u) return; const nm = prompt('Nuevo nombre para esta unidad (máx. 16 letras):', u.name); if (nm !== null && nm.trim()) send({ t: 'cmd', a: 'rename', u: u.id, name: nm }); }
@@ -1133,11 +1503,15 @@ cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', e
 cv.addEventListener('wheel', e => { e.preventDefault(); cam.z = Math.max(S && S.w > 80 ? 8 : 18, Math.min(90, cam.z * (e.deltaY < 0 ? 1.12 : 0.89))); dirty = true; }, { passive: false });
 function clampCam() { if (!S) return; cam.x = Math.max(0, Math.min(S.w, cam.x)); cam.y = Math.max(0, Math.min(S.h, cam.y)); }
 
+let sqPtMode = 0;
 function tapTile(x, y) {
   if (x < 0 || y < 0 || x >= S.w || y >= S.h) return;
+  if (sqPtMode) { const id = sqPtMode; sqPtMode = 0; act({ a: 'sq', d: 'ord', id, k: 'guard', x, y }); return; }
   if (gotoMode) { const uid = gotoMode; gotoMode = null; act({ a: 'ord', u: uid, o: 'goto', x, y }); renderSheet(); return; }
   const k = y * S.w + x, mine = maps.mine.get(k), cre = maps.cre.get(k), oth = maps.oth.get(k), city = maps.city.get(k), u = selUnit();
   if (u) {
+    if (mine && mine !== u && u.e.heal && u.at > 0 && mine.hp < mine.e.maxHp && SH.cheb(u, mine) <= u.mp + u.e.range) return void act({ a: 'heal', u: u.id, to: mine.id });
+    if (oth && u.e.heal && u.at > 0 && S.dip && S.dip[oth.o] === 'alianza' && oth.hp < oth.mhp && SH.cheb(u, oth) <= u.mp + u.e.range) return void act({ a: 'heal', u: u.id, to: oth.id });
     if (mine && mine !== u) return selectUnit(mine.id);
     if (mine === u) { if (!sheet) { openSheet('unit'); } return; }
     if (cre && atkSet.has('c' + cre.id)) return void act({ a: 'attack', u: u.id, tt: 'c', id: cre.id });
@@ -1153,12 +1527,18 @@ function tapTile(x, y) {
   if (S.tourn && S.tourn.x === x && S.tourn.y === y) return openSheet('info', { info: { t: 't' } });
   const site = (S.sites || []).find(q => q.x === x && q.y === y);
   if (site && !city) return openSheet('info', { info: { t: 's', id: site.id } });
-  if (city) { if (city.o === S.you) return openSheet('city', { cityId: city.id }); return openSheet('info', { info: { t: 'city', id: city.id } }); }
+  if (S.ct) {
+    const np = (S.ct.npcs || []).find(n => n.x === x && n.y === y); if (np) return openSheet('info', { info: { t: 'npc', id: np.id } });
+    const A = S.ct.arena; if (Math.abs(x - A.x) <= 2 && Math.abs(y - A.y) <= 2 && !S.mine.some(u => u.id === selId)) { citTab = 'arena'; return openSheet('story'); }
+    const lot = citLotAt(x, y); if (lot && lot.k === 'taberna') { citTab = 'bar'; return openSheet('story'); }
+    if ((lot || citRoadAt(x, y) === 'q') && !city) { const cc = S.cities.find(q => q.cit); if (cc) return openSheet('city', { cityId: cc.id }); }
+  }
+  if (city) { if (city.o === S.you) return openSheet('city', { cityId: city.id }); if (city.vela) { const mv = S.cities.find(c => c.vela && c.o === S.you && c.dgf === city.dgf) || S.cities.find(c => c.vela && c.o === S.you); if (mv) { toast('🕯️ Usas tu propio almacén'); return openSheet('city', { cityId: mv.id }); } } return openSheet('info', { info: { t: 'city', id: city.id } }); }
   if (u || sheet) closeSheet();
 }
 
 /* ---------- mapa: dibujo ---------- */
-const TCOL = { r: '#5b5560', k: '#15121a', g: '#4d7a3b', f: '#2f5a33', h: '#8a7b4c', m: '#69707c', d: '#c2a45a', w: '#2a5b8c', '?': '#0a0c11' };
+const TCOL = { W: '#7a8090', O: '#a98c5a', r: '#5b5560', k: '#15121a', g: '#4d7a3b', f: '#2f5a33', h: '#8a7b4c', m: '#69707c', d: '#c2a45a', w: '#2a5b8c', '?': '#0a0c11' };
 const EMO = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 const WEAPON_E = new Proxy({}, { get: (_, k) => SH.KINDS[k] ? SH.KINDS[k].e : '⚔️' });
 function emoji(ch, cx, cy, size) { ctx.font = Math.floor(size) + 'px ' + EMO; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(ch, cx, cy + size * 0.06); }
@@ -1170,7 +1550,7 @@ const DGTHEME = [
   { fl: '#6b4437', fl2: '#76503f', wl: '#3a1c15', wl2: '#4c261c', ac: '#ff9d3c' },   // 4 fuego
   { fl: '#3d3550', fl2: '#463d5c', wl: '#150f22', wl2: '#201733', ac: '#ff5252' }    // 5 abismo
 ];
-function dgTier(x, y) { for (const d of S.dungeons || []) if (x >= d.exit.x - 8 && x <= d.exit.x + 14 && y >= d.exit.y - 8 && y <= d.exit.y + 7) return d.tier; return 1; }
+function dgTier(x, y) { for (const d of S.dungeons || []) if (d.box) { if (x >= d.box.x && x < d.box.x + d.box.w && y >= d.box.y && y < d.box.y + d.box.h) return d.tier; } else if (x >= d.exit.x - 8 && x <= d.exit.x + 14 && y >= d.exit.y - 8 && y <= d.exit.y + 7) return d.tier; return 1; }
 /* ---------- pixel art fase 2: terreno. Losetas de 16×16 generadas con ruido determinista (variantes por casilla) ---------- */
 const TILE_STAMPS = {
   tree: { rows: ['..kkkk..', '.kGGGgk.', 'kGGgGGGk', 'kGgGGGGk', 'kGGGGgGk', '.kGGGGk.', '..kkkk..', '...nn...', '...nn...'], pal: { k: '#173a1e', G: '#2f6b36', g: '#4a8f4a', n: '#5a3a1a' } },
@@ -1192,6 +1572,9 @@ function tileImg(t, v, fr) {
   else if (t === 'h') { grass(); tStamp(x, 'hill', 0, 1 + (v & 1)); tStamp(x, 'hill', 4, 9 - (v >> 1)); }
   else if (t === 'm') { x.fillStyle = '#5d6472'; x.fillRect(0, 0, 16, 16); dots(14, '#6b7380'); dots(8, '#4f5560'); tStamp(x, 'peak', 0, 5 + (v & 1)); }
   else if (t === 'd') { x.fillStyle = '#c2a45a'; x.fillRect(0, 0, 16, 16); dots(18, '#d0b36d'); dots(10, '#a98c45'); for (let i = 0; i < 2; i++) { const wx = (R() * 10) | 0, wy = 2 + ((R() * 12) | 0); x.fillStyle = '#b39448'; x.fillRect(wx, wy, 4, 1); x.fillRect(wx + 4, wy - 1, 2, 1); } if (v === 1) tStamp(x, 'cactus', 9, 8); if (v === 2) { x.fillStyle = '#8f7a42'; x.fillRect(4, 11, 2, 1); x.fillRect(5, 10, 1, 1); } }
+  else if (t === 'W') { x.fillStyle = '#8a8f9c'; x.fillRect(0, 0, 16, 16); dots(10, '#9aa0ad'); dots(8, '#767c89'); x.fillStyle = '#6a7080'; for (const yy of [4, 9, 14]) x.fillRect(0, yy, 16, 1); for (const [xx, yy] of [[5, 0], [11, 4], [3, 5], [9, 9], [6, 10], [13, 14], [2, 14]]) x.fillRect(xx, yy, 1, 4 - (yy === 0 ? 0 : 0)); x.fillStyle = '#b4bac7'; x.fillRect(0, 0, 16, 1); }
+  else if (t === 'p') { x.fillStyle = '#a98c5a'; x.fillRect(0, 0, 16, 16); dots(18, '#b79b68'); dots(12, '#96794a'); dots(3, '#7d6640'); }
+  else if (t === 'q') { x.fillStyle = '#9a968c'; x.fillRect(0, 0, 16, 16); x.fillStyle = '#827e75'; for (const yy of [0, 5, 10]) x.fillRect(0, yy, 16, 1); for (const [xx, yy] of [[4, 0], [11, 0], [8, 5], [2, 5], [13, 5], [5, 10], [12, 10]]) x.fillRect(xx, yy, 1, 5); dots(8, '#aaa69c'); }
   else if (t === 'w') { x.fillStyle = '#2a5b8c'; x.fillRect(0, 0, 16, 16); dots(10, '#27557f'); const o = fr ? 3 : 0; for (const [wx, wy] of [[1, 3], [9, 7], [3, 12]]) { const xx = (wx + o + v * 2) % 13; x.fillStyle = '#3d78ad'; x.fillRect(xx, wy, 3, 1); x.fillStyle = '#5a97c9'; x.fillRect(xx + 1, wy - 1, 1, 1); } if (!fr) { x.fillStyle = '#9bd0ee'; x.fillRect((5 + v * 4) % 16, 5 + v, 1, 1); } }
   else { x.fillStyle = TCOL[t] || '#000'; x.fillRect(0, 0, 16, 16); }
   tileCache.set(key, cv); return cv;
@@ -1288,6 +1671,12 @@ function merlons(x, y, len, horiz, t) { // almenas a lo largo de un lienzo de mu
   const n = Math.max(2, Math.floor(len / (t * 2.2))), step = len / n; ctx.fillStyle = ctx.fillStyle;
   for (let i = 0; i < n; i++) { const o = i * step + step * .15; if (horiz) ctx.fillRect(x + o, y - t * .9, step * .55, t * .9); else ctx.fillRect(x - t * .9, y + o, t * .9, step * .55); }
 }
+function drawVela(c, ox, oy, z) {
+  const cx = ox + (c.x + .5) * z, cy = oy + (c.y + .5) * z, own = c.o === S.you, col = c.o === null ? '#bbb' : S.players[c.o].color, pul = .5 + .5 * Math.sin(Date.now() / 260 + c.id);
+  const g1 = ctx.createRadialGradient(cx, cy, 1, cx, cy, z * (1.0 + pul * .12)); g1.addColorStop(0, 'rgba(255,200,90,' + (own ? .55 : .3) + ')'); g1.addColorStop(1, 'rgba(255,200,90,0)'); ctx.fillStyle = g1; ctx.fillRect(cx - z * 1.2, cy - z * 1.2, z * 2.4, z * 2.4);
+  ctx.strokeStyle = col; ctx.lineWidth = own ? 2.5 : 1.5; ctx.beginPath(); ctx.arc(cx, cy, z * .4, 0, 7); ctx.stroke();
+  ctx.font = Math.round(z * .62) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🕯️', cx, cy + z * .03); ctx.textBaseline = 'alphabetic';
+}
 function drawCity(c, ox, oy, z) {
   const col = c.o === null ? '#9aa0aa' : S.players[c.o].color, b = c.b || {}, own = c.o !== null;
   const X = ox + (c.x - 1) * z, Y = oy + (c.y - 1) * z, cx = ox + (c.x + .5) * z, cy = oy + (c.y + .5) * z;
@@ -1373,6 +1762,7 @@ function draw() {
     const k = y * S.w + x, t = S.terr[k], px = ox + x * z, py = oy + y * z;
     const inDg = y >= (S.h0 || S.h) && t !== '?';
     if (inDg) drawDgTile(t, k, x, y, px, py, z, bossTiles && bossTiles.some(b => Math.max(Math.abs(b.x - x), Math.abs(b.y - y)) <= 3));
+    else if (S.ct && (t === 'W' || t === 'O' || t === 'g') && drawCitadelTiles(t, x, y, px, py, z, k)) { }
     else if ('gfhmdw'.includes(t)) { ctx.imageSmoothingEnabled = false; ctx.drawImage(tileImg(t, (tileVar(x, y) >> 4) % 3, ((Date.now() / 700 | 0) + x + y) & 1), px, py, z + 0.5, z + 0.5); }
     else { ctx.fillStyle = TCOL[t] || TCOL['?']; ctx.fillRect(px, py, z + 0.5, z + 0.5); }
     if (false && t === 'f' && z > 22) { ctx.fillStyle = '#1f4524'; for (const [ax, ay] of [[.3, .35], [.68, .6], [.35, .72]]) { ctx.beginPath(); ctx.moveTo(px + ax * z, py + (ay - .2) * z); ctx.lineTo(px + (ax + .14) * z, py + (ay + .12) * z); ctx.lineTo(px + (ax - .14) * z, py + (ay + .12) * z); ctx.fill(); } }
@@ -1388,8 +1778,14 @@ function draw() {
   }
   // ciudades (solar de 3×3 con sus edificios)
   for (const c of S.cities) {
-    if (c.x < x0 - 2 || c.x > x1 + 2 || c.y < y0 - 2 || c.y > y1 + 2) continue;
-    drawCity(c, ox, oy, z);
+    if (c.cit && S.ct) { const r = S.ct.r, A = S.ct.arena; if (x1 < r.x0 - 4 || x0 > A.x + 5 || y1 < Math.min(r.y0, A.y - 4) - 4 || y0 > r.y1 + 14) continue; }
+    else if (c.x < x0 - 2 || c.x > x1 + 2 || c.y < y0 - 2 || c.y > y1 + 2) continue;
+    if (c.vela) drawVela(c, ox, oy, z); else if (c.cit && S.ct) drawCitadel(c, ox, oy, z); else drawCity(c, ox, oy, z);
+  }
+  for (const d of S.dungeons || []) if (d.lab && d.inside) { // escaleras de bajada del laberinto
+    const sx = d.lab.down.x, sy = d.lab.down.y; if (sx < x0 - 1 || sx > x1 + 1 || sy < y0 - 1 || sy > y1 + 1) continue;
+    const cx = ox + (sx + .5) * z, cy = oy + (sy + .5) * z; ctx.fillStyle = d.lab.open ? '#5fd36b55' : '#ff525255'; ctx.beginPath(); ctx.arc(cx, cy, z * .45, 0, 7); ctx.fill();
+    ctx.font = Math.round(z * .6) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff'; ctx.fillText(d.lab.final ? '🏁' : d.lab.open ? '⬇️' : '🔒', cx, cy + z * .03); ctx.textBaseline = 'alphabetic';
   }
   // carreteras y estaciones de suministros
   if (S.roads && S.roads.length) {
@@ -1424,6 +1820,13 @@ function draw() {
   // arena del torneo y mercaderes
   if (S.tourn && S.tourn.x >= x0 - 1 && S.tourn.x <= x1 + 1 && S.tourn.y >= y0 - 1 && S.tourn.y <= y1 + 1) { const cx = ox + (S.tourn.x + .5) * z, cy = oy + (S.tourn.y + .5) * z; ctx.fillStyle = '#c9a0ff44'; ctx.beginPath(); ctx.arc(cx, cy, z * 1.45, 0, 7); ctx.fill(); drawPx('arena', cx, cy + z * .5, z * .06, { T: '#c9a0ff', t: '#8f68c4' }); }
   for (const q of S.merch || []) { if (q.x < x0 - 1 || q.x > x1 + 1 || q.y < y0 - 1 || q.y > y1 + 1) continue; const cx = ox + (q.x + .5) * z, cy = oy + (q.y + .5) * z; ctx.fillStyle = '#6bd6ff33'; ctx.beginPath(); ctx.arc(cx, cy, z * .45, 0, 7); ctx.fill(); drawPx('stall', cx, cy + z * .38, z * .04); }
+  if (S.ct) for (const n of S.ct.npcs || []) { // viajeros del mundo exterior
+    if (n.x < x0 - 1 || n.x > x1 + 1 || n.y < y0 - 1 || n.y > y1 + 1) continue;
+    const cx = ox + (n.x + .5) * z, cy = oy + (n.y + .5) * z, bob = Math.abs(Math.sin(Date.now() / 300 + n.id)) * z * .06, col = n.k === 'recluta' ? '#4aa3ff' : n.k === 'sanador' ? '#5fd36b' : '#e6b450';
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(cx, cy + z * .38, z * .25, z * .08, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = col; ctx.fillRect(cx - z * .17, cy - z * .1 - bob, z * .34, z * .42); ctx.fillStyle = '#e8c9a0'; ctx.fillRect(cx - z * .13, cy - z * .36 - bob, z * .26, z * .26); ctx.fillStyle = '#3a2a1a'; ctx.fillRect(cx - z * .15, cy - z * .4 - bob, z * .3, z * .1);
+    if (z >= 10) { ctx.font = Math.round(z * .5) + 'px ' + EMO; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(n.k === 'recluta' ? '❗' : n.k === 'sanador' ? '✚' : '📖', cx, cy - z * .72 - bob); ctx.textBaseline = 'alphabetic'; }
+  }
   // criaturas
   for (const c of S.cre) {
     if (c.x < x0 - 1 || c.x > x1 + 1 || c.y < y0 - 1 || c.y > y1 + 1) continue;
@@ -1469,6 +1872,7 @@ function draw() {
     ctx.font = 'bold ' + Math.floor(z * .24) + 'px sans-serif'; ctx.textAlign = 'right'; ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.strokeText(m.lv, cx + z * .44, cy - z * .3); ctx.fillText(m.lv, cx + z * .44, cy - z * .3);
     if (own && (m.mp > 0 || m.at > 0) && S.status === 'playing') { ctx.fillStyle = '#3fbf7f'; ctx.beginPath(); ctx.arc(cx - z * .34, cy - z * .34, z * .08, 0, 7); ctx.fill(); }
     if (m.hr) emoji(m.hr, cx - z * .3, cy - z * .36, z * .3);
+    if (m.vp) emoji('🧛', cx + z * .3, cy - z * .36, z * .26);
     if (own && (m.pts > 0 || classAvail(m))) emoji('⭐', cx - z * .3, cy + z * .1, z * .3);
     if (own && m.ord && z > 24) emoji(ORD_E[m.ord.t], cx + z * .32, cy - z * .02, z * .26);
     if (m.pz && z > 26) emoji('☠️', cx + z * .3, cy + z * .12, z * .24);
@@ -1497,28 +1901,29 @@ function draw() {
 /* ---------- minimapa y navegación ---------- */
 const mm = $('mm'), mctx = mm.getContext('2d');
 let mmBase = null, mmKey = '', mmS = null, mmSig = '';
+const labOy = () => S.lab ? Math.max(0, Math.min(S.h - 21, Math.floor(cam.y / 22) * 22)) : 0; // en el laberinto el minimapa muestra el piso que estás viendo
 function drawMini() {
-  const n = S.w, sz = 104, sc = sz / n, mdpr = Math.min(2, window.devicePixelRatio || 1);
+  const n = S.w, sz = 104, sc = sz / n, oy0 = labOy(), rows = S.lab ? 21 : n, mdpr = Math.min(2, window.devicePixelRatio || 1);
   if (mm.width !== sz * mdpr) { mm.width = sz * mdpr; mm.height = sz * mdpr; mmKey = ''; }
   if (mmS !== S) { mmS = S; mmSig = S.turn + ':' + S.terr.length + ':' + S.vis.length + ':' + (S.terr.split('?').length) + ':' + (S.vis.split('1').length); } // se calcula solo cuando llega un estado nuevo (mapas grandes)
-  const key = mmSig;
+  const key = mmSig + ':' + oy0;
   if (key !== mmKey || !mmBase) {
     mmKey = key; mmBase = document.createElement('canvas'); mmBase.width = mm.width; mmBase.height = mm.height;
     const b = mmBase.getContext('2d'); b.scale(mdpr, mdpr); b.fillStyle = '#05070b'; b.fillRect(0, 0, sz, sz);
-    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const k = y * n + x, t = S.terr[k]; if (t === '?') continue; b.fillStyle = TCOL[t]; b.fillRect(x * sc, y * sc, sc + .5, sc + .5); if (S.vis[k] === '0') { b.fillStyle = 'rgba(5,7,12,.5)'; b.fillRect(x * sc, y * sc, sc + .5, sc + .5); } }
+    for (let y = 0; y < rows; y++) for (let x = 0; x < n; x++) { const k = (y + oy0) * n + x, t = S.terr[k]; if (t === '?') continue; b.fillStyle = TCOL[t]; b.fillRect(x * sc, y * sc, sc + .5, sc + .5); if (S.vis[k] === '0') { b.fillStyle = 'rgba(5,7,12,.5)'; b.fillRect(x * sc, y * sc, sc + .5, sc + .5); } }
   }
   mctx.setTransform(1, 0, 0, 1, 0, 0); mctx.clearRect(0, 0, mm.width, mm.height); mctx.drawImage(mmBase, 0, 0);
   mctx.setTransform(mdpr, 0, 0, mdpr, 0, 0);
-  const dot = (x, y, col, r) => { mctx.fillStyle = col; mctx.beginPath(); mctx.arc((x + .5) * sc, (y + .5) * sc, r, 0, 7); mctx.fill(); };
+  const dot = (x, y, col, r) => { y -= oy0; if (y < 0 || y >= rows) return; mctx.fillStyle = col; mctx.beginPath(); mctx.arc((x + .5) * sc, (y + .5) * sc, r, 0, 7); mctx.fill(); };
   for (const q of S.sites || []) dot(q.x, q.y, '#ffd86b', Math.max(1.4, sc * .4));
   for (const c of S.cre) dot(c.x, c.y, c.boss ? '#ffd23f' : c.el ? '#c58bff' : c.hd ? '#ff7a2f' : '#e5484d', Math.max(1.3, sc * (c.boss ? .8 : .45)));
-  for (const c of S.cities) { mctx.fillStyle = c.o === null ? '#bbb' : S.players[c.o].color; mctx.fillRect(c.x * sc - 1, c.y * sc - 1, Math.max(3.5, sc * .9), Math.max(3.5, sc * .9)); if (c.o === S.you) { mctx.strokeStyle = '#fff'; mctx.lineWidth = 1; mctx.strokeRect(c.x * sc - 1, c.y * sc - 1, Math.max(3.5, sc * .9), Math.max(3.5, sc * .9)); } }
+  for (const c of S.cities) { const cy = c.y - oy0; if (cy < 0 || cy >= rows) continue; mctx.fillStyle = c.o === null ? '#bbb' : S.players[c.o].color; mctx.fillRect(c.x * sc - 1, cy * sc - 1, Math.max(3.5, sc * .9), Math.max(3.5, sc * .9)); if (c.o === S.you) { mctx.strokeStyle = '#fff'; mctx.lineWidth = 1; mctx.strokeRect(c.x * sc - 1, cy * sc - 1, Math.max(3.5, sc * .9), Math.max(3.5, sc * .9)); } }
   for (const o of S.others) dot(o.x, o.y, S.players[o.o].color, Math.max(1.3, sc * .4));
   for (const m of S.mine) dot(m.x, m.y, '#fff', Math.max(1.5, sc * .5));
   const vw = W / cam.z, vh = H / cam.z; mctx.strokeStyle = '#e6b450'; mctx.lineWidth = 1.5;
-  mctx.strokeRect((cam.x - vw / 2) * sc, (cam.y - vh / 2) * sc, vw * sc, vh * sc);
+  mctx.strokeRect((cam.x - vw / 2) * sc, (cam.y - vh / 2 - oy0) * sc, vw * sc, vh * sc);
 }
-function mmGo(e) { if (!S || S.status === 'lobby') return; const r = mm.getBoundingClientRect(); centerOn((e.clientX - r.left) / r.width * S.w - .5, (e.clientY - r.top) / r.height * S.h - .5); clampCam(); }
+function mmGo(e) { if (!S || S.status === 'lobby') return; const r = mm.getBoundingClientRect(); centerOn((e.clientX - r.left) / r.width * S.w - .5, S.lab ? labOy() + (e.clientY - r.top) / r.height * S.w - .5 : (e.clientY - r.top) / r.height * S.h - .5); clampCam(); }
 let mmDown = false;
 mm.addEventListener('pointerdown', e => { mmDown = true; try { mm.setPointerCapture(e.pointerId); } catch (x) {} mmGo(e); });
 mm.addEventListener('pointermove', e => { if (mmDown) mmGo(e); });
@@ -1571,6 +1976,7 @@ $('nSnd').onclick = () => { sndOn = !sndOn; try { localStorage.setItem('ada_snd'
 fetch('/api/version').then(r => r.json()).then(v => { const t = 'v' + v.version; $('hVer').textContent = '· ' + t; window.APP_VER = t; const lv = $('lVer'); if (lv) lv.textContent = t; }).catch(() => {});
 $('nHome').onclick = () => {
   if (!S) return; const mine = S.cities.filter(c => c.o === S.you).sort((a, b) => (b.cap ? 1 : 0) - (a.cap ? 1 : 0) || a.id - b.id);
+  if (S.lab) { const u = S.mine.find(x => x.id === selId) || S.mine[0], vs = mine.filter(c => u && c.dgf === u.dg); if (vs.length) { centerOn(vs[0].x, vs[0].y); toast('🕯️ ' + vs[0].name); return; } }
   if (!mine.length) { const u = S.mine[0]; if (u) centerOn(u.x, u.y); return; }
   const c = mine[navCity % mine.length]; navCity++; centerOn(c.x, c.y); toast('🏰 ' + c.name);
 };
@@ -2377,6 +2783,61 @@ SPR.w_orbe = [
 '................','................','................','................','................','................','................'
 ];
 
+
+SPR.w_calavera = [
+'................',
+'................',
+'................',
+'.........xxxx...',
+'........xxxxxx..',
+'........xkxxkx..',
+'........xxxxxx..',
+'.........xkkx...',
+'.........x.x.x..',
+'.........x.x.x..',
+'............B...',
+'............B...',
+'............B...',
+'............B...',
+'................',
+'................'
+];
+SPR.w_baculosan = [
+'.............c..',
+'............ccc.',
+'.............c..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'.............B..',
+'................',
+'................'
+];
+SPR.w_silbato = [
+'................',
+'................',
+'................',
+'................',
+'................',
+'.........kkkk...',
+'........kmlllmk.',
+'.......kmlllllmk',
+'.......kmlllllmk',
+'........kmmmmk..',
+'.........kkkk...',
+'.......yy.......',
+'......y..y......',
+'......y..y......',
+'.......yy.......',
+'................'
+];
 
 SPR.ram = ['................', '................', '................', '...kkkkkkkkkk...', '..kBBBBBBBBBBk..', '..kbbbbbbbbbbk..', '..kkkkkkkkkkkk..', '...kb......bk...', '...kb......bk...', '..kkkkkkkkkkkkkk', '.kBBBBBBBBBBBklk', '.kbbbbbbbbbbbkmk', '..kkkkkkkkkkkkk.', '..kddk....kddk..', '..kddk....kddk..', '...kk......kk...'];
 SPR.cata = ['...........kmmk.', '...........kmmk.', '..........kbk...', '.........kbk....', '........kbk.....', '.......kbk......', '......kbk.......', '....kbbkkkkkkk..', '..kBBBBBBBBBBBk.', '..kbbbbbbbbbbbk.', '..kkkkkkkkkkkkk.', '...kb......bk...', '..kddk....kddk..', '..kddk....kddk..', '...kk......kk...', '................'];

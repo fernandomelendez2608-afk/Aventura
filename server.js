@@ -18,7 +18,7 @@ const PUB = path.join(__dirname, 'public');
 const SAVE_EVERY = +process.env.SAVE_EVERY_MS || 30000; // como mucho un guardado por partida cada 30 s (los cambios de turno se guardan enseguida)
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'application/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json' };
 // archivos de la web que también se aceptan en la raíz (por si se subió el proyecto sin carpetas)
-const ROOT_FILES = new Set(['index.html', 'vigia.html', 'shared.js', 'sw.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png']);
+const ROOT_FILES = new Set(['index.html', 'vigia.html', 'shared.js', 'engine.js', 'botchat.js', 'sw.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png']);
 const RETRY_MS = +process.env.RETRY_MS || 60000;
 const SUBJECT = process.env.VAPID_SUBJECT || (/^https:\/\//.test(process.env.RENDER_EXTERNAL_URL || '') ? process.env.RENDER_EXTERNAL_URL : 'mailto:admin@example.com');
 

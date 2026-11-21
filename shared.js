@@ -75,6 +75,9 @@
     latigo:    { n: 'Látigo',      e: '🪢', slot: 'arma',       w: true, base: 8,  range: 2, min: 1, reach: true, mov: 1, d: 'Alcance 2 sin penalización a quemarropa y +1 movimiento. Una mano' },
     guadana:   { n: 'Guadaña',     e: '🌾', slot: 'arma',       w: true, base: 10, range: 1, min: 1, two: true, exe: 0.30, d: '+30% de daño a enemigos por debajo de la mitad de salud. Dos manos' },
     orbe:      { n: 'Orbe',        e: '🔮', slot: 'arma',       w: true, base: 8,  range: 3, min: 1, pierce: 0.15, magic: true, d: 'Arma mágica: alcance 3, ignora 20% de defensa. Una mano (admite escudo)' },
+    calavera:  { n: 'Calavera',    e: '💀', slot: 'arma',       w: true, magic: true, base: 8,  range: 3, min: 1, pierce: 0.2, necro: true, d: 'Arma mágica: alcance 3, ignora 20% de defensa. Una mano (admite escudo). Nigromante: +30% de daño, +1 alcance y esqueletos con +20% de salud' },
+    baculosan: { n: 'Báculo del sanador', e: '✚', slot: 'arma', w: true, magic: true, base: 4, range: 3, min: 1, two: true, heal: 10, d: 'Hace poco daño a enemigos, pero en vez de herir a tus aliados los CURA a distancia (alcance 3, gasta un ataque). Dos manos. Sanador y puntos de Médico curan más' },
+    silbato:   { n: 'Silbato',     e: '📯', slot: 'arma',       w: true, base: 3,  range: 4, min: 1, multi: 4, whistle: true, d: 'Alcance 4, poco daño, pero ataca 4 veces por turno. Una mano. Invocador: +35% de daño y sus invocaciones hacen +20% de daño' },
     escudo:    { n: 'Escudo',      e: '🛡️', slot: 'escudo',     def: 4, d: 'Solo con armas de una mano' },
     casco:     { n: 'Casco',       e: '⛑️', slot: 'casco',      def: 2 },
     guantes:   { n: 'Guantes',     e: '🧤', slot: 'guantes',    def: 1 },
@@ -84,13 +87,13 @@
     botas:     { n: 'Botas',       e: '🥾', slot: 'botas',      def: 1 },
     mochila:   { n: 'Mochila',     e: '🎒', slot: 'mochila',    def: 0, pack: true, d: 'Amplía el inventario de quien la lleva' },
   };
-  const WEAPON_KINDS = ['daga', 'espada', 'hacha', 'katana', 'hachabatalla', 'lanza', 'baston', 'varita', 'arco', 'arcolargo', 'ballesta', 'estoque', 'maza', 'bumeran', 'latigo', 'guadana', 'orbe'];
+  const WEAPON_KINDS = ['daga', 'espada', 'hacha', 'katana', 'hachabatalla', 'lanza', 'baston', 'varita', 'arco', 'arcolargo', 'ballesta', 'estoque', 'maza', 'bumeran', 'latigo', 'guadana', 'orbe', 'calavera', 'baculosan', 'silbato'];
   const GEAR_KINDS = ['escudo', 'casco', 'guantes', 'hombreras', 'pechera', 'pantalones', 'botas', 'mochila'];
   const SLOTS = ['arma', 'escudo', 'casco', 'guantes', 'hombreras', 'pechera', 'pantalones', 'botas', 'mochila'];
   const PACK = [0, 6, 10, 15, 21, 30]; // espacios extra según el material de la mochila
   const SLOT_NAMES = { arma: 'Arma', escudo: 'Escudo', casco: 'Casco', guantes: 'Guantes', hombreras: 'Hombreras', pechera: 'Pechera', pantalones: 'Pantalones', botas: 'Botas', mochila: 'Mochila' };
 
-  const COUNT = { daga: 1, espada: 3, hacha: 3, katana: 4, hachabatalla: 5, lanza: 3, baston: 4, varita: 2, arco: 2, arcolargo: 3, ballesta: 4, estoque: 2, maza: 3, bumeran: 2, latigo: 2, guadana: 4, orbe: 3, escudo: 3, casco: 2, guantes: 1, hombreras: 2, pechera: 4, pantalones: 3, botas: 2, mochila: 3 };
+  const COUNT = { daga: 1, espada: 3, hacha: 3, katana: 4, hachabatalla: 5, lanza: 3, baston: 4, varita: 2, arco: 2, arcolargo: 3, ballesta: 4, estoque: 2, maza: 3, bumeran: 2, latigo: 2, guadana: 4, orbe: 3, calavera: 3, baculosan: 4, silbato: 2, escudo: 3, casco: 2, guantes: 1, hombreras: 2, pechera: 4, pantalones: 3, botas: 2, mochila: 3 };
   function recipe(kind, t) {
     const weapon = !!KINDS[kind].w;
     if (t === 5) return { escama: Math.max(1, Math.ceil(COUNT[kind] / 2)), alma: COUNT[kind] }; // dracónico: escamas de dragón + almas
@@ -245,9 +248,9 @@
     cazador: { n: 'Cazador', e: '🏹', d: '+1 alcance con armas a distancia, +1 movimiento, +20% de daño y +30% de daño a criaturas.', mods: { range: 1, mov: 1, vsCre: 0.30, dmgPct: 0.20 },
       sub: { francotirador: { n: 'Francotirador', e: '🎯', d: '+1 alcance más, +12% de daño e ignora 25% de defensa.', mods: { range: 1, certero: 0.25, dmgPct: 0.12 } },
              rastreador: { n: 'Rastreador', e: '🐾', d: '+30% de daño a criaturas, +1 movimiento y +28% de daño.', mods: { vsCre: 0.30, mov: 1, dmgPct: 0.28 } } } },
-    sanador: { n: 'Sanador', e: '✚', d: 'Cuenta como +2 puntos de Médico y se cura 5% por turno.', mods: { medico: 2, regen: 0.05 },
-      sub: { medico_campo: { n: 'Médico de campaña', e: '⛑️', d: '+3 puntos de Médico.', mods: { medico: 3 } },
-             custodio: { n: 'Custodio', e: '💠', d: '+3 defensa, aura +4% y +1 punto de Médico.', mods: { def: 3, aura: 0.04, medico: 1 } } } },
+    sanador: { n: 'Sanador', e: '✚', d: 'Cuenta como +2 puntos de Médico y se cura 5% por turno.', mods: { medico: 2, regen: 0.05, heal: 0.30 },
+      sub: { medico_campo: { n: 'Médico de campaña', e: '⛑️', d: '+3 puntos de Médico.', mods: { medico: 3, heal: 0.20 } },
+             custodio: { n: 'Custodio', e: '💠', d: '+3 defensa, aura +4% y +1 punto de Médico.', mods: { def: 3, aura: 0.04, medico: 1, heal: 0.10 } } } },
     asesino: { n: 'Asesino', e: '🗡️', d: 'El primer ataque del turno hace +35%, +1 movimiento, ignora 15% de defensa.', mods: { first: 0.35, mov: 1, certero: 0.15 },
       sub: { sombra: { n: 'Sombra', e: '🌑', d: 'Primer ataque +15% más y +1 movimiento.', mods: { first: 0.15, mov: 1 } },
              envenenador: { n: 'Envenenador', e: '☠️', d: 'Sus golpes envenenan (55% de su daño por turno, 3 turnos).', mods: { veneno: 0.55 } } } },
@@ -257,10 +260,10 @@
     mago: { n: 'Mago', e: '🔮', d: '+22% de daño con báculo y varita y +1 alcance a distancia.', mods: { magic: 0.22, range: 1 },
       sub: { hechicero: { n: 'Hechicero', e: '🌩️', d: '+12% más de daño mágico e ignora 15% de defensa.', mods: { magic: 0.12, certero: 0.15 } },
              arcano: { n: 'Arcano', e: '🌀', d: '+1 alcance, +1 movimiento, +15% de daño mágico y se cura 3% por turno.', mods: { range: 1, mov: 1, regen: 0.03, magic: 0.15 } } } },
-    invocador: { n: 'Invocador', e: '🐾', d: '+10% salud y +2 defensa. Invoca lobos u osos cerca de una ciudad (cuestan huesos).', mods: { hpPct: 0.10, def: 2 }, summons: ['lobo', 'oso'],
+    invocador: { n: 'Invocador', e: '🐾', d: '+10% salud y +2 defensa. Invoca lobos u osos cerca de una ciudad (cuestan huesos).', mods: { hpPct: 0.10, def: 2, silb: 0.35 }, summons: ['lobo', 'oso'],
       sub: { domador: { n: 'Domador', e: '🦴', d: 'Sus invocaciones hacen +30% de daño.', mods: { sumDmg: 0.30 } },
              alfa: { n: 'Alfa', e: '🐺', d: 'Sus invocaciones tienen +35% de salud.', mods: { sumHp: 0.35 } } } },
-    nigromante: { n: 'Nigromante', e: '💀', d: '+25% de daño mágico y +10% salud. Invoca esqueletos cerca de una ciudad (cuestan huesos).', mods: { magic: 0.25, hpPct: 0.10 }, summons: ['esqueleto'],
+    nigromante: { n: 'Nigromante', e: '💀', d: '+25% de daño mágico y +10% salud. Invoca esqueletos cerca de una ciudad (cuestan huesos).', mods: { magic: 0.25, hpPct: 0.10, calav: 0.30 }, summons: ['esqueleto'],
       sub: { senor: { n: 'Señor de huesos', e: '🦴', d: 'Sus esqueletos tienen +35% de salud y él +15% de daño mágico.', mods: { sumHp: 0.35, magic: 0.15 } },
              maldito: { n: 'Maldito', e: '☠️', d: 'Sus esqueletos hacen +30% de daño y él +20% de daño mágico.', mods: { sumDmg: 0.30, magic: 0.20 } } } },
   });
@@ -341,9 +344,11 @@
     mode:       { n: 'Modo de juego', def: 'normal', o: { normal: 'Normal', uno: 'Reto de una unidad: cada jugador (y bot) solo tiene 1 unidad y si cae queda eliminado', equipos: 'Por equipos: los jugadores se reparten al azar en equipos aliados (elige 2 o 5 equipos en el ajuste de abajo) y gana el último equipo en pie',
       mundo: 'Mundo abierto: mundo enorme y persistente para jugadores (sin bots). Se entra cuando quieras, no se recluta (solo crías), las ciudades sin tus unidades vuelven a ser neutrales y los monstruos salen de cualquier nivel',
       oleadas: 'Oleadas: cooperativo, todos aliados. Cada pocos turnos una oleada de criaturas ataca vuestras ciudades, cada vez más fuerte y con jefes; gana el grupo si resiste todas',
+      ciudadela: 'Ciudadela: cooperativo. Una gran ciudad amurallada compartida por todos: defiéndela de oleadas de criaturas, mejórala entre oleadas y manda a tus unidades por escuadras',
       laberinto: 'Laberinto: sin mundo exterior; todos aliados bajan por los pisos de un laberinto (10–20) con una vela por piso en vez de ciudades y un jefe cada 2 pisos',
       historia: 'Historia: campaña cooperativa de 6 capítulos (todos los jugadores aliados) que termina contra el Dragón de Ceniza',
       rey: 'Reto del Rey Demonio: un jugador al azar es el Rey Demonio (solo recluta bestias) y los demás están aliados contra él' } },
+    waveGap:    { n: 'Ciudadela: turnos entre oleadas (y hasta la primera)', def: 100, o: { 10: '10 turnos (muy intenso)', 25: '25 turnos', 50: '50 turnos', 100: '100 turnos (tiempo para explorar, recomendado)', 200: '200 turnos (partida muy larga)' } },
     victory:    { n: 'Tipo de final (modos Normal y Reto de una unidad)', def: 'ultimo', o: {
       ultimo: 'Último en pie (o alianza total)',
       tiempo: 'Por tiempo: a los 40 turnos gana quien tenga más puntos (si no pones otro límite)',
@@ -375,6 +380,18 @@
   const VICTORY = { dominio: { pct: 0.5, hold: 4 }, jefes: { n: 2 }, campeon: { lv: 12 }, puntos: { pts: 600 }, tiempo: { turns: 40 } };
   // modo Oleadas: total de oleadas, cada cuántos turnos llega una, y un jefe cada `boss` oleadas
   const WAVES = { total: 20, first: 3, every: 3, boss: 5, bosses: ['reylobo', 'minotauro', 'liche', 'dragon'] };
+  // modo Ciudadela: mapa fijo con una gran ciudad amurallada; rect = interior (las murallas rodean ese rectángulo), gates = puertas (x, y en la muralla)
+  const CIT = { w: 96, h: 76, r: { x0: 35, y0: 28, x1: 60, y1: 47 }, plaza: { x: 47, y: 38 }, gates: [{ k: 'S', x: 54, y: 48 }, { k: 'N', x: 42, y: 27 }, { k: 'E', x: 61, y: 37 }],
+    waves: 20, first: 100, rest: 100, boss: 5, bosses: ['reylobo', 'minotauro', 'liche', 'dragon'], hp: 100, units: 100, raid: 5, startUnits: 4,
+    base: 3, grow: 1.7, perPlayer: 0.35, maxEnemies: 140, repair: 4, spawnDist: 15,
+    arena: { x: 69, y: 32 }, market: { dy: 7, dx: [-10, -6, -2, 3, 10] }, // arena fuera de la puerta este; puestos del mercado en la calle sur
+    lots: [{ k: 'cuartel', n: 'Cuartel', dx: -8, dy: -6 }, { k: 'taller', n: 'Taller del Constructor', dx: 0, dy: -7 }, { k: 'asedio', n: 'Taller de Asedio', dx: 9, dy: -6 }, { k: 'taberna', n: 'Taberna', dx: 5, dy: -7 },
+      { k: 'herreria', n: 'Herrería', dx: -9, dy: -1 }, { k: 'iglesia', n: 'Iglesia', dx: -7, dy: 5 }, { k: 'establo', n: 'Establos', dx: 11, dy: 5 }] };
+  // taberna (reclutas con rareza cada 30 turnos), viajeros del mundo exterior y torneo de la arena
+  const BAR = { every: 30, n: 3, rar: [['Común', '#aab', 46], ['Poco común', '#4caf50', 28], ['Raro', '#3d8bff', 16], ['Épico', '#a050ff', 8], ['Legendario', '#ffc300', 2]],
+    cost: [{ cuero: 8 }, { cuero: 12, hierro: 4 }, { hierro: 10, acero: 2 }, { acero: 8, alma: 3 }, { acero: 16, alma: 8, escama: 2 }] };
+  const NPC = { cap: 9, every: 4, stay: 28, first: 8, kinds: { recluta: { e: '🧑', n: 'Viajero', w: 70 }, sanador: { e: '✚', n: 'Curandero', w: 16 }, maestro: { e: '📖', n: 'Maestro de armas', w: 14 } }, teach: { hierro: 6, alma: 1 } };
+  const ARENA = { every: 12, first: 8, len: 3, rounds: 5 };
   const PRESETS = [
     { id: 'clasica',  e: '🏛️', n: 'Clásica',  d: 'La partida de siempre: turnos de 4 horas y sin límite de turnos.', cfg: { turnHours: 4, maxTurns: 0 } },
     { id: 'rapida',   e: '⚡', n: 'Rápida',   d: 'Para jugar en una tarde: mapa pequeño, 8 unidades de nivel 3, crías a los 3 turnos, turnos de 15 minutos y 30 turnos como máximo.', cfg: { turnHours: 0.25, maxTurns: 30, mapSize: 'pequeno', startUnits: '8', startLevel: '3', breed: 'tres' } },
@@ -384,6 +401,7 @@
     { id: 'rey',      e: '👑', n: 'Rey Demonio', d: 'Un jugador al azar es el Rey Demonio (solo recluta bestias, con un jefe de protagonista) contra todos los demás, aliados. Turnos de 1 hora.', cfg: { turnHours: 1, maxTurns: 0, mode: 'rey' } },
     { id: 'historia', e: '📖', n: 'Historia', d: 'Campaña cooperativa de 6 capítulos contra el Dragón de Ceniza, con todos los jugadores aliados. Turnos de 1 hora.', cfg: { turnHours: 1, maxTurns: 0, mode: 'historia' } },
     { id: 'oleadas',  e: '🌊', n: 'Oleadas', d: 'Cooperativo: todos aliados defienden sus ciudades de 20 oleadas de criaturas cada vez más fuertes, con un jefe cada 5. Cada oleada superada da botín. Turnos de 1 hora.', cfg: { turnHours: 1, maxTurns: 0, mode: 'oleadas' } },
+    { id: 'ciudadela', e: '🏰', n: 'Ciudadela', d: 'Cooperativo: una gran ciudad amurallada compartida por todos. Defiéndela de 20 oleadas, mejórala entre oleadas y manda a tus unidades por escuadras. Turnos de 1 hora.', cfg: { turnHours: 1, maxTurns: 0, mode: 'ciudadela' } },
     { id: 'laberinto', e: '🕯️', n: 'Laberinto', d: 'Cooperativo: todos aliados bajan por los pisos de un laberinto (12 por defecto, un jefe cada 2) con 2 unidades y una vela por piso en lugar de ciudades. Turnos de 1 hora.', cfg: { turnHours: 1, maxTurns: 0, mode: 'laberinto', floors: '12' } },
     { id: 'mundo',    e: '🌍', n: 'Mundo abierto', d: 'Mundo enorme y siempre abierto para jugadores (sin bots): se entra cuando se quiera, no se recluta y las ciudades abandonadas vuelven a ser neutrales. Turnos de 1 hora.', cfg: { turnHours: 1, maxTurns: 0, mode: 'mundo', worldSize: 'enorme', decay: '24' } },
   ];
@@ -478,6 +496,8 @@
     d: { n: 'Desierto', c: 1, def: 0 },
     r: { n: 'Suelo de mazmorra', c: 1, def: 0 },
     k: { n: 'Muro de mazmorra', c: 99, def: 0 },
+    W: { n: 'Muralla de la ciudadela', c: 99, def: 0 },
+    O: { n: 'Puerta de la ciudadela', c: 1, def: 3 },
   };
 
   // agg = radio de agresividad (0 = pasivo hasta que lo golpean)
@@ -558,9 +578,9 @@
   }
 
   return {
-    SKILLS, SKILL_ORDER, MATS, MAT_ORDER, TIER_NAMES, WM, AM, KINDS, WEAPON_KINDS, GEAR_KINDS, SLOTS, SLOT_NAMES, PACK,
+    CIT, SKILLS, SKILL_ORDER, MATS, MAT_ORDER, TIER_NAMES, WM, AM, KINDS, WEAPON_KINDS, GEAR_KINDS, SLOTS, SLOT_NAMES, PACK,
     recipe, itemValue, MAX_TIER, ENCHANT_STEPS, MAX_FX, REFORGE_COST, SET_BONUS, armorSet, itemName, tierName, RARITY, AFFIX, WEAPON_FX, ARMOR_FX, affixText, upgradeCost, ENCHANT_COST,
-    WORLD, WAVES, LAB, SIEGE, CART, HERO, KING, BOSS_IDS, DUNGEON, TEAM_E, STORY, CONVERT, VAMP, SUMMON, WORLD_OPTS, PRESETS, VICTORY, GEMS, GEM_IDS, GEM_LV, gemOf, gemFx, gemText, SOCKETS_BY_R, MAX_SOCKETS, SOCKET_STEPS, GEM_UP, CLASS_LV, SUB_LV, CLASSES, classMods, BUILDER, ROAD_COST, MAT_VAL, itemVal, INCOME, BUILDINGS, bMax, CHURCH, ANGEL, CITY_GUARD, BUILD_ORDER, BUILD_MAX, ORDERS,
+    BAR, NPC, ARENA, WORLD, WAVES, LAB, SIEGE, CART, HERO, KING, BOSS_IDS, DUNGEON, TEAM_E, STORY, CONVERT, VAMP, SUMMON, WORLD_OPTS, PRESETS, VICTORY, GEMS, GEM_IDS, GEM_LV, gemOf, gemFx, gemText, SOCKETS_BY_R, MAX_SOCKETS, SOCKET_STEPS, GEM_UP, CLASS_LV, SUB_LV, CLASSES, classMods, BUILDER, ROAD_COST, MAT_VAL, itemVal, INCOME, BUILDINGS, bMax, CHURCH, ANGEL, CITY_GUARD, BUILD_ORDER, BUILD_MAX, ORDERS,
     SEASON_LEN, SEASONS, seasonIdx, WEATHER, WEATHER_ORDER, TOURN, MERCH, ELITE_NAMES, SITES, PERS, BOT_LEVELS, PACTS, TERR, CREATURES, DIRS, cheb, reach,
   };
 });

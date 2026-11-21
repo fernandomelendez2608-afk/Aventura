@@ -644,3 +644,86 @@ Modo cooperativo nuevo (modo rápido «Laberinto», o *Modo de juego → Laberin
 - Los bots avanzan por los pisos, pelean, vuelven a su vela cuando la mochila se llena y bajan por la escalera.
 
 Pruebas: `test/features13.js`.
+
+## v1.55.1 — Arreglo del menú de la ciudad
+
+- Corregido: con los asedios activados, la ciudad que tenía **muralla** no dibujaba su menú (la pestaña «Construir» fallaba por una variable mal declarada y la hoja quedaba en blanco, sin dejar mejorar ni actualizar nada).
+- Revisado con 184 estados de partida reales (varios modos, hasta 150 turnos) abriendo todas las hojas y pestañas de ciudades y unidades: sin más errores.
+
+## v1.55.2 — Velas aliadas
+
+- En el Laberinto, una unidad junto a la vela de **otro jugador** (aliado) ahora puede equipar, guardar y retirar objetos como si estuviera junto a la suya, usando **su propio almacén** (el de sus velas). Nadie gasta ni toca lo de otro.
+- Tocar en el mapa la vela de un aliado abre el menú de **tu** vela de ese piso (forjar, mejorar, encantar, revivir con tu almacén).
+
+## v1.55.3 — Sin islas aisladas
+
+- Al generar el mapa, cualquier trozo de tierra que no se pueda alcanzar a pie desde las capitales (por ejemplo una isla en el borde) pasa a ser agua. Así ninguna mazmorra (como el Abismo), cofre, ruina o aldea queda inalcanzable.
+
+## v1.56 — Modo sin conexión 📴
+
+- En la pantalla de inicio, tarjeta **«Sin conexión»** → *Crear partida sin conexión*. El motor del juego corre dentro del propio celular (`public/local.js` carga `engine.js` en el navegador) y las partidas se guardan en el celular (IndexedDB). Se juega con bots, sin internet.
+- **Importante:** abre el juego **una vez con señal** antes del viaje (el service worker `sw.js` guarda una copia de la app). Después se abre y se juega sin red. Con red siempre carga lo más nuevo; si la señal es mala (>4 s) usa la copia guardada.
+- Hay un solo jugador humano; los turnos avanzan al pulsar «Fin de turno» (sin reloj). Cualquier modo menos Mundo abierto. Sin chat entre personas, avisos ni cuentas.
+- Las partidas sin conexión (📴) no se comparten con el servidor ni con la cuenta; se borran con ✕ y no se recuperan. Si borras los datos del navegador, se pierden.
+- Pruebas: `test/features15.js`.
+
+## v1.57 — Botón Automatizar y 3 armas nuevas
+
+**🤖 Automatizar** (panel «Más» → Automatizar, o la fila «Automático» en la ficha de cada unidad). Cada unidad tiene 4 modos: ✋ manual · ⚔️ moverse y atacar · 🎒 equiparse · 🤖 todo. También hay botones para poner **todas** a la vez y «▶ Ejecutar ahora».
+- Las unidades automáticas actúan solas **al terminar el turno** (también si el turno acaba por el reloj).
+- ⚔️ Cazan las criaturas que pueden vencer (comparando su fuerza, con los aliados cercanos, contra la de la criatura; los jefes exigen más ventaja), curan a aliados heridos si llevan el báculo del sanador, vuelven a casa con menos del 50% de salud o la mochila llena (y guardan el botín). **Nunca atacan a otros jugadores.**
+- 🎒 Se equipan lo mejor de su mochila y del almacén de la ciudad junto a la que estén (no cambian de tipo de arma: un arquero sigue con arma a distancia).
+- «Terminar turno» ya no avisa por unidades automáticas que aún tienen ataques.
+
+**Armas nuevas** (se forjan, caen de botín y las usan los bots según su clase):
+- 💀 **Calavera** — mágica, alcance 3, ignora 20% de defensa, una mano. **Nigromante:** +30% de daño, +1 alcance y sus esqueletos tienen +20% de salud mientras la lleve.
+- ✚ **Báculo del sanador** — dos manos, alcance 3, hace poco daño a enemigos, pero **cura a tus aliados** (y a los aliados por pacto) a distancia gastando un ataque: toca a un aliado herido con la unidad seleccionada. Cura = 10 × material + 3 por punto de Médico; **Sanador** +30% (Médico de campaña +20%, Custodio +10%).
+- 📯 **Silbato** — una mano, alcance 4, poco daño, **4 ataques por turno** (los golpes siguientes hacen 60%). **Invocador:** +35% de daño con él y sus invocaciones hacen +20% de daño mientras lo lleve.
+- Comando nuevo `heal` (`{a:'heal', u, to}`), `auto` y `autorun`. Pruebas: `test/features16.js`.
+
+## v1.58 — Modo Ciudadela 🏰 (fase 1)
+
+Modo cooperativo largo: una gran ciudad amurallada **compartida por todos los jugadores** (todos son dueños: almacén, edificios y mejoras comunes).
+
+- **Oleadas**: 20 oleadas (una cada **100 turnos**, tiempo para explorar mazmorras y el mundo), con jefe cada 5. Los enemigos salen fuera de las murallas y entran por las 3 puertas (norte, sur, este); si llegan a la plaza bajan la *integridad* de la ciudad (se repara sola entre oleadas). Si llega a 0, se pierde; si se superan las 20, se gana.
+- **Dificultad por jugadores**: más jugadores, más enemigos y más recompensa. Sin límite práctico de unidades (tope técnico de 100 por jugador).
+- **Entre oleadas**: descanso de varios turnos para reclutar, mejorar edificios y recoger recursos. Dentro de las murallas cuentas como estar en la ciudad.
+- **Escuadras con órdenes** (botón *Ciudadela* en «Más»): ✋ Libre, 🛡️ Defender (puerta N/S/E, plaza o un punto del mapa), ⚔️ Cazar, 🏠 A la ciudad. Se cumplen al acabar el turno o con «Ejecutar órdenes ahora». Cada unidad se asigna desde su ficha.
+- Dibujo: murallas con almenas, puertas de madera, torres, calles, plaza del mercado, casas y lotes para los edificios.
+- Los bots defienden las puertas y reclutan.
+- Pendiente (siguientes fases): 2) invadir la mazmorra con 5 unidades y ver la próxima oleada; 3) ciudad en pixel art más detallada.
+
+## v1.59 — Ciudadela, fase 2: invadir la mazmorra 🕳️
+
+- 3 entradas de mazmorra fuera de las murallas (niveles 1, 2 y 3 al inicio; suben de nivel cada 6 oleadas y se renuevan en cada oleada).
+- Dentro de la mazmorra solo puedes tener **5 unidades por jugador** a la vez (las invocaciones acompañan sin contar).
+- **Explorar**: al entrar en una mazmorra todos ven la próxima oleada (cantidad, nivel, tipos de enemigo y jefe). La vista previa desaparece al llegar esa oleada.
+- Vencer al jefe de una mazmorra hace la siguiente oleada un 10% más pequeña (acumulable hasta −30%).
+- Nueva orden de escuadra 🕳️ **Invadir mazmorra**: hasta 5 entran, luchan, recogen tesoros y salen si se hieren o la limpian.
+- La ciudad y su entorno (con las entradas) siempre son visibles.
+- Pendiente: fase 3, ciudad en pixel art más detallada.
+
+## v1.60 — Ciudadela, fase 3: ciudad en pixel art detallado 🎨
+
+- Murallas con camino de ronda, almenas exteriores, contrafuertes y aspilleras; se tiñen de azul (muralla nivel 2) y llevan filete dorado (nivel 3+).
+- Puertas con arco de piedra, hojas de madera, rastrillo y antorchas; estandartes ondeando en las torres.
+- Barrio con casas en hileras que **aumentan según las mejoras de la ciudad**, humo de chimeneas, árboles, calles secundarias, caminos de tierra fuera de las puertas, farolas con luz parpadeante.
+- Plaza con fuente de agua animada, puestos de mercado y aldeanos que van y vienen (más gente cuanto más se mejora).
+- Cajas y barriles junto a la herrería y los establos. Los edificios se dibujan sobre sus lotes.
+
+## v1.61 — Ciudadela: mundo exterior, taberna, mercado y arena 🍺🏟️
+
+- **Mundo más grande** (96×76) alrededor de la muralla, con más criaturas y sitios por explorar. La ciudad, sus alrededores y la arena siempre se ven; el resto hay que explorarlo.
+- **Viajeros por el mundo** (hasta 9 a la vez, se renuevan cada pocos turnos): *Viajeros* reclutables al azar (nivel según la oleada, atributos y a veces clase; se pagan con el almacén de la ciudad), *Curandero* (cura por completo a las unidades cercanas, hasta 3 veces) y *Maestro de armas* (+2 puntos de habilidad). Toca el viajero con una unidad a su lado.
+- **Taberna** (edificio nuevo, siempre presente): 3 clientes con rareza Común → Legendario y atributos al azar; **se renuevan cada 30 turnos**. Los Épicos traen clase e ítem; los **Legendarios son vampiros** con clase, especialización y un objeto raro. Cualquier jugador puede reclutar (paga el almacén común).
+- **Calle del mercado**: 5 puestos con toldo al sur de la plaza; los mercaderes ambulantes se instalan ahí cada pocos turnos (7 turnos) y se les compra con el almacén de la ciudad desde cualquier unidad dentro de las murallas.
+- **Torneo de la arena** (coliseo fuera de la puerta este): se abre cada 12 turnos durante 3. Una unidad lucha contra 5 gladiadores seguidos cada vez más fuertes; **si cae solo sale de la arena y no pierde nada** (ni vida). Cada ronda da experiencia y materiales; ganar las 5 da gemas y un objeto raro. Cada unidad compite una vez por torneo.
+- La hoja de la Ciudadela tiene ahora pestañas: Defensa, Taberna, Arena y Mercado.
+
+## v1.61.1 — Ciudadela: oleadas cada 100 turnos
+
+La primera oleada llega en el turno 100 y cada oleada siguiente 100 turnos después de superar la anterior (antes: 6 y 5). Así hay tiempo de sobra para explorar mazmorras, viajeros, taberna y arena entre oleadas.
+
+## v1.61.2 — Ajuste de lobby: turnos entre oleadas (Ciudadela)
+
+Nuevo ajuste del mundo «Ciudadela: turnos entre oleadas (y hasta la primera)»: 10, 25, 50, **100 (por defecto)** o 200 turnos.

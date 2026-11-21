@@ -1,6 +1,36 @@
 /* Aventura de almas — service worker: recibe los avisos push y abre el juego al tocarlos */
-self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+/* Copia de la app para poder abrirla y jugar sin conexión (v1.56). Con red va primero lo más nuevo;
+   si la red no responde en 4 s (poca señal) se usa la copia guardada. */
+const CACHE = 'ada-app-v1';
+const SHELL = ['/', '/shared.js', '/botchat.js', '/engine.js', '/local.js', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png'];
+self.addEventListener('install', e => {
+  e.waitUntil((async () => {
+    const c = await caches.open(CACHE);
+    await Promise.all(SHELL.map(u => fetch(u, { cache: 'no-cache' }).then(r => { if (r.ok) return c.put(u, r); }).catch(() => {})));
+    await self.skipWaiting();
+  })());
+});
+self.addEventListener('activate', e => e.waitUntil((async () => {
+  for (const k of await caches.keys()) if (k.startsWith('ada-app-') && k !== CACHE) await caches.delete(k);
+  await self.clients.claim();
+})()));
+self.addEventListener('fetch', e => {
+  const req = e.request, url = new URL(req.url);
+  if (req.method !== 'GET' || url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith('/api/') || url.pathname === '/health' || url.pathname === '/sw.js') return;
+  const key = req.mode === 'navigate' || url.pathname === '/index.html' ? '/' : url.pathname;
+  e.respondWith((async () => {
+    const c = await caches.open(CACHE);
+    const net = fetch(req).then(r => { if (r && r.ok && (SHELL.includes(key))) c.put(key, r.clone()); return r; });
+    try {
+      const cached = await c.match(key);
+      if (!cached) return await net;
+      return await Promise.race([net, new Promise((_, rej) => setTimeout(rej, 4000))]);
+    } catch (err) {
+      return (await c.match(key)) || Response.error();
+    }
+  })());
+});
 
 self.addEventListener('push', e => {
   let d = {};

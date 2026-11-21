@@ -1,12 +1,12 @@
 {
   "name": "aventura-de-almas",
-  "version": "1.55.0",
+  "version": "1.61.2",
   "description": "Aventura de almas: estrategia por turnos para celular, hasta 10 jugadores",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "sim": "node test/sim.js 10 150",
-    "test": "node test/human.js && node test/push-vector.js && node test/persist.js && node test/features.js && node test/features2.js && node test/features3.js && node test/menu.js && node test/features4.js && node test/features5.js && node test/features6.js && node test/features7.js && node test/features8.js && node test/features9.js && node test/features10.js && node test/features11.js && node test/features12.js && node test/features13.js"
+    "test": "node test/human.js && node test/push-vector.js && node test/persist.js && node test/features.js && node test/features2.js && node test/features3.js && node test/menu.js && node test/features4.js && node test/features5.js && node test/features6.js && node test/features7.js && node test/features8.js && node test/features9.js && node test/features10.js && node test/features11.js && node test/features12.js && node test/features13.js && node test/features14.js && node test/features15.js && node test/features16.js && node test/features17.js && node test/features18.js && node test/features19.js"
   },
   "engines": { "node": ">=18" },
   "dependencies": {}

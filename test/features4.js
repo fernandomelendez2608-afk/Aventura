@@ -600,7 +600,7 @@ console.log('Chat de la partida');
   const g = mks(); const st = () => E.snapshot(g, 0).story;
   ok(g.players.every(a => g.players.every(b => a === b || E.pactOf(g, a.id, b.id) === 'alianza')), 'todos los jugadores empiezan aliados');
   ok(!!E.cmd(g, 0, { a: 'dip', d: 'offer', to: 1, k: 'paz' }).err, 'no hay diplomacia en la historia');
-  ok(st() && st().ch === 0 && st().n === 9 && st().goals.length === 1 && st().title === 'El eco de la ceniza', 'la vista incluye el capítulo 1 y sus objetivos');
+  ok(st() && st().ch === 0 && st().n === S.STORY.chapters.length && st().goals.length === 1 && st().title === 'El eco de la ceniza', 'la vista incluye el capítulo 1 y sus objetivos');
   ok(g.events.some(l => /La Ceniza del Dragón/.test(l.text)) && g.events.some(l => /Capítulo 1/.test(l.text)), 'se cuenta el prólogo y el capítulo 1');
   const noBoss = () => !g.creatures.some(c => S.CREATURES[c.t].boss && !c.dg);
   for (let i = 0; i < 12; i++) E.advanceTurn(g);
@@ -612,19 +612,33 @@ console.log('Chat de la partida');
   ok(st().done.length === 1 && g.events.some(l => /Capítulo 1 completado/.test(l.text)), 'el capítulo anterior queda en el registro');
   // sin cumplirse: no avanza
   E.advanceTurn(g); ok(st().ch === 1, 'sin cumplir los objetivos no se avanza');
-  // forzar capítulos 2 y 3
-  for (const c of g.cities) if (c.owner === null) c.owner = 0; E.advanceTurn(g); ok(st().ch === 2, 'capítulo 2 (ciudades) completado');
-  const u0 = g.units.find(u => u.o === 0 && !u.sm); u0.lv = 8; u0.eq.pechera = { id: g.nid++, k: 'pechera', t: 3 }; E.advanceTurn(g);
-  ok(st().ch === 3, 'capítulo 3 (nivel 8 + calidad acero) completado');
-  { const cap = g.cities.find(c => c.owner === 0); cap.b = Object.assign(cap.b || {}, { iglesia: 2 }); E.advanceTurn(g); ok(st().ch === 3, 'con la iglesia a nivel 2 no se completa el capítulo del refugio'); cap.b.iglesia = 3; E.advanceTurn(g); ok(st().ch === 4, 'capítulo 4 (iglesia nivel 3) completado'); }
-  { E.advanceTurn(g); ok(st().ch === 4, 'sin despejar una mazmorra no se avanza'); g.story.dg = (g.story.dg || 0) + 1; E.advanceTurn(g); ok(st().ch === 5, 'capítulo 5 (despejar una mazmorra) completado'); }
-  { const cap = g.cities.find(c => c.owner === 0); cap.b.iglesia = 4; E.advanceTurn(g); ok(st().ch === 5 && /Guardianas/.test(st().txt), 'el capítulo de las Guardianas pide una iglesia de nivel 5'); cap.b.iglesia = 5; E.advanceTurn(g); ok(st().ch === 6, 'capítulo 6 (iglesia nivel 5, desciende el ángel) completado'); }
-  const rl = g.creatures.find(c => c.t === 'reylobo'); ok(!!rl && rl.lv >= 5, 'el capítulo 7 hace aparecer al Rey Lobo (nivel ' + (rl && rl.lv) + ')');
-  // si el jefe del capítulo desaparece sin morir, reaparece
-  g.creatures.splice(g.creatures.indexOf(rl), 1); E.advanceTurn(g); ok(g.creatures.some(c => c.t === 'reylobo'), 'si el jefe del capítulo desaparece, vuelve a aparecer');
-  // matar a los jefes (usa el camino real de muerte)
-  g.story.killed.reylobo = true; E.advanceTurn(g); ok(st().ch === 7 && g.creatures.some(c => c.t === 'liche'), 'matar al Rey Lobo pasa al capítulo 8 y aparece el Liche');
-  g.story.killed.liche = true; E.advanceTurn(g); ok(st().ch === 8 && g.creatures.some(c => c.t === 'dragon'), 'matar al Liche pasa al capítulo 9 y aparece el Dragón');
+  // recorre todos los capítulos cumpliendo sus objetivos según su tipo (así añadir capítulos no rompe la prueba)
+  const CH = S.STORY.chapters, u0 = g.units.find(u => u.o === 0 && !u.sm);
+  const satisfy = go => {
+    if (go.k === 'kills') g.players[0].stats.kills += go.n;
+    else if (go.k === 'cities') { for (const c of g.cities) if (c.owner === null) c.owner = 0; }
+    else if (go.k === 'level') u0.lv = Math.max(u0.lv, go.n);
+    else if (go.k === 'tier') u0.eq.pechera = { id: g.nid++, k: 'pechera', t: go.n };
+    else if (go.k === 'church') { const cap = g.cities.find(c => c.owner === 0); cap.b = Object.assign(cap.b || {}, { iglesia: go.n }); }
+    else if (go.k === 'dungeon') g.story.dg = (g.story.dg || 0) + go.n;
+    else if (go.k === 'boss') g.story.killed[go.t] = true;
+  };
+  ok(CH.length >= 16 && CH.filter(c => c.boss).length >= 6, 'la campaña tiene al menos 16 capítulos y 6 jefes (' + CH.length + ')');
+  ok(CH.every(c => c.t && c.txt && c.goals && c.goals.length) && CH.slice(0, -1).every(c => c.done && c.reward), 'todos los capítulos tienen título, texto, objetivos y (salvo el último) final y premio');
+  ok(CH.slice(0, -1).filter(c => c.boss).every(c => S.CREATURES[c.boss] && S.CREATURES[c.boss].boss), 'los jefes de los capítulos existen');
+  for (let i = 1; i < CH.length - 1; i++) {
+    ok(st().ch === i && st().title === CH[i].t, `capítulo ${i + 1}: ${CH[i].t}`);
+    if (CH[i].boss) {
+      const bs = g.creatures.find(c => c.t === CH[i].boss); ok(!!bs, `  aparece ${S.CREATURES[CH[i].boss].n} (nivel ${bs && bs.lv})`);
+      if (i === CH.findIndex(c => c.boss === 'reylobo')) { g.creatures.splice(g.creatures.indexOf(bs), 1); E.advanceTurn(g); ok(g.creatures.some(c => c.t === 'reylobo'), '  si el jefe del capítulo desaparece, vuelve a aparecer'); }
+    }
+    if (CH[i].t === 'El refugio sagrado') { const cap = g.cities.find(c => c.owner === 0); cap.b = Object.assign(cap.b || {}, { iglesia: 2 }); E.advanceTurn(g); ok(st().ch === i, '  con la iglesia a nivel 2 no se completa'); }
+    else if (CH[i].t === 'Bajo la tierra') { E.advanceTurn(g); ok(st().ch === i, '  sin despejar una mazmorra no se avanza'); }
+    else if (CH[i].t === 'El milagro de las Guardianas') { const cap = g.cities.find(c => c.owner === 0); cap.b.iglesia = 4; E.advanceTurn(g); ok(st().ch === i && /Guardianas/.test(st().txt), '  pide una iglesia de nivel 5 (con 4 no basta)'); }
+    CH[i].goals.forEach(satisfy); E.advanceTurn(g);
+    ok(st().ch === i + 1, `  capítulo ${i + 1} completado`);
+  }
+  const lastCh = CH.length - 1; ok(st().ch === lastCh && g.creatures.some(c => c.t === 'dragon'), 'el último capítulo hace aparecer al Dragón de Ceniza');
   g.story.killed.dragon = true; E.advanceTurn(g);
   ok(g.status === 'over' && g.winners.length === g.players.length && g.story.fin && st().fin, '¡victoria compartida al derrotar al Dragón!');
   // derrota: cae todo el grupo
