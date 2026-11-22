@@ -727,3 +727,54 @@ La primera oleada llega en el turno 100 y cada oleada siguiente 100 turnos despu
 ## v1.61.2 — Ajuste de lobby: turnos entre oleadas (Ciudadela)
 
 Nuevo ajuste del mundo «Ciudadela: turnos entre oleadas (y hasta la primera)»: 10, 25, 50, **100 (por defecto)** o 200 turnos.
+
+## v1.61.3 — Escuadras de la Ciudadela, más claras y fiables
+
+- Al dar una orden a una escuadra, **se ejecuta en el momento** (no solo al final del turno).
+- **Defender** mantiene el puesto: ataca a los enemigos a 4 casillas del puesto y vuelve, ya no sale a perseguir lejos.
+- El mapa muestra el **puesto** de cada escuadra (escudo de color) y un **distintivo de color con su número** en cada unidad; al tocar una unidad se ve la línea hacia su puesto.
+- Cada escuadra muestra su estado: unidades en su puesto, salud media, heridos, enemigos cerca del puesto.
+- Nuevo botón «🔁 Unidades nuevas se unen solas» (una escuadra a la vez): los reclutas, viajeros y clientes de la taberna entran en ella automáticamente.
+
+## v1.64.0 — Escuadras: reglas, comparativa, formación y avisos
+
+- **Retirada y regreso automáticos:** cada escuadra tiene su regla «se retiran por debajo de» (nunca / 25 / 35 / 50 / 65 %, por defecto 50) y «vuelven a su puesto con» (50 / 80 / 100 %, por defecto 80). La unidad herida va a curarse a la plaza y, al recuperarse, retoma sola la orden de su escuadra. Marca «🩹 retirándose» en el panel y en su perfil.
+- **Comparativa:** una lista con todas las escuadras: unidades, fuerza (daño por turno + vida + defensa), salud media, heridas, retirándose, en mazmorra, en su puesto, enemigos cerca, y botones de orden directos.
+- **Formación:** al defender, cada unidad se coloca al **frente** (en el puesto), al **centro** (1 casilla atrás) o en **retaguardia** (2 atrás, hacia la plaza). Automático: arma a distancia y sanadores atrás, el resto al frente; se cambia en el perfil de cada unidad (Auto / Frente / Centro / Atrás).
+- **Avisos:** te dice cuando unidades de una escuadra se retiran a curarse, cuando su salud media baja de la mitad y cuando una escuadra termina una mazmorra.
+- Los bots de la Ciudadela siguen retirándose al 35 % y vuelven al 50 % de salud para no quedarse fuera demasiado tiempo.
+- **Por qué 50 %:** en una prueba de 250 turnos (6 partidas por ajuste, 12 unidades, oleada cada 50 turnos) con retirada al 35 % sobrevivían de media 5,5 unidades; sin retirada 2,2; al 50 % unas 9,7 con las mismas bajas enemigas. Al 65 % con regreso al 100 % sobrevivían 10,7 pero con más riesgo de dejar el puesto vacío: pruébalo si quieres jugar seguro.
+
+## v1.63.0 — Diseña a tu protagonista
+
+- En el perfil de tu protagonista (y de tu única unidad en el **reto de una unidad**) hay un botón **🎨 Diseñar**. Abre un creador con vista previa fija del retrato y botones para: nombre, género, piel (6), peinado (8), color de pelo (8), ojos (5), barba, cicatriz, complexión, postura, túnica, pantalón, capa y hasta 4 **accesorios** (parche, gafas, pendientes, bufanda, pintura de guerra, orejas élficas, flor, cuernos). Incluye «🎲 Al azar». Empieza con el aspecto actual del personaje.
+- **Gratis en el turno 1** (y la primera vez que lo diseñas, aunque sea más tarde). **Rediseñarlo después cuesta 5 almas** del almacén de una ciudad tuya con iglesia, estando junto a ella.
+- Si cambias de protagonista en el turno 1, el diseño pasa al nuevo. El diseño y el género se conservan cuando el protagonista cae y reaparece; los caídos resucitados también conservan su género.
+- Funciona en Historia, partidas normales y reto de una unidad; también sin conexión. Los modos sin protagonista (Ciudadela, Rey Demonio) no lo tienen.
+
+## v1.62.2 — Contador de eliminados
+
+- Cada personaje cuenta los **enemigos que ha eliminado** (criaturas, jefes, secuaces, unidades enemigas y rondas ganadas en la arena). Se ve en el perfil («☠️ N enemigos eliminados») y junto al nombre en la cabecera.
+- El contador se conserva cuando el protagonista reaparece o cuando resucitas a un caído en la iglesia. Las unidades que ya existían empiezan en 0.
+- Cuenta quien da el golpe final; las unidades que invoca un mago o nigromante llevan su propio contador.
+
+## v1.62.1 — Géneros
+
+- Cada unidad es **♂ o ♀** (símbolo junto al nombre en perfil, taberna y viajeros). Las 4 unidades iniciales son 2 y 2; las crías nacen con género al azar; los reclutas conservan el suyo.
+- **Para tener cría hace falta pareja ♂ + ♀.** El perfil indica qué género buscar. Ajuste del lobby «Crías: hace falta una pareja ♂ + ♀» (activado por defecto; en «No» vale cualquier pareja).
+- La taberna siempre ofrece clientes de los dos géneros, para que nunca quedes bloqueado.
+- El **retrato** cambia según el género (peinados, barba solo en ♂, pestañas y labios en ♀, complexión).
+- Partidas guardadas antiguas: cada unidad deduce su género de su id, sin romper nada. Las bestias del Rey Demonio no crían, como antes.
+
+## v1.62.0 — Retratos únicos
+
+- Cada personaje tiene su **retrato en pixel art** generado con código a partir de una semilla fija: tono de piel (6), peinado (8) y color de pelo (8), ojos, ceja, barba, cicatriz, complexión (3) y postura (4). Siempre se ve igual, y casi nunca coinciden dos.
+- **Se ve el equipo**: casco (con penacho en calidades altas), pechera, hombreras, guantes, botas, escudo y arma (espada, hacha, lanza, báculo, varita, arco, daga, maza) con el color de su calidad. La clase tiñe la túnica. El protagonista lleva corona y capa; los vampiros son pálidos, de ojos rojos y colmillos; si la salud baja del 35 % aparecen vendas.
+- Aparece en el **perfil de la unidad**, en las **tarjetas de la taberna** (fondo del color de su rareza) y en el **viajero** que vas a reclutar. Al reclutar, conserva la cara que tenía.
+- Sin imágenes ni peso extra: se dibuja en el móvil y funciona sin conexión.
+
+## v1.61.4 — Menos lag
+
+- **Caché del terreno**: el suelo del mapa (hierba, agua, muralla, calles…) y la niebla se dibujan una vez en un lienzo y luego solo se copian en cada fotograma, en vez de repintar miles de casillas cada vez. Se reconstruye solo cuando cambia el terreno, la niebla o la muralla. Las puertas animadas y las mazmorras se siguen dibujando en vivo.
+- **Colores de unidades**: se calculaban creando un lienzo nuevo por unidad y fotograma; ahora se guardan en memoria.
+- Medido simulando un móvil 6 veces más lento: de ~57 ms a ~12 ms por fotograma con todo el mapa a la vista, y de ~38 a ~10 ms con zoom medio.

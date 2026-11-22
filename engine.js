@@ -411,7 +411,7 @@ function newUnit(g, owner, x, y) {
   const used = new Set(g.units.filter(u => u.o === owner).map(u => u.name));
   let name = UNIT_NAMES.find(n => !used.has(n));
   if (!name) name = pick(g, UNIT_NAMES) + g.nid;
-  const u = { id: g.nid++, o: owner, name, x, y, lv: 1, xp: 0, hp: 50, pts: 1,
+  const u = { id: g.nid++, o: owner, sx: used.size % 2 ? 'F' : 'M', name, x, y, lv: 1, xp: 0, hp: 50, pts: 1,
     sk: { dano: 0, salud: 0, movilidad: 0, medico: 0, doble: 0, defensa: 0, general: 0 },
     eq: {}, inv: { m: {}, it: [] }, mp: 3, at: 1, hits: 0, moved: false, acted: false };
   g.units.push(u); touch(g);
@@ -1867,6 +1867,7 @@ function removeCreature(g, c) {
 function killCreature(g, c, u) {
   const d = S.CREATURES[c.t], p = g.players[u.o];
   removeCreature(g, c);
+  u.kl = (u.kl || 0) + 1; // contador de enemigos eliminados por esta unidad
   if (c.min) { p.stats.kills++; gainXp(g, u, 4 + 2 * c.lv); return; } // secuaces de jefe: solo experiencia
   if (d.boss || c.bd) for (const m of g.creatures.filter(x => x.bo === c.id)) removeCreature(g, m);
   if (c.dg) dgOnKill(g, c, u);
@@ -1903,13 +1904,13 @@ function killUnit(g, u, by) { // by: {unit} o {creature}
   const p = g.players[u.o];
   if (u.hero && !u.sm && g.cfg.hero !== 'no') { // el protagonista reaparece en la capital
     g.rv = g.rv || [];
-    g.rv.push({ o: u.o, name: u.name, bs: u.bs || null, emb: u.hero, lv: u.lv, pts: u.pts, sk: Object.assign({}, u.sk), cls: u.cls || null, sub: u.sub || null, bn: u.bn || null, gen: u.gen || 0, keep: by.unit ? null : { eq: u.eq, inv: u.inv }, due: g.turn + S.HERO.wait }); // si lo mata una criatura conserva su equipo
+    g.rv.push({ o: u.o, name: u.name, bs: u.bs || null, emb: u.hero, lv: u.lv, pts: u.pts, sk: Object.assign({}, u.sk), cls: u.cls || null, sub: u.sub || null, bn: u.bn || null, gen: u.gen || 0, kl: u.kl || 0, sx: u.sx, hd: u.hd || null, sx0: u.sx0, keep: by.unit ? null : { eq: u.eq, inv: u.inv }, due: g.turn + S.HERO.wait }); // si lo mata una criatura conserva su equipo
     ev(g, `${u.hero} ¡Tu protagonista ${u.name} ha caído! Volverá a tu ciudad en ${S.HERO.wait} turnos, ${S.HERO.loss} niveles más débil.`, [u.o], 'dead');
   }
   if (by.unit && by.unit.o !== u.o) { botReact(g, 'kill_win', g.players[by.unit.o], { n: g.players[u.o].name }, 0.35); botReact(g, 'kill_lose', g.players[u.o], { n: g.players[by.unit.o].name }, 0.3); }
   if (by.unit) {
     const k = by.unit, kp = g.players[k.o];
-    kp.stats.pk++;
+    kp.stats.pk++; k.kl = (k.kl || 0) + 1;
     addMats(k, u.inv.m);
     for (const it of u.inv.it) if (invW(k) + 2 <= capOf(k)) k.inv.it.push(it);
     for (const s in u.eq) if (rng(g) < 0.5 && invW(k) + 2 <= capOf(k)) k.inv.it.push(u.eq[s]);
@@ -1922,7 +1923,7 @@ function killUnit(g, u, by) { // by: {unit} o {creature}
   }
   if (!u.sm && !u.cart && !u.bld && !u.sg && !u.bs && !u.hero && g.cfg.mode !== 'uno') { // lápida: se puede resucitar en una ciudad; si cayó ante una criatura deja su equipo en una tumba
     g.graves = g.graves || [];
-    g.graves.push({ id: g.nid++, o: u.o, name: u.name, lv: u.lv, pts: u.pts, sk: Object.assign({}, u.sk), cls: u.cls || null, sub: u.sub || null, bn: u.bn || null, gen: u.gen || 0, turn: g.turn });
+    g.graves.push({ id: g.nid++, o: u.o, name: u.name, lv: u.lv, pts: u.pts, sk: Object.assign({}, u.sk), cls: u.cls || null, sub: u.sub || null, bn: u.bn || null, gen: u.gen || 0, kl: u.kl || 0, sx: u.sx, turn: g.turn });
     const mine = g.graves.filter(x => x.o === u.o); if (mine.length > 8) g.graves.splice(g.graves.indexOf(mine[0]), 1);
     if (!by.unit) dropTomb(g, u);
     if (!by.unit || by.unit.o === u.o) ev(g, `🪦 Puedes resucitar a ${u.name} en una ciudad tuya (cuesta ${fmtMats(reviveCost({ lv: u.lv }))}).`, [u.o], 'dead');
@@ -2163,8 +2164,24 @@ function cmd(g, pid, m) {
       if (g.turn > S.HERO.pickTurn) return { err: 'El protagonista ya quedó fijo (solo se elige en el turno 1)' };
       const emb = S.HERO.emb.includes(m.emb) ? m.emb : (u.hero || S.HERO.emb[0]);
       const old = p.hero ? g.units.find(x => x.id === p.hero) : null;
-      if (old && old !== u) { old.hero = null; }
+      if (old && old !== u) { old.hero = null; if (old.hd) { u.sx0 = u.sx; u.hd = old.hd; u.sx = old.hd.sx; old.sx = old.sx0 || old.sx; delete old.hd; delete old.sx0; } } // el diseño pasa al nuevo protagonista
       u.hero = emb; p.hero = u.id; touch(g); msg = `${u.name} es tu protagonista ${emb}`; break;
+    }
+    case 'design': { // el jugador diseña a su protagonista (o a su única unidad en el reto de una unidad)
+      const u = unitOf(); if (!u) return { err: 'Unidad no encontrada' };
+      if (u.sm || !(u.hero || g.cfg.mode === 'uno')) return { err: 'Solo puedes diseñar a tu protagonista' };
+      const d = S.cleanDesign(m.d); if (!d) return { err: 'Diseño no válido' };
+      let paid = '';
+      if (u.hd && g.turn > S.HERO.pickTurn) { // rediseñar después del turno 1 cuesta almas, en una ciudad con iglesia
+        const c = g.cities.filter(ct => ct.owner === pid && holyOf(ct) >= 1 && cheb(u, ct) <= 1)[0];
+        if (!c) return { err: 'Para rediseñarlo debe estar junto a una ciudad tuya con iglesia' };
+        if (!canAfford(c.st.m, S.DESIGN.cost)) return { err: 'Faltan materiales en el almacén: ' + fmtMats(S.DESIGN.cost) };
+        spend(c.st.m, S.DESIGN.cost); paid = ' (' + fmtMats(S.DESIGN.cost) + ')';
+      }
+      if (!u.hd) u.sx0 = u.sx;
+      u.hd = d; u.sx = d.sx;
+      const nm = String(m.name === undefined ? '' : m.name).replace(/<[^>]*>/g, '').replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 16); if (nm) u.name = nm;
+      touch(g); msg = u.name + ' tiene su nuevo aspecto' + paid; break;
     }
     case 'rename': {
       const u = unitOf(); if (!u) return { err: 'Unidad no encontrada' };
@@ -2218,7 +2235,7 @@ function cmd(g, pid, m) {
       const c = cityOf(); if (!c) return { err: 'Ciudad no encontrada' };
       err = doCart(g, p, c); if (!err) msg = 'Carreta construida (descansa este turno)'; break;
     }
-    case 'sq': { const r = doSquad(g, p, m); if (r) return { err: r }; msg = null; break; }
+    case 'sq': { const r = doSquad(g, p, m); if (typeof r === 'string') return { err: r }; msg = r ? r.msg : null; break; }
     case 'sqrun': {
       if (!isCit(g)) return { err: 'Las escuadras son del modo Ciudadela' };
       const n = squadRun(g, p); msg = n ? `🏰 ${n} ${n === 1 ? 'unidad cumplió' : 'unidades cumplieron'} sus órdenes` : 'Las escuadras no tenían nada que hacer'; break;
@@ -2440,7 +2457,7 @@ function doRevive(g, p, c, gid) {
   if (g.units.filter(u => u.o === p.id && !isAux(u)).length + (g.rv || []).filter(r => r.o === p.id).length >= maxUnitsOf(g)) return `Máximo ${MAX_UNITS} unidades`;
   const cost = reviveCost(gr, c); if (!canAfford(c.st.m, cost)) return 'Faltan materiales en el almacén: ' + fmtMats(cost);
   spend(c.st.m, cost); g.graves.splice(g.graves.indexOf(gr), 1);
-  g.rv = g.rv || []; g.rv.push({ o: p.id, name: gr.name, bs: null, emb: null, lv: gr.lv, pts: gr.pts, sk: Object.assign({}, gr.sk), cls: gr.cls || null, sub: gr.sub || null, bn: gr.bn || null, gen: gr.gen || 0, keep: null, due: g.turn + 2, city: c.id });
+  g.rv = g.rv || []; g.rv.push({ o: p.id, name: gr.name, bs: null, emb: null, lv: gr.lv, pts: gr.pts, sk: Object.assign({}, gr.sk), cls: gr.cls || null, sub: gr.sub || null, bn: gr.bn || null, gen: gr.gen || 0, kl: gr.kl || 0, sx: gr.sx, keep: null, due: g.turn + 2, city: c.id });
   touch(g);
   return gr;
 }
@@ -3094,6 +3111,7 @@ function breedTick(g) {
   for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
     const a = list[i], b = list[j];
     if (a.o !== b.o || cheb(a, b) !== 1 || used.has(a.id) || used.has(b.id)) continue;
+    if (g.cfg.gender !== 'no' && S.sexOf(a) === S.sexOf(b)) continue; // hace falta pareja ♂ + ♀
     used.add(a.id); used.add(b.id);
     const key = Math.min(a.id, b.id) + '-' + Math.max(a.id, b.id);
     let n = Math.min(need, (g.pairs[key] || 0) + 1);
@@ -3111,7 +3129,7 @@ function breedTick(g) {
       const kid = newUnit(g, a.o, spot.x, spot.y);
       const pb = x => (x.bn || { hp: 0, dmg: 0 }); // la cría hereda lo mejor de sus padres y suma el bonus de nacimiento: cada generación es más fuerte
       kid.bn = { hp: Math.max(pb(a).hp, pb(b).hp) + BREED_BONUS.hp, dmg: Math.max(pb(a).dmg, pb(b).dmg) + BREED_BONUS.dmg };
-      kid.gen = Math.max(a.gen || 0, b.gen || 0) + 1; kid.bc = g.turn + BREED_WAIT; kid.born = g.turn;
+      kid.sx = S.sexSeed(S.ptSeed(kid.id * 13 + g.turn)); kid.gen = Math.max(a.gen || 0, b.gen || 0) + 1; kid.bc = g.turn + BREED_WAIT; kid.born = g.turn;
       { const L = Math.max(1, Math.min(S.MAX_LEVEL || 53, Math.round(((a.lv || 1) + (b.lv || 1)) / 2))); kid.lv = L; kid.pts = L; } // nace con el nivel promedio de sus padres
       kid.hp = eff(g, kid).maxHp; kid.moved = true; kid.acted = true; kid.mp = 0; kid.at = 0;
       a.bc = b.bc = g.turn + BREED_WAIT;
@@ -3199,7 +3217,7 @@ function reviveTick(g) {
     const u = newUnit(g, r.o, spot.x, spot.y); if (c0.dg) u.dg = c0.dg;
     if (r.keep) { u.eq = r.keep.eq; u.inv = r.keep.inv; }
     if (r.bs) u.bs = r.bs;
-    u.name = r.name; u.hero = r.emb; u.cls = r.cls; u.sub = r.sub; u.bn = r.bn; u.gen = r.gen || 0; u.sk = r.sk; u.lv = r.lv; u.pts = r.pts; u.xp = 0;
+    u.name = r.name; u.hero = r.emb; u.cls = r.cls; u.sub = r.sub; u.bn = r.bn; u.gen = r.gen || 0; u.kl = r.kl || 0; if (r.sx) u.sx = r.sx; if (r.hd) { u.hd = r.hd; u.sx0 = r.sx0; u.sx = r.hd.sx; } u.sk = r.sk; u.lv = r.lv; u.pts = r.pts; u.xp = 0;
     for (let i = 0; i < (r.emb ? S.HERO.loss : 1) && u.lv > 1; i++) { // pierde niveles: primero puntos sin gastar, luego habilidades
       u.lv--;
       if (u.pts > 0) u.pts--; else { const k = Object.keys(u.sk).sort((a, b) => u.sk[b] - u.sk[a])[0]; if (u.sk[k] > 0) u.sk[k]--; }
@@ -3616,11 +3634,11 @@ function citInfo(g, pid, vis) {
   const wv = vis || visFor(g, pid), W0 = g.map.w;
   return { hp: g.cit.hp, max: g.cit.max, arena: S.CIT.arena, lots: S.CIT.lots, market: S.CIT.market,
     npcs: (g.npcs || []).filter(n => wv[n.y * W0 + n.x]).map(n => ({ id: n.id, k: n.k, x: n.x, y: n.y, name: n.name, left: Math.max(0, n.until - g.turn), lv: n.lv, sk: n.sk, cost: n.cost, cls: n.cls, uses: n.uses | 0 })),
-    bar: g.bar ? { left: Math.max(0, g.bar.next - g.turn), c: g.bar.c.map(c => ({ id: c.id, rar: c.rar, name: c.name, lv: c.lv, sk: c.sk, cls: c.cls, sub: c.sub, vamp: c.vamp ? 1 : 0, cost: c.cost, taken: c.taken !== undefined })) } : null,
+    bar: g.bar ? { left: Math.max(0, g.bar.next - g.turn), c: g.bar.c.map(c => ({ id: c.id, rar: c.rar, name: c.name, lv: c.lv, sk: c.sk, cls: c.cls, sub: c.sub, vamp: c.vamp ? 1 : 0, sx: c.sx || 'M', cost: c.cost, taken: c.taken !== undefined })) } : null,
     ar: g.arena ? { open: 1, left: Math.max(0, g.arena.end - g.turn), ent: Object.keys(g.arena.ent).map(Number), rounds: S.ARENA.rounds, last: g.arena.last || null } : { open: 0, next: Math.max(0, arenaNext(g) - g.turn), rounds: S.ARENA.rounds, ent: [] }, r: S.CIT.r, gates: S.CIT.gates, plaza: S.CIT.plaza, units: S.CIT.units,
     pv: (w.scout === w.n + 1 && w.n < w.total) ? (q => ({ n: q.n, cnt: citCnt(g, q), lv: q.lv, types: q.types, boss: q.boss }))(citPlan(g, w.n + 1)) : null, weak: citWeak(g), raid: S.CIT.raid, inDg: g.units.filter(u => u.o === pid && u.dg && !u.sm).length,
     w: { n: w.n, total: w.total, next: w.next ? Math.max(0, w.next - g.turn) : 0, left, cnt: w.cnt || 0, cleared: w.cleared || 0, fin: !!w.fin, lost: !!w.lost, boss: S.CIT.boss },
-    sq: ((p && p.sq) || []).map(s => ({ id: s.id, n: s.n, k: s.k, x: s.x, y: s.y, g: s.g || null, c: g.units.filter(u => u.o === pid && u.sq === s.id).length })) };
+    sq: ((p && p.sq) || []).map(s => ({ id: s.id, n: s.n, k: s.k, x: s.x, y: s.y, g: s.g || null, auto: s.auto ? 1 : 0, ...(sqStat(g, pid, s)) })) };
 }
 /* ---------- Ciudadela (v1.61): viajeros del mundo exterior, taberna, mercado y torneo de la arena ---------- */
 const NPC_NAMES = ['Alden', 'Brisa', 'Cato', 'Dunia', 'Eloy', 'Faro', 'Gaia', 'Hugo', 'Inés', 'Jairo', 'Kora', 'Lauro', 'Mira', 'Nilo', 'Olga', 'Pelayo', 'Quira', 'Rolo', 'Sabina', 'Tadeo', 'Urko', 'Valen', 'Wanda', 'Yago', 'Zoe'];
@@ -3637,6 +3655,7 @@ function citMkUnit(g, p, spot, c) { // crea una unidad a partir de un candidato 
   u.lv = c.lv; u.pts = 0; u.sk = Object.assign({}, c.sk);
   if (c.cls && S.CLASSES[c.cls]) { u.cls = c.cls; if (c.sub && S.CLASSES[c.cls].sub && S.CLASSES[c.cls].sub[c.sub]) u.sub = c.sub; }
   if (c.vamp) u.vamp = 1;
+  u.pt = S.ptSeed(c.k ? c.id * 5 + 2 : c.id * 3 + 1); u.sx = c.sx || S.sexSeed(u.pt); // mismo retrato que tenía en la taberna / el camino
   u.hp = eff(g, u).maxHp; u.mp = 0; u.at = 0;
   return u;
 }
@@ -3666,6 +3685,7 @@ function barRefresh(g) {
     const rar = wpick(g, W), lv = Math.max(1, 1 + prog + rar * 2 + ri(g, 0, 2));
     const cand = { id: g.nid++, rar, name: pick(g, NPC_NAMES), lv, sk: citRandSk(g, lv), cost: Object.assign({}, S.BAR.cost[rar]) };
     if (rar >= 3) { cand.cls = pick(g, Object.keys(S.CLASSES)); if (rar === 4) { const sb = Object.keys(S.CLASSES[cand.cls].sub || {}); if (sb.length) cand.sub = pick(g, sb); cand.vamp = 1; } }
+    cand.sx = (i + g.turn) % 2 ? 'F' : 'M'; // siempre hay de los dos géneros
     c.push(cand);
   }
   g.bar = { next: g.turn + S.BAR.every, c }; touch(g);
@@ -3753,7 +3773,7 @@ function doArena(g, p, m) {
     gainXp(g, u, 10 + 3 * lv);
     city.st.m.cuero = (city.st.m.cuero || 0) + 6 + 2 * r; city.st.m.hierro = (city.st.m.hierro || 0) + 1 + r; if (r >= 2) city.st.m.acero = (city.st.m.acero || 0) + r - 1;
   }
-  A.ent[u.id] = won; A.last = { name: u.name, won, rounds: S.ARENA.rounds, p: p.name };
+  A.ent[u.id] = won; u.kl = (u.kl || 0) + won; A.last = { name: u.name, won, rounds: S.ARENA.rounds, p: p.name };
   let extra = '';
   if (won === S.ARENA.rounds) {
     const gems = {}; for (let i = 0; i < 2; i++) { const k = rollGem(g, 0.7); gems[k] = (gems[k] || 0) + 1; } for (const k in gems) city.st.m[k] = (city.st.m[k] || 0) + gems[k];
@@ -3783,12 +3803,21 @@ function doSquad(g, p, m) {
     if ((m.id | 0) && !sq) return 'Esa escuadra no existe';
     if (m.id | 0) u.sq = sq.id; else delete u.sq; touch(g); return null;
   }
+  if (m.d === 'fm') { // formación de una unidad: f frente, c centro, b retaguardia; otro valor = automática
+    const u = units([m.u | 0])[0]; if (!u) return 'Unidad no encontrada';
+    if (['f', 'c', 'b'].includes(m.v)) u.fm = m.v; else delete u.fm; touch(g); return null;
+  }
   if (m.d === 'fill') { // meter en la escuadra a todas las unidades que no tienen escuadra
     if (!sq) return 'Esa escuadra no existe';
     for (const u of g.units.filter(x => x.o === p.id && !isAux(x) && !x.bs && !x.sq)) u.sq = sq.id; touch(g); return null;
   }
   if (!sq) return 'Esa escuadra no existe';
   if (m.d === 'del') { p.sq = p.sq.filter(s => s !== sq); for (const u of g.units) if (u.o === p.id && u.sq === sq.id) delete u.sq; touch(g); return null; }
+  if (m.d === 'rule') { // reglas de la escuadra: se retiran por debajo de rt % de salud y vuelven al llegar a rb %
+    if (m.rt !== undefined && [0, 25, 35, 50, 65].includes(m.rt | 0)) sq.rt = m.rt | 0;
+    if (m.rb !== undefined && [50, 80, 100].includes(m.rb | 0)) sq.rb = m.rb | 0;
+    touch(g); return null;
+  }
   if (m.d === 'name') { sq.n = String(m.n || '').replace(/[<>]/g, '').trim().slice(0, 14) || sq.n; touch(g); return null; }
   if (m.d === 'ord') {
     if (!SQ_ORDERS.includes(m.k)) return 'Orden no válida';
@@ -3800,15 +3829,22 @@ function doSquad(g, p, m) {
       else if (inB(g, m.x | 0, m.y | 0) && 'gfhdO'.includes(terrAt(g, m.x | 0, m.y | 0))) { sq.x = m.x | 0; sq.y = m.y | 0; sq.g = null; }
       else if (!sq.g && sq.x === S.CIT.plaza.x) { const pt = gateIn(S.CIT.gates[0]); sq.x = pt.x; sq.y = pt.y; sq.g = S.CIT.gates[0].k; }
     }
-    touch(g); return null;
+    touch(g); const n = squadRun(g, p, sq); return n ? { msg: `${n} unidad(es) se ponen en marcha ya` } : null;
   }
+  if (m.d === 'auto') { for (const q of p.sq) if (q !== sq) delete q.auto; if (sq.auto) delete sq.auto; else sq.auto = 1; touch(g); return { msg: sq.auto ? 'Las unidades nuevas se unirán a esta escuadra' : 'Ya no se unen solas las unidades nuevas' }; }
   return 'Orden no válida';
 }
-function raidUnit(g, p, u) { // invadir la mazmorra: entra con otros hasta el cupo, lucha y sale si se hiere o la limpia
+function sqStat(g, pid, s) { // resumen para la pantalla de escuadras
+  const us = g.units.filter(u => u.o === pid && u.sq === s.id && !isAux(u)), has = s.k === 'guard' && s.x !== undefined;
+  const hpPct = us.length ? Math.round(100 * us.reduce((a, u) => a + u.hp / Math.max(1, eff(g, u).maxHp), 0) / us.length) : 0;
+  return { c: us.length, hp: hpPct, hurt: us.filter(u => u.hp / Math.max(1, eff(g, u).maxHp) < 0.5).length, pos: has ? us.filter(u => cheb(u, s) <= 3).length : 0, dg: us.filter(u => u.dg).length, rtr: us.filter(u => u.rtr).length, pw: Math.round(us.reduce((a, u) => { const q = eff(g, u); return a + q.dmg * q.attacks + q.maxHp * 0.2 + q.def * 1.5; }, 0)), fr: us.filter(u => sqRole(g, u) !== 'b').length, bk: us.filter(u => sqRole(g, u) === 'b').length, rt: s.rt === undefined ? 50 : s.rt, rb: s.rb || 80, foes: has ? g.creatures.filter(c => c.tg && cheb(c, s) <= 6).length : 0, ids: us.map(u => u.id) };
+}
+function raidUnit(g, p, u, sq) { // invadir la mazmorra: entra con otros hasta el cupo, lucha y sale si se hiere o la limpia
   const e0 = eff(g, u), plaza = S.CIT.plaza; let did = false;
   if (u.dg) {
     const d = g.dungeons.find(x => x.id === u.dg); if (!d) return false;
     const foes = g.creatures.filter(c => c.dg === d.id), tre = g.sites.filter(q => q.dg === d.id && q.k === 'tesoro');
+    if (sq && !foes.length && !tre.length && sq.nd !== d.id) { sq.nd = d.id; ev(g, `🗝️ ${sq.n} terminó la mazmorra: sin enemigos ni tesoros`, [p.id]); }
     if (u.hp / e0.maxHp < 0.45 || (!foes.length && !tre.length)) { if (cheb(u, d.exit) <= 1) { doDungeon(g, p, { d: 'leave', u: u.id }); return true; } headTo(g, u, d.exit.x, d.exit.y); return true; }
     const reach = u.mp + e0.range + 1, ok = new Set(foes.filter(c => cheb(c, u) <= reach).map(c => c.id)), sv = p._ok; p._ok = ok;
     try { const b = u.at; botStrike(g, p, u); if (u.at < b) did = true; } finally { p._ok = sv; }
@@ -3822,31 +3858,56 @@ function raidUnit(g, p, u) { // invadir la mazmorra: entra con otros hasta el cu
   if (cheb(u, d) <= 1) { const r = doDungeon(g, p, { d: 'enter', u: u.id, id: d.id }); if (typeof r === 'string') { if (cheb(u, plaza) > 4) headTo(g, u, plaza.x, plaza.y); } return true; }
   headTo(g, u, d.x, d.y); return true;
 }
+function sqRole(g, u) { // frente 'f', centro 'c' o retaguardia 'b': lo que eligió el jugador o, si no, según el arma (a distancia y sanadores atrás)
+  if (u.fm === 'f' || u.fm === 'c' || u.fm === 'b') return u.fm;
+  const e = eff(g, u); return e.range >= 2 || e.heal ? 'b' : 'f';
+}
+function sqSlot(g, u, sq) { // casilla donde se coloca la unidad al defender: el frente en el puesto, el centro 1 casilla atrás y la retaguardia 2 (hacia la plaza)
+  const d = ({ f: 0, c: 1, b: 2 })[sqRole(g, u)]; if (!d) return sq;
+  const P = S.CIT.plaza; let dx = Math.sign(P.x - sq.x), dy = Math.sign(P.y - sq.y); if (!dx && !dy) dy = 1;
+  const t = { x: sq.x + dx * d, y: sq.y + dy * d };
+  return inB(g, t.x, t.y) && 'gfhdO'.includes(terrAt(g, t.x, t.y)) ? t : sq;
+}
 function squadUnit(g, p, u, sq) {
   let did = false;
   const e0 = eff(g, u), plaza = S.CIT.plaza, inCity = citAtCity(g, u);
   if (inCity) { const c = cityNear(g, u); if (c) { if (autoGear(g, u, c)) did = true; if (invW(u) >= 12) { depositAll(g, u, c); did = true; } } }
   if (autoHeal(g, u)) did = true;
   if (!g.units.includes(u)) return true;
-  if (sq.k === 'raid') return raidUnit(g, p, u) || did;
+  if (sq.k === 'raid') return raidUnit(g, p, u, sq) || did;
   const back = () => { if (!inCity || cheb(u, plaza) > 4) { headTo(g, u, plaza.x, plaza.y); did = true; } };
-  if (sq.k === 'city' || u.hp / e0.maxHp < 0.35) { back(); return did; } // herida (o a casa): vuelve a la plaza
+  { // retirada automática: baja de su umbral → vuelve a curarse; hasta recuperarse (umbral de regreso) no vuelve a su puesto, y entonces sigue con la orden
+    const fr = u.hp / e0.maxHp * 100, rt = sq.rt === undefined ? 50 : sq.rt, rb = sq.rb || 80;
+    if (u.rtr && fr >= rb) delete u.rtr;
+    if (!u.rtr && rt > 0 && fr < rt) { u.rtr = 1; sq.rn = (sq.rn || 0) + 1; }
+    if (sq.k === 'city' || u.rtr) { back(); return did; }
+  }
   if (!inCity && invW(u) >= 14) { back(); return true; }
   if (sq.k === 'hunt') { const sv = u.au; u.au = 1; try { if (autoUnit(g, p, u)) did = true; } finally { if (sv) u.au = sv; else delete u.au; } return did; }
-  // defender: ataca lo que alcance sin miedo (defiende su puesto) y vuelve al punto
+  // defender: mantiene su puesto; ataca a los enemigos que se acercan (a 4 casillas del puesto) y vuelve, sin perseguir lejos
   const reach = u.mp + e0.range + 1, ok = new Set();
-  for (const c of g.creatures) if (cheb(c, u) <= reach) ok.add(c.id);
+  for (const c of g.creatures) if (cheb(c, u) <= reach && cheb(c, sq) <= 4) ok.add(c.id);
   const saveOk = p._ok; p._ok = ok;
   try { const before = u.at; botStrike(g, p, u); if (u.at < before) did = true; } finally { p._ok = saveOk; }
   if (!g.units.includes(u)) return true;
-  if (u.at >= eff(g, u).attacks && u.mp > 0 && cheb(u, sq) > 2) { headTo(g, u, sq.x, sq.y); did = true; }
+  const slot = sqSlot(g, u, sq);
+  if (u.at >= eff(g, u).attacks && u.mp > 0 && cheb(u, slot) > 1) { headTo(g, u, slot.x, slot.y); did = true; }
   return did;
 }
-function squadRun(g, p) {
+function squadRun(g, p, only) {
   let n = 0;
+  const au = (p.sq || []).find(q => q.auto); // escuadra que acoge a las unidades nuevas
+  if (au) for (const u of g.units) if (u.o === p.id && !u.sq && !isAux(u) && !u.bs && !u.dg) u.sq = au.id;
   for (const sq of p.sq || []) {
-    if (sq.k === 'free') continue;
+    if (sq.k === 'free' || (only && sq !== only)) continue;
     for (const u of g.units.filter(x => x.o === p.id && x.sq === sq.id && !isAux(x) && !x.bs)) { if (g.units.includes(u) && squadUnit(g, p, u, sq)) n++; }
+  }
+  for (const sq of p.sq || []) { // avisos (solo al cerrar el turno, no con las órdenes manuales)
+    if (sq.rn) { if (!only) ev(g, `🩹 ${sq.n}: ${sq.rn} ${sq.rn === 1 ? 'unidad se retira' : 'unidades se retiran'} a curarse`, [p.id]); sq.rn = 0; }
+    if (only) continue;
+    const st = sqStat(g, p.id, sq);
+    if (st.c && st.hp < 50 && !sq.low) { sq.low = 1; ev(g, `⚠️ ${sq.n} tiene la salud media por debajo de la mitad (${st.hp}%)`, [p.id]); }
+    else if (st.hp >= 65) sq.low = 0;
   }
   return n;
 }
@@ -3854,7 +3915,7 @@ function citBot(g, p) { // los bots de la Ciudadela defienden la puerta más cer
   const plaza = S.CIT.plaza, foes = g.creatures.filter(c => c.tg).sort((a, b) => cheb(a, plaza) - cheb(b, plaza));
   let pt = { x: plaza.x, y: plaza.y };
   if (foes.length) { const gt = S.CIT.gates.slice().sort((a, b) => cheb(a, foes[0]) - cheb(b, foes[0]))[0]; pt = gateIn(gt); }
-  const sq = { k: 'guard', x: pt.x, y: pt.y };
+  const sq = { k: 'guard', x: pt.x, y: pt.y, rt: 35, rb: 50 };
   for (const u of g.units.filter(x => x.o === p.id && !isAux(x))) if (g.units.includes(u)) squadUnit(g, p, u, sq);
   const city = citCity(g); // los bots también reclutan (sin vaciar el almacén)
   if (city && g.units.filter(x => x.o === p.id && !isAux(x)).length < 10) { const cost = recruitCost(g, p.id, city); if (canAfford(city.st.m, cost) && (city.st.m.cuero || 0) >= 3 * (cost.cuero || 0)) doRecruit(g, p, city); }
@@ -4176,7 +4237,7 @@ function heroInfo(g, p) {
 function pairInfo(g, u) {
   const need = BREED_NEED[g.cfg.breed]; if (!need) return null;
   for (const k in (g.pairs || {})) { const [a, b] = k.split('-').map(Number); if (a === u.id || b === u.id) { const o = g.units.find(x => x.id === (a === u.id ? b : a)); return o ? { w: o.name, n: g.pairs[k], need } : null; } }
-  return { cd: Math.max(0, (u.bc || 0) - g.turn), need };
+  return { cd: Math.max(0, (u.bc || 0) - g.turn), need, gd: g.cfg.gender !== 'no' ? 1 : 0 };
 }
 function summary(g) { // resumen de fin de partida: clasificación y premios
   const rows = g.players.map(p => {
@@ -4226,7 +4287,7 @@ function snapshot(g, pid, now) {
     if (u.o === pid) {
       const e = eff(g, u);
       mine.push({ id: u.id, o: u.o, name: u.name, x: u.x, y: u.y, dg: u.dg || 0, lv: u.lv, xp: u.xp, xpn: xpNeed(u.lv), hp: u.hp, pts: u.pts, sk: u.sk, eq: u.eq, inv: u.inv, mp: u.mp, at: u.at,
-        e: { maxHp: e.maxHp, def: e.def, dmg: e.dmg, range: e.range, min: e.min, mov: e.mov, attacks: e.attacks, pierce: e.pierce, aura: e.aura, ha: e.ha, fx: e.fx, heal: e.heal || 0 }, au: u.au || 0, sq: u.sq || 0, pz: u.pz ? 1 : 0, bn: u.bn || null, gen: u.gen || 0, cz: cityZone(g, u), bc: u.bc || 0, pr: pairInfo(g, u), sm: u.sm ? u.sm.k : null, bs: u.bs || null, hr: u.hero || null, cart: u.cart ? 1 : 0, sg: u.sg ? { k: u.sg.k, c: u.sg.c } : null, bld: u.bld ? { c: u.bld.c, bt: u.bt === g.turn ? 1 : 0 } : null, cap: capOf(u), sc: summonInfo(g, u), vp: u.vamp ? 1 : 0, cls: u.cls || null, sub: u.sub || null, ord: u.ord || null, nearCity: !!cityNear(g, u), nearCart: !!cartNear(g, u) });
+        e: { maxHp: e.maxHp, def: e.def, dmg: e.dmg, range: e.range, min: e.min, mov: e.mov, attacks: e.attacks, pierce: e.pierce, aura: e.aura, ha: e.ha, fx: e.fx, heal: e.heal || 0 }, au: u.au || 0, sq: u.sq || 0, pz: u.pz ? 1 : 0, bn: u.bn || null, gen: u.gen || 0, cz: cityZone(g, u), bc: u.bc || 0, pr: pairInfo(g, u), sm: u.sm ? u.sm.k : null, bs: u.bs || null, hr: u.hero || null, cart: u.cart ? 1 : 0, sg: u.sg ? { k: u.sg.k, c: u.sg.c } : null, bld: u.bld ? { c: u.bld.c, bt: u.bt === g.turn ? 1 : 0 } : null, cap: capOf(u), sc: summonInfo(g, u), vp: u.vamp ? 1 : 0, pt: u.pt || 0, kl: u.kl || 0, hd: u.hd || null, fm: u.fm || null, rtr: u.rtr ? 1 : 0, sx: S.sexOf(u), cls: u.cls || null, sub: u.sub || null, ord: u.ord || null, nearCity: !!cityNear(g, u), nearCart: !!cartNear(g, u) });
     } else if (vis[u.y * w + u.x]) {
       const e = eff(g, u);
       others.push({ id: u.id, o: u.o, name: u.name, x: u.x, y: u.y, lv: u.lv, hp: u.hp, mhp: e.maxHp, w: e.kind, def: e.def, dmg: e.dmg, pz: u.pz ? 1 : 0, sm: u.sm ? u.sm.k : null, bs: u.bs || null, hr: u.hero || null, vp: u.vamp ? 1 : 0, ct: u.cart ? 1 : 0, bl: u.bld ? 1 : 0, sg: u.sg ? u.sg.k : null, ah: u.eq && u.eq.casco ? u.eq.casco.t : 0, ac: u.eq && u.eq.pechera ? u.eq.pechera.t : 0 });

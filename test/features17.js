@@ -55,6 +55,22 @@ ok(C.first === 100 && C.rest === 100, 'una oleada cada 100 turnos por defecto');
 { const q = E.createGame('CG1', 'Host', 't'); q.cfg.mode = 'ciudadela'; q.cfg.waveGap = 25; q.cfg.sim = true; E.addBot(q, 'azar'); E.startGame(q); ok(q.cw.next === 25, 'ajuste del lobby: primera oleada a los 25 turnos'); q.cw.next = q.turn; q.cw.n = 0; for (let i = 0; i < 2; i++) E.advanceTurn(q); const ids = q.cw.ids.slice(); for (const id of ids) { const ix = q.creatures.findIndex(c => c.id === id); if (ix >= 0) q.creatures.splice(ix, 1); } E.advanceTurn(q); ok(q.cw.n === 1 && q.cw.next - q.turn >= 23, 'al superarla la siguiente tarda 25 turnos (n=' + q.cw.n + ', next-turn=' + (q.cw.next - q.turn) + ')'); }
 g.cw.next = g.turn; for (let i = 0; i < 3 && g.status === 'playing'; i++) E.advanceTurn(g);
 ok(g.cw.n >= 1, 'al forzar el turno llega la oleada (n=' + g.cw.n + ')');
+// escuadras (v1.61.3): orden inmediata, unidades nuevas que se unen solas y resumen de estado
+{ const h = E.createGame('SQ9', 'Host', 't'); h.cfg.mode = 'ciudadela'; h.cfg.idleTurns = 0; h.cfg.sim = true; E.addBot(h, 'azar'); E.startGame(h);
+  const mine = () => h.units.filter(u => u.o === 0 && !u.sm), p0 = h.players[0], x0 = mine().map(u => u.x + ',' + u.y).join();
+  E.cmd(h, 0, { a: 'sq', d: 'new', n: 'A', ids: mine().map(u => u.id) });
+  const r1 = E.cmd(h, 0, { a: 'sq', d: 'ord', id: 1, k: 'guard', g: 'S' });
+  ok(/ponen en marcha/.test(r1.msg || '') && mine().map(u => u.x + ',' + u.y).join() !== x0, 'al dar la orden las unidades se mueven en el momento');
+  let st = E.snapshot(h, 0).ct.sq[0]; ok(st.c === 4 && st.hp === 100 && st.ids.length === 4 && st.auto === 0, 'resumen: unidades, salud media y auto');
+  E.cmd(h, 0, { a: 'sq', d: 'auto', id: 1 }); ok(p0.sq[0].auto === 1, 'activar «unidades nuevas se unen solas»');
+  const city = h.cities.find(c => c.cit); city.st.m = { cuero: 500, hierro: 100, acero: 50, hueso: 100 };
+  E.cmd(h, 0, { a: 'recruit', c: city.id }); E.cmd(h, 0, { a: 'sqrun' });
+  ok(mine().every(u => u.sq === 1), 'la unidad recién reclutada entra en la escuadra automática');
+  E.cmd(h, 0, { a: 'sq', d: 'auto', id: 1 }); ok(!p0.sq[0].auto, 'desactivar la unión automática');
+  // defender no persigue lejos del puesto
+  const sq = p0.sq[0], foe = { id: 99001, t: 'orco', lv: 1, x: sq.x, y: sq.y + 12, hp: 99, tg: city.id, ttl: 50 }; h.creatures.push(foe);
+  for (const u of mine()) { u.x = sq.x; u.y = sq.y - 1; } E.cmd(h, 0, { a: 'sqrun' });
+  ok(mine().every(u => Math.max(Math.abs(u.x - sq.x), Math.abs(u.y - sq.y)) <= 4), 'la escuadra que defiende no sale a perseguir enemigos lejanos'); }
 // derrota: plaza a 0
 { const { g: h } = mk(1, 'CT4'); h.cit.hp = 1; h.cw.n = 1; const c = h.cities.find(q => q.cit); h.creatures.push({ id: 99999, t: 'orco', lv: 3, x: S.CIT.plaza.x, y: S.CIT.plaza.y, hp: 999, tg: c.id, ttl: 50 }); h.cw.ids = [99999]; h.cw.cnt = 1; for (let i = 0; i < 3 && h.status === 'playing'; i++) E.advanceTurn(h); ok(h.status === 'over' || h.cw.lost || h.cit.hp <= 0, 'si los enemigos llegan a la plaza se pierde'); }
 // victoria: todas las oleadas superadas

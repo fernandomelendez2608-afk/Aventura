@@ -57,6 +57,16 @@
   const WM = [0, 1, 1.5, 2.1, 3.0, 4.1];   // multiplicador de daño de armas
   const AM = [0, 1, 1.7, 2.6, 3.8, 5.3];   // multiplicador de defensa de armaduras
 
+  function ptSeed(n) { let h = ((n | 0) ^ 0x9e3779b9) >>> 0; h = Math.imul(h ^ (h >>> 16), 0x85ebca6b) >>> 0; h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0; return (h ^ (h >>> 16)) >>> 0; } // semilla de retrato
+  const sexSeed = n => ((n >>> 5) & 1) ? 'F' : 'M'; // género a partir de una semilla
+  const sexOf = u => u.sx || sexSeed(u.pt || ptSeed(u.id * 7 + 3)); // las unidades antiguas (sin género guardado) lo deducen de su retrato
+  const DESIGN = { skin: 6, hair: 8, eye: 5, tun: 8, cape: 8, pant: 5, style: 8, build: 3, pose: 4, acc: ['parche', 'gafas', 'pendiente', 'bufanda', 'pintura', 'orejas', 'flor', 'cuernos'], maxAcc: 4, cost: { alma: 5 } };
+  function cleanDesign(d) { // valida el diseño del protagonista que manda el cliente
+    if (!d || typeof d !== 'object') return null;
+    const n = (v, max) => Math.max(0, Math.min(max - 1, v | 0));
+    const acc = Array.isArray(d.acc) ? [...new Set(d.acc.filter(a => DESIGN.acc.includes(a)))].slice(0, DESIGN.maxAcc) : [];
+    return { sx: d.sx === 'F' ? 'F' : 'M', skin: n(d.skin, DESIGN.skin), hair: n(d.hair, DESIGN.hair), eye: n(d.eye, DESIGN.eye), tun: n(d.tun, DESIGN.tun), cape: n(d.cape, DESIGN.cape), pant: n(d.pant, DESIGN.pant), style: n(d.style, DESIGN.style), build: n(d.build, DESIGN.build), pose: n(d.pose, DESIGN.pose), beard: d.beard ? 1 : 0, scar: d.scar ? 1 : 0, brow: d.brow ? 1 : 0, acc };
+  }
   const KINDS = {
     daga:      { n: 'Daga',        e: '🗡️', slot: 'arma',       w: true, base: 8,  range: 1, min: 1, pierce: 0.25, mov: 1, d: 'Ignora 25% de defensa, +1 movimiento' },
     espada:    { n: 'Espada',      e: '⚔️', slot: 'arma',       w: true, base: 9,  range: 1, min: 1, d: 'Arma cuerpo a cuerpo equilibrada' },
@@ -370,6 +380,7 @@
     bossRegen:  { n: 'Recuperación de los jefes', def: 'lenta', o: { lenta: 'Lenta (3% por turno)', normal: 'Normal (10% por turno, como las demás criaturas)', ninguna: 'Ninguna' } },
     botChat:    { n: 'Los bots hablan en el chat', def: 'si', o: { si: 'Sí', no: 'No' } },
     hero:       { n: 'Protagonista (una unidad especial por jugador)', def: 'si', o: { si: 'Sí', no: 'No' } },
+    gender:     { n: 'Crías: hace falta una pareja ♂ + ♀', def: 'si', o: { si: 'Sí: solo se emparejan un macho y una hembra (♂ + ♀)', no: 'No: cualquier pareja puede tener crías' } },
     breed:      { n: 'Crías (dos unidades juntas cerca de una ciudad)', def: 'cinco', o: { apagado: 'Desactivadas', cinco: 'Tras 5 turnos juntas', tres: 'Tras 3 turnos juntas' } },
     startUnits: { n: 'Unidades iniciales por jugador', def: 4, o: { 4: '4 (normal)', 8: '8', 14: '14 (máximo)' } },
     startLevel: { n: 'Nivel inicial de las unidades', def: 1, o: { 1: 'Nivel 1 (normal)', 3: 'Nivel 3', 6: 'Nivel 6', 10: 'Nivel 10' } },
@@ -580,7 +591,7 @@
   return {
     CIT, SKILLS, SKILL_ORDER, MATS, MAT_ORDER, TIER_NAMES, WM, AM, KINDS, WEAPON_KINDS, GEAR_KINDS, SLOTS, SLOT_NAMES, PACK,
     recipe, itemValue, MAX_TIER, ENCHANT_STEPS, MAX_FX, REFORGE_COST, SET_BONUS, armorSet, itemName, tierName, RARITY, AFFIX, WEAPON_FX, ARMOR_FX, affixText, upgradeCost, ENCHANT_COST,
-    BAR, NPC, ARENA, WORLD, WAVES, LAB, SIEGE, CART, HERO, KING, BOSS_IDS, DUNGEON, TEAM_E, STORY, CONVERT, VAMP, SUMMON, WORLD_OPTS, PRESETS, VICTORY, GEMS, GEM_IDS, GEM_LV, gemOf, gemFx, gemText, SOCKETS_BY_R, MAX_SOCKETS, SOCKET_STEPS, GEM_UP, CLASS_LV, SUB_LV, CLASSES, classMods, BUILDER, ROAD_COST, MAT_VAL, itemVal, INCOME, BUILDINGS, bMax, CHURCH, ANGEL, CITY_GUARD, BUILD_ORDER, BUILD_MAX, ORDERS,
+    ptSeed, sexSeed, sexOf, DESIGN, cleanDesign, BAR, NPC, ARENA, WORLD, WAVES, LAB, SIEGE, CART, HERO, KING, BOSS_IDS, DUNGEON, TEAM_E, STORY, CONVERT, VAMP, SUMMON, WORLD_OPTS, PRESETS, VICTORY, GEMS, GEM_IDS, GEM_LV, gemOf, gemFx, gemText, SOCKETS_BY_R, MAX_SOCKETS, SOCKET_STEPS, GEM_UP, CLASS_LV, SUB_LV, CLASSES, classMods, BUILDER, ROAD_COST, MAT_VAL, itemVal, INCOME, BUILDINGS, bMax, CHURCH, ANGEL, CITY_GUARD, BUILD_ORDER, BUILD_MAX, ORDERS,
     SEASON_LEN, SEASONS, seasonIdx, WEATHER, WEATHER_ORDER, TOURN, MERCH, ELITE_NAMES, SITES, PERS, BOT_LEVELS, PACTS, TERR, CREATURES, DIRS, cheb, reach,
   };
 });

@@ -53,6 +53,7 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:0}
 #toast .e{border-color:var(--red);color:#ffc9cb}
 @keyframes tin{from{opacity:0;transform:translateY(-6px)}to{opacity:1}}
 #sheet{background:var(--panel);border-top:1px solid var(--line);max-height:48vh;overflow:auto;padding:10px 12px 14px;border-radius:16px 16px 0 0}
+#sheet.big{max-height:82vh}
 #sheet .hd{display:flex;align-items:center;gap:8px;margin-bottom:8px;position:sticky;top:-10px;background:var(--panel);padding:4px 0;z-index:2}
 #sheet .hd b{font-size:17px;flex:1}
 .x{min-width:40px;min-height:40px;border:none;background:var(--panel2);border-radius:50%;font-size:18px}
@@ -95,6 +96,7 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:0}
 #nav button{width:46px;height:46px;border-radius:50%;border:1px solid var(--line);background:#181c27ee;font-size:20px;position:relative}
 #sheet .chm{padding:5px 8px;margin:4px 0;border-radius:10px;background:#ffffff0d}#sheet .chm.me{background:#e6b45a22}#sheet .chm div{word-break:break-word}
 #nav button:not(#nHome):not(#nNext){display:none} /* el resto de botones viven en el panel «Más» */
+body.sheetdesign #mm{display:none}
 body.sheetopen #nav{display:none} /* con una hoja abierta no tapan los botones + */
 .mgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:8px 0 4px}
 .mgrid button{position:relative;min-height:74px;border-radius:14px;border:1px solid var(--line);background:var(--panel2);font-size:12px;line-height:1.2;padding:8px 4px;color:var(--fg,inherit)}
@@ -107,6 +109,8 @@ body.sheetopen #nav{display:none} /* con una hoja abierta no tapan los botones +
 .pact.paz{background:#1c3b4f;color:#9fd4ff}.pact.alianza{background:#1d4a30;color:#9bf0b9}.pact.guerra{background:#3a1c20;color:#ffb3b6}
 .offer{background:#262034;border:1px solid #6b4fa0;border-radius:12px;padding:10px;margin:6px 0}
 #bar .badge.pl{top:2px}
+.ptf{flex:none;border-radius:10px;border:2px solid #1b1522;overflow:hidden;box-shadow:0 2px 6px #0006}
+.swd{width:30px;height:30px;border-radius:8px;border:2px solid #0006;padding:0}.swd.on{outline:3px solid #f4d24f}
 </style>
 </head>
 <body>
@@ -776,6 +780,7 @@ function drawCitadel(c, ox, oy, z) {
   // barra de integridad sobre la plaza
   if (z >= 12) { const w = z * 3, pct = ct.hp / ct.max; ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(pcx - w / 2, Y(P.y - 1.7), w, z * .22); ctx.fillStyle = pct > .5 ? '#5fd36b' : pct > .25 ? '#e6b450' : '#ff5252'; ctx.fillRect(pcx - w / 2, Y(P.y - 1.7), w * pct, z * .22); }
 }
+const SQC = ['#4aa3ff', '#ff7a45', '#5fd36b', '#c77dff', '#ffd34a', '#ff5c8a', '#3dd6d0', '#b0b0b0'];
 const SQ_ORD = { free: ['✋', 'Libre'], guard: ['🛡️', 'Defender'], hunt: ['⚔️', 'Cazar'], city: ['🏠', 'A la ciudad'], raid: ['🕳️', 'Invadir mazmorra'] };
 let citTab = 'war';
 const citSt = () => ((S.cities.find(c => c.cit) || {}).st || { m: {} }).m || {};
@@ -790,7 +795,7 @@ function citBarHtml() {
   const bar0 = S.ct.bar, st = citSt(); if (!bar0) return '<p class="dim">La taberna aún no abre.</p>';
   let h = `<p class="hint" style="margin-top:0">🍺 En la taberna hay clientes con atributos al azar. <b>Cada 30 turnos</b> se renuevan (próxima renovación en <b>${bar0.left}</b> turnos). Pagas con el almacén de la ciudad. Cuanto más avanza la partida, mejores clientes: ¡a veces llega un <b style="color:#ffc300">Legendario</b>, y esos son <b>vampiros</b>! ${SH.VAMP.e}</p>`;
   h += bar0.c.map(c => { const R = SH.BAR.rar[c.rar], can = !c.taken && SH.MAT_ORDER.every(k => !c.cost[k] || (st[k] || 0) >= c.cost[k]);
-    return `<div class="card" style="border-left:4px solid ${R[1]}"><div class="line"><div class="g"><b>${esc(c.name)}</b> <span style="color:${R[1]};font-weight:700">${R[0]}</span> <span class="dim">· nivel ${c.lv}</span>${c.vamp ? ' <span class="chip">' + SH.VAMP.e + ' Vampiro</span>' : ''}</div></div>${clsTxt(c.cls, c.sub) ? `<div class="dim">${clsTxt(c.cls, c.sub)}</div>` : ''}<div style="margin:3px 0">${skTxt(c.sk)}</div><div>${costChips(c.cost, st)}</div>${c.taken ? '<div class="dim" style="margin-top:4px">Ya reclutado</div>' : `<button class="btn sm gold" style="margin-top:4px" data-c='${jattr({ a: 'bar', id: c.id })}' ${can ? '' : 'disabled'}>Reclutar</button>`}</div>`; }).join('');
+    return `<div class="card" style="border-left:4px solid ${R[1]};display:flow-root"><div style="float:left;margin:0 8px 4px 0">${ptHtml({ seed: SH.ptSeed(c.id * 3 + 1), sx: c.sx, vp: c.vamp, cls: c.cls, rar: c.rar }, 60, R[1])}</div><div class="line"><div class="g"><b>${esc(c.name)}</b> ${sxTag(c.sx)} <span style="color:${R[1]};font-weight:700">${R[0]}</span> <span class="dim">· nivel ${c.lv}</span>${c.vamp ? ' <span class="chip">' + SH.VAMP.e + ' Vampiro</span>' : ''}</div></div>${clsTxt(c.cls, c.sub) ? `<div class="dim">${clsTxt(c.cls, c.sub)}</div>` : ''}<div style="margin:3px 0">${skTxt(c.sk)}</div><div>${costChips(c.cost, st)}</div>${c.taken ? '<div class="dim" style="margin-top:4px">Ya reclutado</div>' : `<button class="btn sm gold" style="margin-top:4px" data-c='${jattr({ a: 'bar', id: c.id })}' ${can ? '' : 'disabled'}>Reclutar</button>`}</div>`; }).join('');
   return h;
 }
 function citArenaHtml() {
@@ -825,14 +830,29 @@ function citWarHtml() {
     else if (!w.fin && !w.lost) h += `<div class="line"><div class="g dim">🔭 Aún no has explorado: entra en una mazmorra para ver la próxima oleada.</div></div>`;
     if (ct.weak) h += `<div class="line"><div class="g">⚔️ Mazmorras vencidas: la próxima oleada será un <b>${10 * ct.weak}%</b> más pequeña.</div></div>`; }
   h += hd('🛡️ Escuadras') + `<p class="hint" style="margin-top:0">Agrupa unidades y dales una <b>orden permanente</b>: se cumple al terminar el turno (y con «Ejecutar ahora»). Seguirás pudiendo tocar cada unidad.</p>`;
+  if (ct.sq.length) { // comparativa de todas las escuadras con órdenes directas
+    const inSq = S.mine.filter(u => u.sq).length;
+    h += hd('📊 Comparativa') + `<p class="hint" style="margin-top:0">Fuerza = daño por turno + vida + defensa de sus unidades (para comparar). ${inSq} en escuadras, ${free.length} sin escuadra.</p>`;
+    for (const s of ct.sq) {
+      const col = SQC[(s.id - 1) % 8], o = SQ_ORD[s.k] || SQ_ORD.free;
+      h += `<div class="card" style="padding:6px 8px;border-left:4px solid ${col}"><div class="line" style="margin:0"><div class="g"><span style="color:${col}">●</span> <b>${esc(s.n)}</b> <span class="dim">· ${s.c} u. · 💪 ${s.pw}</span></div><span class="chip">${o[0]} ${o[1]}</span></div>${s.c ? bar(s.hp >= 50 ? 'hp' : 'hp low', s.hp, 100) : ''}<div style="font-size:12px;margin:2px 0" class="dim">${s.c ? 'salud ' + s.hp + '%' : '<b class="lack">vacía</b>'}${s.rtr ? ` · <b class="lack">🩹 ${s.rtr} retirándose</b>` : ''}${s.hurt ? ` · ${s.hurt} herida(s)` : ''}${s.dg ? ` · 🕳️ ${s.dg} en mazmorra` : ''}${s.k === 'guard' ? ` · ${s.pos}/${s.c} en su puesto` : ''}${s.foes && s.k === 'guard' ? ` · <b class="lack">⚠️ ${s.foes} enemigo(s)</b>` : ''}</div><div class="row" style="flex-wrap:wrap;gap:4px">${Object.keys(SQ_ORD).map(k => `<button class="btn sm ${s.k === k ? 'gold' : ''}" title="${SQ_ORD[k][1]}" data-sq='${jattr({ d: 'ord', id: s.id, k })}'>${SQ_ORD[k][0]}</button>`).join('')}</div></div>`;
+    }
+  }
   for (const s of ct.sq) {
     const gname = s.g === 'P' ? 'la plaza' : s.g ? 'la puerta ' + ({ N: 'norte', S: 'sur', E: 'este' })[s.g] : 'un punto';
-    h += `<div class="card"><div class="line"><div class="g"><b>${esc(s.n)}</b> <span class="dim">· ${s.c} ${s.c === 1 ? 'unidad' : 'unidades'}</span></div><button class="btn sm" data-sq='${jattr({ d: 'del', id: s.id })}'>✕</button></div>`;
+    h += `<div class="card" style="border-left:4px solid ${SQC[(s.id - 1) % 8]}"><div class="line"><div class="g"><b>${esc(s.n)}</b> <span class="dim">· ${s.c} ${s.c === 1 ? 'unidad' : 'unidades'}</span></div><button class="btn sm" data-sq='${jattr({ d: 'del', id: s.id })}'>✕</button></div>`;
+    { const col = SQC[(s.id - 1) % 8], dgn = s.dg ? ` · 🕳️ ${s.dg} en mazmorra` : '';
+      let st = s.c ? `salud media <b>${s.hp}%</b>${s.hurt ? ` · <b class="lack">${s.hurt} herida(s)</b>` : ''}${dgn}` : '<b class="lack">sin unidades: añade unidades</b>';
+      if (s.k === 'guard') st = `${s.pos}/${s.c} en su puesto · ` + st + (s.foes ? ` · <b class="lack">⚠️ ${s.foes} enemigo(s) cerca del puesto</b>` : '');
+      h += `<div style="font-size:13px;margin:2px 0"><span style="color:${col}">●</span> Número ${s.id} en el mapa · ${st}</div>`; }
     h += `<div class="row" style="flex-wrap:wrap;gap:4px;margin:4px 0">${Object.keys(SQ_ORD).map(k => `<button class="btn sm ${s.k === k ? 'gold' : ''}" data-sq='${jattr({ d: 'ord', id: s.id, k })}'>${SQ_ORD[k][0]} ${SQ_ORD[k][1]}</button>`).join('')}</div>`;
     if (s.k === 'guard') h += `<div class="row" style="flex-wrap:wrap;gap:4px;margin:4px 0"><span class="dim">Defender:</span>${[['N', 'Puerta N'], ['S', 'Puerta S'], ['E', 'Puerta E'], ['P', 'Plaza']].map(([k, t]) => `<button class="btn sm ${s.g === k ? 'gold' : ''}" data-sq='${jattr({ d: 'ord', id: s.id, k: 'guard', g: k })}'>${t}</button>`).join('')}<button class="btn sm" data-sqpt="${s.id}">📍 Punto…</button></div><div class="dim" style="font-size:12px">Vigila ${gname}</div>`;
     if (s.k === 'hunt') h += '<div class="dim" style="font-size:12px">Salen a cazar lo que puedan vencer y vuelven a la ciudad si se hieren o llenan la mochila.</div>';
     if (s.k === 'raid') h += '<div class="dim" style="font-size:12px">Hasta 5 entran en la mazmorra con enemigos, luchan, recogen tesoros y salen si se hieren o la limpian. El resto espera en la ciudad.</div>';
     if (s.k === 'city') h += '<div class="dim" style="font-size:12px">Vuelven a la plaza, se equipan y guardan el botín.</div>';
+    h += `<div class="row" style="flex-wrap:wrap;gap:4px;margin:4px 0"><span class="dim">🩹 Se retiran por debajo de:</span>${[[0, 'nunca'], [25, '25%'], [35, '35%'], [50, '50%'], [65, '65%']].map(([v, t]) => `<button class="btn sm ${s.rt === v ? 'gold' : ''}" data-sq='${jattr({ d: 'rule', id: s.id, rt: v })}'>${t}</button>`).join('')}</div><div class="row" style="flex-wrap:wrap;gap:4px;margin:4px 0"><span class="dim">↩️ Vuelven a su puesto con:</span>${[50, 80, 100].map(v => `<button class="btn sm ${s.rb === v ? 'gold' : ''}" data-sq='${jattr({ d: 'rule', id: s.id, rb: v })}'>${v}%</button>`).join('')}</div>`;
+    if (s.k === 'guard') h += `<div class="dim" style="font-size:12px;margin:2px 0">🧱 Formación: <b>${s.fr}</b> al frente/centro · <b>${s.bk}</b> en retaguardia. Por defecto los de arma a distancia y los sanadores van atrás; cámbialo en el perfil de cada unidad.</div>`;
+    h += `<button class="btn sm ${s.auto ? 'gold' : ''}" data-sq='${jattr({ d: 'auto', id: s.id })}'>🔁 Unidades nuevas se unen solas: ${s.auto ? 'SÍ' : 'no'}</button> `;
     if (free.length) h += `<button class="btn sm" data-sq='${jattr({ d: 'fill', id: s.id })}'>➕ Añadir las ${free.length} sin escuadra</button>`;
     h += '</div>';
   }
@@ -854,7 +874,9 @@ function renderSheet() {
   const el = $('sheet');
   document.body.classList.toggle('sheetopen', !!(sheet && S && S.status !== 'lobby'));
   if (sheet && sheet.mode === 'chat' && S && S.status !== 'lobby' && $('chList')) { chatRefresh(); return; } // no pisa lo que se está escribiendo
-  if (!sheet || !S || S.status === 'lobby') { el.classList.add('hidden'); el.innerHTML = ''; return; }
+  if (!sheet || !S || S.status === 'lobby') { el.classList.add('hidden'); el.classList.remove('big'); document.body.classList.remove('sheetdesign'); el.innerHTML = ''; return; }
+  el.classList.toggle('big', sheet.mode === 'design');
+  document.body.classList.toggle('sheetdesign', sheet.mode === 'design');
   let html = '';
   const u = selUnit();
   if (S.status === 'over') {
@@ -864,6 +886,7 @@ function renderSheet() {
     case 'unit': html += u ? unitSheet(u) : ''; break;
     case 'units': html += hd('Tus unidades') + S.mine.map(m => `<div class="line" data-ui="pick:${m.id}"><div class="g"><b>${esc(m.name)}</b> <span class="dim">niv. ${m.lv}</span> ${clsTag(m)} ${m.pts || classAvail(m) ? '<span class="pips">⭐' + (m.pts || '') + '</span>' : ''}${m.ord ? ' ' + ORD_E[m.ord.t] : ''}${(m.mp > 0 || m.at > 0) && !m.ord ? ' <span class="ok">●</span>' : ''}${bar('hp', m.hp, m.e.maxHp)}</div><span class="dim">${m.hp}/${m.e.maxHp}</span></div>`).join('') || '<p class="dim">No tienes unidades.</p>'; break;
     case 'recap': html += recapSheet(); break;
+    case 'design': html += designSheet(); break;
     case 'story': html += storySheet(); break;
     case 'summary': html += summarySheet(); break;
     case 'cities': html += hd('Tus ciudades') + (S.cities.filter(c => c.o === S.you).map(c => `<div class="line" data-ui="city:${c.id}"><div class="g"><b>${esc(c.name)}</b> ${bldHtml(c.b)}<div>${matsHtml(c.st.m)}</div></div><span class="dim">${c.st.it.length} 🎒</span></div>`).join('') || '<p class="dim">No controlas ciudades.</p>'); break;
@@ -902,17 +925,22 @@ function recapSheet() {
 function unitSheet(u) {
   if (u.sm) sheet.tab = 'state';
   const e = u.e, tabs = u.sm ? [['state', 'Estado']] : u.bs ? [['state', 'Estado'], ['skills', 'Habilidades' + (u.pts ? ' ⭐' + u.pts : '')], ['bag', 'Mochila']] : u.bld || u.sg ? [['state', 'Estado']] : u.cart ? [['state', 'Estado'], ['bag', 'Carga']] : [['state', 'Estado'], ['skills', 'Habilidades' + (u.pts ? ' ⭐' + u.pts : '')], ['class', 'Clase' + (classAvail(u) ? ' ⭐' : '')], ['gear', 'Equipo'], ['bag', 'Mochila']];
-  let h = `<div class="hd"><span class="sw" style="background:${S.players[S.you].color}"></span><b>${esc(u.name)} <span class="dim">niv. ${u.lv}</span> ${clsTag(u)}</b><button class="btn sm fix" data-ui="rename" title="Cambiar nombre" style="margin-left:auto">✏️</button><button class="x" data-ui="close">✕</button></div>`;
+  let h = `<div class="hd"><span class="sw" style="background:${S.players[S.you].color}"></span><b>${esc(u.name)} ${sxTag(u.sx)} <span class="dim">niv. ${u.lv}</span> ${clsTag(u)}${u.kl ? ` <span class="dim" title="Enemigos eliminados">☠️${u.kl}</span>` : ''}</b><button class="btn sm fix" data-ui="rename" title="Cambiar nombre" style="margin-left:auto">✏️</button><button class="x" data-ui="close">✕</button></div>`;
   h += `<div class="tabs">${tabs.map(t => `<button class="tab ${sheet.tab === t[0] ? 'on' : ''}" data-ui="tab:${t[0]}">${t[1]}</button>`).join('')}</div>`;
   if (sheet.tab === 'state') {
     const w = u.eq.arma;
+    const pt0 = !u.sm && !u.bs && !u.bld && !u.sg && !u.cart; if (pt0) h += '<div style="display:flex;gap:10px;align-items:flex-start">' + ptHtml(ptUnit(u), 92, u.vp ? '#6a1830' : u.hr ? '#8a6a1e' : '#3a3550') + '<div style="flex:1;min-width:0">';
     h += `<div style="display:flex;justify-content:space-between"><span>❤️ Salud</span><span>${u.hp}/${e.maxHp}</span></div>${bar('hp', u.hp, e.maxHp)}`;
     h += `<div style="display:flex;justify-content:space-between;margin-top:8px"><span>✨ Experiencia</span><span>${u.xp}/${u.xpn}</span></div>${bar('xp', u.xp, u.xpn)}`;
+    if (pt0) h += '</div></div>';
     if (S.ct && !u.sm && !u.bld && !u.sg && !u.cart) h += `<div class="row" style="flex-wrap:wrap;gap:4px;margin-top:8px"><span class="dim">Escuadra:</span><button class="btn sm ${!u.sq ? 'gold' : ''}" data-sq='${jattr({ d: 'unit', u: u.id, id: 0 })}'>Ninguna</button>${S.ct.sq.map(q => `<button class="btn sm ${u.sq === q.id ? 'gold' : ''}" data-sq='${jattr({ d: 'unit', u: u.id, id: q.id })}'>${esc(q.n)}</button>`).join('')}</div>`;
+    if (S.ct && u.sq && !u.sm && !u.bld && !u.sg && !u.cart) { const role = u.fm || (u.e.range >= 2 || u.e.heal ? 'b' : 'f'); h += `<div class="row" style="flex-wrap:wrap;gap:4px;margin-top:6px"><span class="dim">Formación${u.fm ? '' : ' (auto: ' + ({ f: 'frente', b: 'retaguardia' })[role] + ')'}:</span>${[['a', 'Auto'], ['f', 'Frente'], ['c', 'Centro'], ['b', 'Atrás']].map(([v, t]) => `<button class="btn sm ${(u.fm || 'a') === v ? 'gold' : ''}" data-sq='${jattr({ d: 'fm', u: u.id, v })}'>${t}</button>`).join('')}</div>${u.rtr ? '<p class="hint">🩹 Se está retirando a curarse; volverá a su puesto al recuperarse.</p>' : ''}`; }
     h += `<div class="grid" style="margin-top:10px">
       <div class="stat"><small>Daño</small>${e.dmg}${e.attacks > 1 ? ' ×' + e.attacks : ''}</div><div class="stat"><small>Defensa</small>${e.def}</div>
       <div class="stat"><small>Alcance</small>${e.min === e.range ? e.range : e.min + '–' + e.range}</div><div class="stat"><small>Movimiento</small>${Math.round(u.mp * 10) / 10}/${e.mov}</div>
       <div class="stat"><small>Ataques</small>${u.at}/${e.attacks}</div><div class="stat"><small>Arma</small>${w ? SH.KINDS[w.k].e + ' ' + SH.itemName(w) : u.bs ? '🐾 Garras' : '✊ Puños'}</div></div>`;
+    if (!u.sm && !u.cart && !u.bld && !u.sg) h += `<p class="hint" style="margin:6px 0">☠️ <b>${u.kl || 0}</b> ${u.kl === 1 ? 'enemigo eliminado' : 'enemigos eliminados'}</p>`;
+    if (!u.sm && (u.hr || (S.cfg && S.cfg.mode === 'uno'))) h += `<div class="row" style="margin:4px 0"><button class="btn sm" data-ui="design:${u.id}">🎨 ${!u.hd ? 'Diseñar a ' + (u.hr ? 'mi protagonista' : 'mi personaje') : S.turn <= SH.HERO.pickTurn ? 'Cambiar diseño' : 'Rediseñar (5 almas)'}</button></div>`;
     if (e.heal) h += `<p class="hint ok">✚ <b>Cura ${e.heal}</b> de salud a un aliado a distancia ${e.range} (gasta un ataque). Con este báculo equipado, toca a un aliado herido para curarlo.</p>`;
     if (!u.sm && !u.cart && !u.bld && !u.sg && !u.bs) h += `<div class="row" style="gap:4px;align-items:center;margin:8px 0"><span class="dim">🤖 Automático:</span>${[0, 1, 2, 3].map(i => `<button class="btn sm ${(u.au || 0) === i ? 'gold' : ''}" title="${AUTO_T[i]}" data-c='${jattr({ a: 'auto', u: u.id, m: i })}'>${['✋', '⚔️', '🎒', '🤖'][i]}</button>`).join('')}<button class="btn sm fix" data-ui="auto" style="margin-left:auto">Todas…</button></div>`;
     h += dgUnitHtml(u);
@@ -943,7 +971,7 @@ function unitSheet(u) {
     if (u.sm) h += `<p class="hint ok">🔮 Invocación (${SH.CREATURES[u.sm].n}): su fuerza sube con el nivel de su invocador y desaparece si él cae.</p><button class="btn sm red" data-c='${jattr({ a: 'dismiss', u: u.id })}'>Despedir</button>`;
     if (u.sc) h += `<h3 class="hint" style="margin-top:12px">🔮 Invocar (${u.sc.n}/${u.sc.max} por esta unidad)</h3>` + (u.sc.near ? '' : '<p class="hint lack">Acércate a 2 casillas o menos de una ciudad tuya.</p>') + `<div class="row" style="flex-wrap:wrap;gap:6px">${u.sc.opts.map(o => `<button class="btn sm gold" ${u.sc.near && u.sc.n < u.sc.max && u.sc.bones >= o.cost.hueso ? '' : 'disabled'} data-c='${jattr({ a: 'summon', u: u.id, k: o.k })}'>${SH.CREATURES[o.k].e} ${SH.CREATURES[o.k].n} · ${SH.MATS.hueso.e}${o.cost.hueso}</button>`).join('')}</div><p class="hint">Huesos en el almacén cercano: ${u.sc.bones}.</p>`;
     if (u.bn) h += `<p class="hint ok">👶 Cría${u.gen ? ' de la generación ' + u.gen : ''}: +${u.bn.hp} salud y +${u.bn.dmg} daño de nacimiento.</p>`;
-    if (u.pr) h += u.pr.w ? `<p class="hint ok">💞 Junto a <b>${esc(u.pr.w)}</b> cerca de la ciudad: ${u.pr.n}/${u.pr.need} turnos.</p>` : `<p class="hint">💞 ${u.pr.cd > 0 ? 'Podrá tener otra cría en ' + u.pr.cd + ' turnos.' : 'Para tener una cría: quédate 1 casilla de otra unidad tuya, a 2 casillas de una ciudad tuya, durante ' + u.pr.need + ' turnos.'}</p>`;
+    if (u.pr) h += u.pr.w ? `<p class="hint ok">💞 Junto a <b>${esc(u.pr.w)}</b> cerca de la ciudad: ${u.pr.n}/${u.pr.need} turnos.</p>` : `<p class="hint">💞 ${u.pr.cd > 0 ? 'Podrá tener otra cría en ' + u.pr.cd + ' turnos.' : 'Para tener una cría: quédate 1 casilla de ' + (u.pr.gd ? 'una unidad tuya del otro género (' + (u.sx === 'F' ? '♂' : '♀') + ')' : 'otra unidad tuya') + ', a 2 casillas de una ciudad tuya, durante ' + u.pr.need + ' turnos.'}</p>`;
     if (e.aura) h += `<p class="hint">Aura de aliado cercano: +${Math.round(e.aura * 100)}% salud y defensa.</p>`;
     h += `<h3 class="hint" style="margin-top:12px">Órdenes (siguen solas los próximos turnos)</h3>`;
     if (u.ord) h += `<p class="hint ok">${ORD_E[u.ord.t]} Orden actual: <b>${SH.ORDERS[u.ord.t].n}</b>${u.ord.t === 'goto' ? ` (${u.ord.x},${u.ord.y})` : ''}</p>`;
@@ -1379,7 +1407,8 @@ function infoSheet() {
   if (i.t === 'npc') {
     const n = ((S.ct && S.ct.npcs) || []).find(x => x.id === i.id); if (!n) return hd('Viajero') + '<p class="dim">Ya no está a la vista.</p>';
     const near = S.mine.filter(u => !u.sm && Math.max(Math.abs(u.x - n.x), Math.abs(u.y - n.y)) <= 1), u0 = near.find(u => u.id === selId) || near[0], st = citSt(), K = SH.NPC.kinds[n.k];
-    let h = hd(K.e + ' ' + esc(n.name) + ' <span class="dim">· ' + K.n + '</span>') + `<p class="hint" style="margin-top:0">Se marcha en ${n.left} turno(s) y deambula por el mundo exterior. Pagas con el <b>almacén de la ciudad</b>.${u0 ? '' : ' <b class="lack">Pon una de tus unidades a su lado.</b>'}</p>`;
+    let h = hd(K.e + ' ' + esc(n.name) + ' ' + sxTag(SH.sexSeed(SH.ptSeed(n.id * 5 + 2))) + ' <span class="dim">· ' + K.n + '</span>') + `<p class="hint" style="margin-top:0">Se marcha en ${n.left} turno(s) y deambula por el mundo exterior. Pagas con el <b>almacén de la ciudad</b>.${u0 ? '' : ' <b class="lack">Pon una de tus unidades a su lado.</b>'}</p>`;
+    h += `<div style="float:right;margin:0 0 6px 8px">${ptHtml({ seed: SH.ptSeed(n.id * 5 + 2), sx: SH.sexSeed(SH.ptSeed(n.id * 5 + 2)), cls: n.cls }, 64, n.k === 'sanador' ? '#2f7a5a' : n.k === 'maestro' ? '#5a4a8a' : '#3a3550')}</div>`;
     const btn = (label, can, cmd) => u0 ? `<button class="btn gold block" data-c='${jattr(Object.assign({ a: 'npc', id: n.id, u: u0.id }, cmd || {}))}' ${can ? '' : 'disabled'}>${label}</button>` : '';
     if (n.k === 'recluta') h += `<div class="card"><div><b>Nivel ${n.lv}</b> ${clsTxt(n.cls) ? '· ' + clsTxt(n.cls) : ''}</div><div style="margin:3px 0">${skTxt(n.sk)}</div><div>${costChips(n.cost, st)}</div></div>` + btn('Reclutar', SH.MAT_ORDER.every(k => !n.cost[k] || (st[k] || 0) >= n.cost[k]));
     else if (n.k === 'sanador') h += '<p>Cura <b>por completo</b> a tus unidades que estén a 4 casillas o menos (gratis, hasta 3 veces).</p>' + btn('✚ Curar a mis unidades cercanas', true);
@@ -1403,6 +1432,17 @@ function infoSheet() {
 }
 
 $('sheet').addEventListener('click', e => {
+  const hb = e.target.closest('[data-hd]');
+  if (hb && HD) { const [k, v] = hb.dataset.hd.split(':'), box = $('sheet'), top = box.scrollTop, nm = $('dName'); if (nm) sheet.dname = nm.value;
+    if (k === 'acc') { const i = HD.acc.indexOf(v); if (i >= 0) HD.acc.splice(i, 1); else if (HD.acc.length < SH.DESIGN.maxAcc) HD.acc.push(v); else toast('Máximo ' + SH.DESIGN.maxAcc + ' accesorios'); }
+    else if (k === 'sx') HD.sx = v; else if (['beard', 'scar'].includes(k)) HD[k] = HD[k] ? 0 : 1; else HD[k] = +v;
+    renderSheet(); box.scrollTop = top; return; }
+  const hr = e.target.closest('[data-hdact]');
+  if (hr && HD) { const k = hr.dataset.hdact, u = S.mine.find(x => x.id === sheet.du);
+    if (k === 'rnd') { const sx = Math.random() < .5 ? 'M' : 'F'; HD = ptTraits((Math.random() * 4294967295) >>> 0, sx); HD.acc = Math.random() < .5 ? [SH.DESIGN.acc[Math.floor(Math.random() * SH.DESIGN.acc.length)]] : []; const nm = $('dName'); if (nm) sheet.dname = nm.value; renderSheet(); }
+    else if (k === 'ok' && u) { const nm = $('dName'); act({ a: 'design', u: u.id, d: HD, name: nm ? nm.value : '' }); selId = u.id; HD = null; openSheet('unit'); }
+    else if (k === 'back' && u) { selId = u.id; HD = null; openSheet('unit'); }
+    return; }
   const c = e.target.closest('[data-c]');
   if (c) { act(JSON.parse(c.dataset.c)); return; }
   const ctb = e.target.closest('[data-cittab]'); if (ctb) { citTab = ctb.dataset.cittab; renderSheet(); return; }
@@ -1416,6 +1456,7 @@ $('sheet').addEventListener('click', e => {
   else if (k === 'auto') openSheet('auto');
   else if (k === 'mo') { const bt = $(v); if (!bt) return; if (v === 'nSnd') { bt.click(); renderSheet(); } else { closeSheet(); bt.click(); } }
   else if (k === 'gotocart') { closeSheet(); centerOn(+b.dataset.x, +b.dataset.y); }
+  else if (k === 'design') { const u = S.mine.find(x => x.id === +v); if (!u) return; HD = JSON.parse(JSON.stringify(u.hd || Object.assign(ptTraits(u.pt || SH.ptSeed(u.id * 7 + 3), u.sx), { sx: u.sx === 'F' ? 'F' : 'M' }))); openSheet('design', { du: u.id }); }
   else if (k === 'rename') { const u = S.mine.find(x => x.id === selId); if (!u) return; const nm = prompt('Nuevo nombre para esta unidad (máx. 16 letras):', u.name); if (nm !== null && nm.trim()) send({ t: 'cmd', a: 'rename', u: u.id, name: nm }); }
   else if (k === 'gcreate') { const n = prompt('Nombre del gremio (3-16 letras):', ''); if (n === null || !n.trim()) return; const t = prompt('Etiqueta (2-4 letras o números):', n.trim().slice(0, 3).toUpperCase()); if (t === null || !t.trim()) return; act({ a: 'guild', d: 'create', n, t }); }
   else if (k === 'gleave') { if (confirm('¿Dejar el gremio? Se acaba la alianza con sus miembros.')) act({ a: 'guild', d: 'leave' }); }
@@ -1467,7 +1508,7 @@ function selectUnit(id, center) {
 function centerOn(x, y) { cam.x = x + 0.5; cam.y = y + 0.5; dirty = true; }
 
 /* ---------- mapa: interacción ---------- */
-const cv = $('cv'), ctx = cv.getContext('2d');
+const cv = $('cv'); let ctx = cv.getContext('2d'); const mainCtx = ctx;
 let dirty = true, W = 300, H = 300, dpr = 1;
 function resize() {
   requestAnimationFrame(() => {
@@ -1751,6 +1792,36 @@ function drawCity(c, ox, oy, z) {
   drawPx(c.o === null ? 'ruincity' : 'castle', cx, cy + ks * .55, ks / 16 * 1.25, c.o === null ? null : { T: col, t: sprShade(col, .6) });
   if (det && c.o !== null && c.cap) emoji('👑', cx, cy - z * .42, z * .24);
 }
+/* ---- caché del terreno: el suelo casi no cambia, así que se dibuja una vez en un lienzo y luego solo se copia (mucho menos lag en el móvil) ---- */
+const TC = { terr: null, vis: null, sig: '', cv: [null, null], fog: null, sizeOk: true };
+const TCZ = 16;
+function tcSig() { const cc = S.ct && S.cities.find(c => c.cit); return (S.h0 || S.h) + ':' + S.w + ':' + (cc && cc.b ? (cc.b.muralla | 0) + '' + (cc.b.atalaya | 0) : '') + (S.ct ? 'c' : ''); }
+function tcBuild(fr) {
+  const w = S.w, hh = S.h0 || S.h, cz = TCZ, c = document.createElement('canvas'); c.width = w * cz; c.height = hh * cz; const cx = c.getContext('2d'), save = ctx; ctx = cx;
+  try {
+    for (let y = 0; y < hh; y++) for (let x = 0; x < w; x++) {
+      const k = y * w + x, t = S.terr[k], px = x * cz, py = y * cz;
+      if (S.ct && t === 'O') { cx.imageSmoothingEnabled = false; cx.drawImage(tileImg('p', (tileVar(x, y) >> 4) % 3, 0), px, py, cz + .5, cz + .5); }
+      else if (S.ct && (t === 'W' || t === 'g') && drawCitadelTiles(t, x, y, px, py, cz, k)) { }
+      else if ('gfhmdw'.includes(t)) { cx.imageSmoothingEnabled = false; cx.drawImage(tileImg(t, (tileVar(x, y) >> 4) % 3, (fr + x + y) & 1), px, py, cz + .5, cz + .5); }
+      else { cx.fillStyle = TCOL[t] || TCOL['?']; cx.fillRect(px, py, cz + .5, cz + .5); }
+    }
+  } finally { ctx = save; }
+  return c;
+}
+function tcFog() {
+  const w = S.w, hh = S.h0 || S.h, cz = TCZ, c = document.createElement('canvas'); c.width = w * cz; c.height = hh * cz; const cx = c.getContext('2d'); cx.fillStyle = 'rgba(5,7,12,.5)';
+  for (let y = 0; y < hh; y++) for (let x = 0; x < w; x++) { const k = y * w + x; if (S.terr[k] !== '?' && S.vis[k] === '0') cx.fillRect(x * cz, y * cz, cz, cz); }
+  return c;
+}
+function tcGet(fr) { // devuelve {c, fog} o null si el mapa es demasiado grande para cachear
+  const w = S.w, hh = S.h0 || S.h; if (w * hh * TCZ * TCZ > 14e6) return null;
+  const sig = tcSig();
+  if (TC.terr !== S.terr || TC.sig !== sig) { TC.terr = S.terr; TC.sig = sig; TC.cv = [null, null]; TC.vis = null; }
+  if (!TC.cv[fr]) TC.cv[fr] = tcBuild(fr);
+  if (TC.vis !== S.vis || !TC.fog) { TC.vis = S.vis; TC.fog = tcFog(); }
+  return { c: TC.cv[fr], fog: TC.fog };
+}
 function draw() {
   if (!S || S.status === 'lobby') return;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = '#0a0c11'; ctx.fillRect(0, 0, W, H);
@@ -1758,7 +1829,15 @@ function draw() {
   const x0 = Math.max(0, Math.floor((0 - ox) / z)), x1 = Math.min(S.w - 1, Math.floor((W - ox) / z));
   const y0 = Math.max(0, Math.floor((0 - oy) / z)), y1 = Math.min(S.h - 1, Math.floor((H - oy) / z));
   const bossTiles = y1 >= (S.h0 || S.h) ? S.cre.filter(c => c.boss && c.y >= (S.h0 || S.h)) : null;
-  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+  const hDg = S.h0 || S.h, tcc = z <= 28 ? tcGet((Date.now() / 700 | 0) & 1) : null; let yS = y0;
+  if (tcc && y0 < hDg) { // suelo del mapa: una sola copia desde la caché; solo se dibujan en vivo las puertas animadas y las mazmorras
+    const yy1 = Math.min(y1, hDg - 1), sx = x0 * TCZ, sy = y0 * TCZ, sw = (x1 - x0 + 1) * TCZ, sh = (yy1 - y0 + 1) * TCZ; ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(tcc.c, sx, sy, sw, sh, ox + x0 * z, oy + y0 * z, (x1 - x0 + 1) * z, (yy1 - y0 + 1) * z);
+    if (S.ct) for (let y = y0; y <= yy1; y++) for (let x = x0; x <= x1; x++) if (S.terr[y * S.w + x] === 'O') drawCitadelTiles('O', x, y, ox + x * z, oy + y * z, z, y * S.w + x);
+    ctx.drawImage(tcc.fog, sx, sy, sw, sh, ox + x0 * z, oy + y0 * z, (x1 - x0 + 1) * z, (yy1 - y0 + 1) * z);
+    yS = Math.max(y0, hDg);
+  }
+  for (let y = yS; y <= y1; y++) for (let x = x0; x <= x1; x++) {
     const k = y * S.w + x, t = S.terr[k], px = ox + x * z, py = oy + y * z;
     const inDg = y >= (S.h0 || S.h) && t !== '?';
     if (inDg) drawDgTile(t, k, x, y, px, py, z, bossTiles && bossTiles.some(b => Math.max(Math.abs(b.x - x), Math.abs(b.y - y)) <= 3));
@@ -1887,6 +1966,11 @@ function draw() {
   }
   for (const m of S.mine) if (m.dg && m.y >= (S.h0 || S.h)) { const lx = ox + (m.x + .5) * z, ly = oy + (m.y + .5) * z, g1 = ctx.createRadialGradient(lx, ly, z * .3, lx, ly, z * 3.2); g1.addColorStop(0, 'rgba(255,190,110,.22)'); g1.addColorStop(1, 'rgba(255,190,110,0)'); ctx.fillStyle = g1; ctx.fillRect(lx - z * 3.2, ly - z * 3.2, z * 6.4, z * 6.4); }
   for (const m of S.mine) drawUnit(m, true);
+  if (S.ct) { // escuadras: puestos de defensa y distintivo de color en cada unidad
+    for (const q of S.ct.sq) if (q.k === 'guard' && q.x !== undefined) { const px = ox + (q.x + .5) * z, py = oy + (q.y + .5) * z, col = SQC[(q.id - 1) % 8]; ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.arc(px, py, z * .62, 0, 7); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = col + '55'; ctx.beginPath(); ctx.arc(px, py, z * .62, 0, 7); ctx.fill(); if (z >= 9) emoji('🛡️', px, py, z * .6); if (z >= 12) citLabel(q.n, px, py + z * .95, z); }
+    for (const m of S.mine) if (m.sq) { const q = S.ct.sq.find(x => x.id === m.sq); if (!q || m.x < x0 - 1 || m.x > x1 + 1 || m.y < y0 - 1 || m.y > y1 + 1) continue; const bx = ox + m.x * z + z * .18, by = oy + m.y * z + z * .18; ctx.fillStyle = SQC[(q.id - 1) % 8]; ctx.beginPath(); ctx.arc(bx, by, Math.max(3, z * .17), 0, 7); ctx.fill(); ctx.strokeStyle = '#000c'; ctx.lineWidth = 1; ctx.stroke(); if (z >= 12) { ctx.font = 'bold ' + Math.round(z * .2) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#000'; ctx.fillText(q.id, bx, by + 1); ctx.textBaseline = 'alphabetic'; }
+      if (m.id === selId && q.k === 'guard' && q.x !== undefined) { ctx.strokeStyle = SQC[(q.id - 1) % 8]; ctx.lineWidth = 2; ctx.setLineDash([6, 5]); ctx.beginPath(); ctx.moveTo(ox + (m.x + .5) * z, oy + (m.y + .5) * z); ctx.lineTo(ox + (q.x + .5) * z, oy + (q.y + .5) * z); ctx.stroke(); ctx.setLineDash([]); } }
+  }
   { const perCity = new Map(); // contadores de unidades por ciudad y dueño, sobre el borde del solar
     for (const bd of badges.values()) { const i = perCity.get(bd.c.id) || 0; perCity.set(bd.c.id, i + 1);
       const bw = z * .62, bh = z * .3, bx = ox + (bd.c.x + 2) * z - bw - 2 - i * (bw + 3), by = oy + (bd.c.y - 1) * z - bh * .55;
@@ -2843,9 +2927,11 @@ SPR.ram = ['................', '................', '................', '...kkkkk
 SPR.cata = ['...........kmmk.', '...........kmmk.', '..........kbk...', '.........kbk....', '........kbk.....', '.......kbk......', '......kbk.......', '....kbbkkkkkkk..', '..kBBBBBBBBBBBk.', '..kbbbbbbbbbbbk.', '..kkkkkkkkkkkkk.', '...kb......bk...', '..kddk....kddk..', '..kddk....kddk..', '...kk......kk...', '................'];
 const SPR_TIER = [null, ['#8b5a2b', '#5a3a1a'], ['#9aa0ac', '#5d6270'], ['#6aa0d8', '#3f6ea0'], ['#a07be0', '#5b3fa0'], ['#d8523a', '#8a2430']];
 const sprCache = new Map();
-function sprShade(c, f) { // oscurece un color (#rrggbb o hsl) multiplicando su brillo
+const shadeCache = new Map();
+function sprShade(c, f) { // oscurece un color (#rrggbb o hsl) multiplicando su brillo (con caché: se llama por cada unidad y fotograma)
+  const key = c + '|' + f, hit = shadeCache.get(key); if (hit) return hit;
   const cv = document.createElement('canvas'); cv.width = cv.height = 1; const x = cv.getContext('2d'); x.fillStyle = c; x.fillRect(0, 0, 1, 1); const d = x.getImageData(0, 0, 1, 1).data;
-  return `rgb(${Math.round(d[0] * f)},${Math.round(d[1] * f)},${Math.round(d[2] * f)})`;
+  const out = `rgb(${Math.round(d[0] * f)},${Math.round(d[1] * f)},${Math.round(d[2] * f)})`; if (shadeCache.size > 500) shadeCache.clear(); shadeCache.set(key, out); return out;
 }
 function sprImg(layers, dyn) { // layers: nombres de sprite que se apilan; dyn: letras dinámicas (equipo, casco, pechera)
   const key = layers.join('+') + '|' + Object.keys(dyn || {}).map(k => k + dyn[k]).join(',');
@@ -2879,6 +2965,156 @@ function drawUnitSpr(m, own, cx, cy, size, col) {
 function hpBar(cx, cy, w, f) { f = Math.max(0, Math.min(1, f)); ctx.fillStyle = '#000a'; ctx.fillRect(cx - w / 2, cy, w, 4); ctx.fillStyle = f > .5 ? '#3fbf7f' : f > .25 ? '#e6b450' : '#e5484d'; ctx.fillRect(cx - w / 2, cy, w * f, 4); }
 setInterval(() => { if (S && S.status === 'playing' && !document.hidden) dirty = true; }, 700); // anima el agua
 (function loop() { if (fx.length) dirty = true; if (dirty) { dirty = false; try { draw(); } catch (e) { console.error(e); } } requestAnimationFrame(loop); })();
+
+/* ---------- retratos únicos (se dibujan con código a partir de una semilla; no pesan nada y funcionan sin conexión) ---------- */
+const PT_SKIN = ['#f6d2b0', '#e8b98d', '#d39b6c', '#b87a4d', '#8a5632', '#5e3a22'];
+const PT_HAIR = ['#2a1d17', '#5a3a1e', '#8a5a2b', '#c98f3e', '#e8cf7a', '#b8402a', '#9aa0b0', '#3a4fa8'];
+const PT_EYE = ['#2a1d17', '#2b6cb0', '#2f8f4e', '#7a4a28', '#6a4ca0'];
+const PT_TUN = ['#3b5fc0', '#b8382f', '#2f8f4e', '#8a4fb8', '#c98a1e', '#2b8f9a', '#6b6b7a', '#a8456f'];
+const PT_PANT = ['#4a3a2e', '#3a3f55', '#2e4a38', '#5a2e2e', '#44444c'];
+const PT_CAPE = ['#2f7a3a', '#7a2430', '#2b4a8a', '#5a2f7a'];
+const PT_METAL = [null, '#b9a07a', '#c9ced8', '#9ec8f0', '#c8a8f5', '#ff8a6a'];
+const PT_CAPE2 = PT_CAPE.concat(['#1f1f26', '#d8d2c0', '#c98a1e', '#2b8f9a']);
+const ptCache = new Map();
+let HD = null; // borrador del diseño del protagonista
+const HD_LAB = { style: ['Corto', 'Pinchos', 'Melena', 'Calvo', 'Coleta', 'Cresta', 'Rizado', 'Bob'], build: ['Delgado', 'Normal', 'Fornido'], pose: ['Firme', 'Relajado', 'Brazos cruzados', 'Alerta'], acc: { parche: '🏴‍☠️ Parche', gafas: '👓 Gafas', pendiente: '💎 Pendientes', bufanda: '🧣 Bufanda', pintura: '🎭 Pintura', orejas: '🧝 Orejas', flor: '🌸 Flor', cuernos: '😈 Cuernos' } };
+function designSheet() {
+  const u = S.mine.find(x => x.id === sheet.du); if (!u || !HD) return hd('Diseñar') + '<p class="hint">Nada que diseñar.</p>';
+  const sw = (k, arr) => `<div class="row" style="flex-wrap:wrap;gap:6px;margin:4px 0">${arr.map((c, i) => `<button class="swd ${HD[k] === i ? 'on' : ''}" data-hd="${k}:${i}" style="background:${c}"></button>`).join('')}</div>`;
+  const ch = (k, arr) => `<div class="row" style="flex-wrap:wrap;gap:6px;margin:4px 0">${arr.map((t, i) => `<button class="btn sm ${HD[k] === i ? 'gold' : ''}" data-hd="${k}:${i}">${t}</button>`).join('')}</div>`;
+  const lab = t => `<div class="dim" style="margin:8px 0 2px;font-size:12px">${t}</div>`;
+  const free = S.turn <= SH.HERO.pickTurn || !u.hd;
+  const pv = Object.assign(ptUnit(u), { hd: HD, sx: HD.sx });
+  return hd('🎨 Diseño del ' + (u.hr ? 'protagonista' : 'personaje')) + `<div style="display:flex;gap:12px;align-items:flex-start;position:sticky;top:30px;background:var(--panel);z-index:1;padding:4px 0 8px">${ptHtml(pv, 130, u.hr ? '#8a6a1e' : '#3a3550')}<div style="flex:1;min-width:0"><div class="dim" style="font-size:12px">Nombre</div><input id="dName" maxlength="16" value="${esc(sheet.dname !== undefined ? sheet.dname : u.name)}" style="width:100%;box-sizing:border-box"><div class="row" style="gap:6px;margin-top:8px"><button class="btn sm ${HD.sx === 'M' ? 'gold' : ''}" data-hd="sx:M">♂ Hombre</button><button class="btn sm ${HD.sx === 'F' ? 'gold' : ''}" data-hd="sx:F">♀ Mujer</button></div><div class="row" style="margin-top:8px"><button class="btn sm" data-hdact="rnd">🎲 Al azar</button></div></div></div>`
+    + lab('Piel') + sw('skin', PT_SKIN) + lab('Peinado') + ch('style', HD_LAB.style) + lab('Color de pelo') + sw('hair', PT_HAIR) + lab('Ojos') + sw('eye', PT_EYE)
+    + lab('Rasgos') + `<div class="row" style="flex-wrap:wrap;gap:6px">${HD.sx === 'M' ? `<button class="btn sm ${HD.beard ? 'gold' : ''}" data-hd="beard:1">🧔 Barba</button>` : ''}<button class="btn sm ${HD.scar ? 'gold' : ''}" data-hd="scar:1">⚔️ Cicatriz</button></div>`
+    + lab('Complexión') + ch('build', HD_LAB.build) + lab('Postura') + ch('pose', HD_LAB.pose)
+    + lab('Túnica') + sw('tun', PT_TUN) + lab('Pantalón') + sw('pant', PT_PANT) + (u.hr ? lab('Capa') + sw('cape', PT_CAPE2) : '')
+    + lab('Accesorios (máx. ' + SH.DESIGN.maxAcc + ')') + `<div class="row" style="flex-wrap:wrap;gap:6px">${SH.DESIGN.acc.map(a => `<button class="btn sm ${HD.acc.includes(a) ? 'gold' : ''}" data-hd="acc:${a}">${HD_LAB.acc[a]}</button>`).join('')}</div>`
+    + `<p class="hint" style="margin-top:10px">${free ? 'Diseñarlo ahora es gratis.' : 'Rediseñarlo cuesta 5 almas del almacén de una ciudad tuya con iglesia (debe estar junto a ella).'}</p>`
+    + `<div class="row" style="gap:8px;margin:8px 0 14px"><button class="btn gold" data-hdact="ok">✔ Confirmar</button><button class="btn" data-hdact="back">Cancelar</button></div>`;
+}
+function ptTraits(seed, sx) { // rasgos que salen de la semilla (el mismo orden que siempre, para que nadie cambie de cara)
+  const R = ptRng(seed), n = k => Math.floor(R() * k);
+  const skin = n(6), hair = n(8), s0 = n(8), eye = n(5), tun = n(8), pant = n(5), cape = n(4), build = n(3), pose = n(4), beard = R() < .25 ? 1 : 0, scar = R() < .2 ? 1 : 0, brow = n(2);
+  return { sx: sx === 'F' ? 'F' : 'M', skin, hair, style: sx === 'F' ? [2, 4, 7, 6, 0, 2, 4, 7][s0] : [0, 1, 3, 5, 6, 0, 1, 3][s0], eye, tun, cape, pant, build, pose, beard, scar, brow, acc: [] };
+}
+const sxTag = s => s === 'F' ? '<span style="color:#f08ab8" title="Hembra">♀</span>' : '<span style="color:#6ab0f0" title="Macho">♂</span>';
+function ptRng(seed) { let s = (seed >>> 0) || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
+function ptWeapon(k) {
+  const K = k && SH.KINDS[k]; if (!K) return null;
+  if (K.magic) return K.range >= 3 ? 'staff' : 'wand';
+  if (K.reach && K.two) return 'spear';
+  if (/arco|ballesta|bumeran/.test(k)) return 'bow';
+  if (/hacha|guadana/.test(k)) return 'axe';
+  if (k === 'daga') return 'dagger';
+  if (k === 'maza') return 'mace';
+  return 'sword';
+}
+function ptDraw(o) {
+  const key = [o.seed, o.ah | 0, o.ac | 0, o.hm | 0, o.sh | 0, o.gl | 0, o.bt | 0, o.w || '', o.wt | 0, o.vp ? 1 : 0, o.hr ? 1 : 0, o.cls || '', o.hurt ? 1 : 0, o.rar | 0, o.sx || 'M', o.hd ? JSON.stringify(o.hd) : ''].join('|');
+  const hit = ptCache.get(key); if (hit) return hit;
+  const T = o.hd || ptTraits(o.seed, o.sx);
+  const skinB = PT_SKIN[T.skin], hairC = PT_HAIR[T.hair], eyeB = PT_EYE[T.eye], tunB = PT_TUN[T.tun], pantC = PT_PANT[T.pant], capeB = PT_CAPE2[T.cape], build = T.build, pose = T.pose, style = T.style, beard = o.sx !== 'F' && !!T.beard, scar = !!T.scar, brow = T.brow | 0, acc = T.acc || [];
+  let ch = 0; if (o.cls) for (let i = 0; i < o.cls.length; i++) ch = (ch * 31 + o.cls.charCodeAt(i)) >>> 0;
+  const skin = o.vp ? '#e6dde8' : skinB, eye = o.vp ? '#d9382f' : eyeB, tun = o.cls && !o.hd ? PT_TUN[ch % 8] : tunB;
+  const skinD = sprShade(skin, .82), skinL = sprShade(skin, 1.1);
+  const cv = document.createElement('canvas'); cv.width = 32; cv.height = 48; const x = cv.getContext('2d');
+  const px = (a, b, w, h, c) => { x.fillStyle = c; x.fillRect(a, b, w, h); };
+  const F = o.sx === 'F', bw = F ? [8, 8, 10][build] : [10, 12, 12][build], x0 = 16 - bw / 2, lean = [0, -1, 1, 0][pose], hx = 10 + lean, ap = pose === 3 ? 1 : 0;
+  const tier = (t, d) => { const c = SPR_TIER[t]; return c ? c[d] : null; };
+  const capeC = o.vp ? '#5a1020' : capeB;
+  if (o.hr || o.rar >= 3 || o.vp) { px(x0 - 2, 21, bw + 4, 19, capeC); px(x0 - 3, 30, bw + 6, 10, capeC); px(x0 - 2, 22, 1, 17, sprShade(capeC, .7)); px(x0 + bw + 1, 22, 1, 17, sprShade(capeC, .7)); }
+  if (style === 2) px(hx - 2, 9, 16, 17, hairC); else if (style === 4) px(hx + 11, 11, 4, 11, hairC); else if (style === 7) px(hx - 2, 9, 16, 10, hairC);
+  // piernas y botas
+  const bootC = tier(o.bt, 0) || '#6b4423', bootD = tier(o.bt, 1) || '#43270f';
+  px(12 - ap, 34, 4, 7, pantC); px(17 + ap, 34, 4, 7, pantC); px(12 - ap, 34, 1, 7, sprShade(pantC, .75)); px(17 + ap, 34, 1, 7, sprShade(pantC, .75));
+  px(11 - ap, 40, 5, 4, bootC); px(17 + ap, 40, 5, 4, bootC); px(11 - ap, 43, 5, 1, bootD); px(17 + ap, 43, 5, 1, bootD);
+  // torso y brazos
+  const plate = tier(o.ac, 0), plateD = tier(o.ac, 1), body = plate || tun, bodyD = plateD || sprShade(tun, .72);
+  const armC = plate || tun, armD = plateD || sprShade(tun, .72);
+  const lax = x0 - 3, rax = x0 + bw;
+  px(lax, 22, 3, 9 - (pose === 1 ? 2 : 0), armC); px(rax, 22 + (pose === 1 ? 1 : 0), 3, 9 - (pose === 1 ? 2 : 0), armC);
+  px(lax, 22, 1, 9, armD); px(rax + 2, 22, 1, 9, armD);
+  px(x0, 21, bw, 13, body); px(x0, 21, 1, 13, bodyD); px(x0 + bw - 1, 21, 1, 13, bodyD);
+  if (plate) { px(x0 + bw / 2 - 1, 22, 2, 9, plateD); px(x0 + 1, 23, bw - 2, 1, sprShade(plate, 1.2)); } else { px(x0 + bw / 2 - 1, 21, 2, 4, sprShade(tun, 1.25)); }
+  px(x0, 31, bw, 2, '#3a2a1e'); px(15, 31, 2, 2, '#e6c14a');
+  px(x0, 33, bw, 1, bodyD);
+  const gloveC = tier(o.gl, 0) || skin;
+  if (pose === 2) { px(x0 - 1, 25, bw + 2, 3, armC); px(x0 - 1, 27, bw + 2, 1, armD); px(x0 - 1, 25, 3, 3, gloveC); px(x0 + bw - 2, 25, 3, 3, gloveC); }
+  else { px(lax, 30, 3, 2, gloveC); px(rax, 30 + (pose === 1 ? 0 : 0), 3, 2, gloveC); }
+  if (o.hm) { const hc = tier(o.hm, 0), hd2 = tier(o.hm, 1); px(x0 - 3, 20, 5, 4, hc); px(x0 + bw - 2, 20, 5, 4, hc); px(x0 - 3, 23, 5, 1, hd2); px(x0 + bw - 2, 23, 5, 1, hd2); }
+  px(14, 19, 4, 3, skinD);
+  // escudo (mano izquierda de la imagen)
+  if (o.sh) { const sc = tier(o.sh, 0) || '#8b5a2b', sd = tier(o.sh, 1) || '#5a3a1a', sx = lax - 5, sy = 24; px(sx + 1, sy, 8, 10, sd); px(sx, sy + 1, 10, 8, sd); px(sx + 1, sy + 1, 8, 8, sc); px(sx + 4, sy + 4, 2, 2, '#f4d24f'); px(sx + 1, sy + 1, 8, 1, sprShade(sc, 1.25)); }
+  // cabeza
+  px(hx, 8, 12, 11, skin); x.clearRect(hx, 8, 1, 1); x.clearRect(hx + 11, 8, 1, 1); x.clearRect(hx, 18, 1, 1); x.clearRect(hx + 11, 18, 1, 1);
+  px(hx - 1, 13, 1, 3, skinD); px(hx + 12, 13, 1, 3, skinD);
+  px(hx + 1, 15, 3, 2, skinL);
+  // pelo
+  const hl = sprShade(hairC, 1.25);
+  if (style === 0 || style === 4) { px(hx - 1, 6, 14, 4, hairC); px(hx - 1, 9, 2, 4, hairC); px(hx + 11, 9, 2, 4, hairC); px(hx + 1, 9, 10, 1, hairC); px(hx + 2, 6, 4, 1, hl); }
+  else if (style === 1) { px(hx - 1, 6, 14, 4, hairC); px(hx + 1, 3, 2, 4, hairC); px(hx + 5, 2, 2, 5, hairC); px(hx + 9, 3, 2, 4, hairC); px(hx - 1, 9, 2, 3, hairC); px(hx + 11, 9, 2, 3, hairC); }
+  else if (style === 2) { px(hx - 1, 6, 14, 4, hairC); px(hx - 2, 9, 3, 15, hairC); px(hx + 11, 9, 3, 15, hairC); px(hx + 1, 9, 6, 2, hairC); px(hx + 2, 6, 4, 1, hl); }
+  else if (style === 3) { px(hx + 2, 8, 4, 1, skinL); }
+  else if (style === 5) { px(hx + 4, 2, 4, 7, hairC); px(hx + 5, 2, 1, 7, hl); }
+  else if (style === 6) { px(hx - 2, 4, 16, 6, hairC); px(hx - 3, 6, 2, 5, hairC); px(hx + 13, 6, 2, 5, hairC); px(hx, 3, 4, 2, hairC); px(hx + 8, 3, 4, 2, hairC); px(hx + 3, 4, 3, 1, hl); }
+  else if (style === 7) { px(hx - 1, 6, 14, 4, hairC); px(hx - 2, 9, 3, 9, hairC); px(hx + 11, 9, 3, 9, hairC); px(hx + 1, 9, 10, 2, hairC); px(hx + 2, 6, 4, 1, hl); }
+  // cara
+  px(hx + 2, 13, 3, 2, '#fff'); px(hx + 7, 13, 3, 2, '#fff'); px(hx + 3, 13, 2, 2, eye); px(hx + 8, 13, 2, 2, eye); px(hx + 3, 13, 1, 1, '#000');px(hx + 8, 13, 1, 1, '#000');
+  const bc = style === 3 || style === 5 ? sprShade(skin, .6) : sprShade(hairC, .9);
+  px(hx + 2, 12 - brow, 3, 1, bc); px(hx + 7, 12 - brow, 3, 1, bc);
+  px(hx + 5, 15, 2, 1, skinD);
+  if (beard) { px(hx + 1, 16, 10, 3, hairC); x.clearRect(hx + 1, 18, 1, 1); x.clearRect(hx + 10, 18, 1, 1); }
+  px(hx + 5, 17, 2, 1, beard ? sprShade(skin, .7) : F ? '#c4506a' : '#a8584a');
+  if (F) { px(hx + 1, 13, 1, 1, '#1b1522'); px(hx + 10, 13, 1, 1, '#1b1522'); px(hx + 2, 18, 8, 0, skin); }
+  if (o.vp) { px(hx + 4, 18, 1, 1, '#fff'); px(hx + 7, 18, 1, 1, '#fff'); }
+  if (scar) { px(hx + 8, 11, 1, 2, '#b84a4a'); px(hx + 9, 13, 1, 2, '#b84a4a'); px(hx + 10, 15, 1, 2, '#b84a4a'); }
+  // casco
+  if (o.ah) { const hc = tier(o.ah, 0), hd2 = tier(o.ah, 1); px(hx - 1, 5, 14, 6, hc); px(hx - 1, 10, 3, 6, hc); px(hx + 10, 10, 3, 6, hc); px(hx - 1, 10, 14, 1, hd2); px(hx + 5, 5, 2, 8, hd2); px(hx + 1, 6, 4, 1, sprShade(hc, 1.25));
+    if (o.ah >= 3) { px(hx + 5, 0, 2, 5, o.ah === 5 ? '#d8523a' : '#e5484d'); } }
+  if (o.hr) { px(hx - 1, o.ah ? 4 : 7, 14, 1, '#f4d24f'); px(hx + 1, o.ah ? 2 : 5, 2, 2, '#f4d24f'); px(hx + 5, o.ah ? 1 : 4, 2, 3, '#f4d24f'); px(hx + 9, o.ah ? 2 : 5, 2, 2, '#f4d24f'); }
+  if (acc.length) {
+    const has = a => acc.includes(a), dk = '#1b1522';
+    if (has('orejas')) { px(hx - 2, 10, 1, 3, skin); px(hx - 1, 11, 1, 4, skin); px(hx + 13, 10, 1, 3, skin); px(hx + 12, 11, 1, 4, skin); }
+    if (has('cuernos')) { px(hx, 3, 2, 4, '#e8e0d0'); px(hx - 1, 2, 1, 2, '#e8e0d0'); px(hx + 10, 3, 2, 4, '#e8e0d0'); px(hx + 12, 2, 1, 2, '#e8e0d0'); }
+    if (has('pintura')) { px(hx + 1, 15, 3, 1, '#c43a3a'); px(hx + 8, 15, 3, 1, '#c43a3a'); px(hx + 2, 16, 2, 1, '#c43a3a'); px(hx + 8, 16, 2, 1, '#c43a3a'); }
+    if (has('pendiente')) { px(hx - 1, 16, 1, 2, '#f4d24f'); px(hx + 12, 16, 1, 2, '#f4d24f'); }
+    if (has('flor')) { px(hx + 8, 5, 4, 4, '#e5668d'); px(hx + 9, 6, 2, 2, '#fff3a0'); }
+    if (has('gafas')) { for (const a of [hx + 1, hx + 6]) { px(a, 12, 5, 1, dk); px(a, 15, 5, 1, dk); px(a, 12, 1, 4, dk); px(a + 4, 12, 1, 4, dk); } px(hx + 5, 13, 2, 1, dk); }
+    if (has('parche')) { px(hx + 2, 13, 3, 3, dk); px(hx, 12, 12, 1, '#3a2a2e'); }
+    if (has('bufanda')) { px(x0 - 1, 20, bw + 2, 3, '#c43a3a'); px(x0 - 1, 22, bw + 2, 1, '#8a2424'); px(x0 + bw - 3, 22, 3, 8, '#c43a3a'); px(x0 + bw - 3, 29, 3, 1, '#8a2424'); }
+  }
+  // vendas si está herido
+  if (o.hurt) { px(hx - 1, 8, 14, 2, '#f2efe6'); px(hx + 8, 8, 2, 2, '#c43a3a'); px(x0 + 2, 26, 2, 2, '#b84a4a'); px(x0 + bw - 4, 29, 2, 1, '#b84a4a'); }
+  // arma (mano derecha de la imagen)
+  const wk = ptWeapon(o.w);
+  if (wk) {
+    const wx = rax + (pose === 1 ? 0 : 0), mc = PT_METAL[o.wt] || '#c9ced8', wood = '#6b3a1a', gold = '#e6c14a';
+    if (wk === 'sword') { px(wx + 1, 12, 2, 19, mc); px(wx + 1, 12, 1, 19, '#fff'); px(wx - 1, 29, 6, 2, gold); px(wx + 1, 31, 2, 3, wood); }
+    else if (wk === 'axe') { px(wx + 1, 12, 2, 22, wood); px(wx + 3, 12, 5, 7, mc); px(wx + 3, 12, 1, 7, sprShade(mc, .7)); px(wx + 7, 13, 1, 5, '#fff'); }
+    else if (wk === 'spear') { px(wx + 1, 4, 2, 31, wood); px(wx + 1, 0, 2, 5, mc); px(wx, 3, 4, 1, mc); }
+    else if (wk === 'staff') { px(wx + 1, 7, 2, 27, wood); px(wx, 2, 4, 5, o.wt >= 4 ? '#b57bff' : '#66d0ea'); px(wx + 1, 3, 1, 1, '#fff'); px(wx - 1, 6, 6, 1, gold); }
+    else if (wk === 'wand') { px(wx + 1, 21, 2, 11, wood); px(wx, 18, 4, 3, gold); px(wx + 1, 17, 2, 1, '#fff'); }
+    else if (wk === 'bow') { for (let y = 8; y <= 32; y++) { const off = Math.round(4 * Math.sin(Math.PI * (y - 8) / 24)); px(wx + off, y, 1, 1, wood); } px(wx, 8, 1, 25, '#ddd'); }
+    else if (wk === 'dagger') { px(wx + 1, 24, 2, 8, mc); px(wx + 1, 24, 1, 8, '#fff'); px(wx, 31, 4, 1, gold); px(wx + 1, 32, 2, 2, wood); }
+    else if (wk === 'mace') { px(wx + 1, 16, 2, 18, wood); px(wx - 1, 11, 6, 6, mc); px(wx - 1, 11, 6, 1, sprShade(mc, 1.2)); px(wx - 1, 16, 6, 1, sprShade(mc, .7)); px(wx + 1, 9, 2, 2, mc); }
+  }
+  // contorno oscuro de 1 píxel alrededor de todo (así queda el estilo "sprite")
+  const id = x.getImageData(0, 0, 32, 48), d = id.data, out = new Uint8ClampedArray(d), A = (i, j) => i < 0 || j < 0 || i > 31 || j > 47 ? 0 : d[(j * 32 + i) * 4 + 3];
+  for (let j = 0; j < 48; j++) for (let i = 0; i < 32; i++) if (!A(i, j) && (A(i - 1, j) || A(i + 1, j) || A(i, j - 1) || A(i, j + 1))) { const k = (j * 32 + i) * 4; out[k] = 27; out[k + 1] = 21; out[k + 2] = 34; out[k + 3] = 255; }
+  x.putImageData(new ImageData(out, 32, 48), 0, 0);
+  const S6 = 6, big = document.createElement('canvas'); big.width = 32 * S6; big.height = 48 * S6; const bx = big.getContext('2d'); bx.imageSmoothingEnabled = false; bx.drawImage(cv, 0, 0, 32 * S6, 48 * S6);
+  const url = big.toDataURL(); if (ptCache.size > 200) ptCache.clear(); ptCache.set(key, url); return url;
+}
+function ptHtml(o, w, bg) { // retrato con fondo; bg = color del fondo (por rareza, etc.)
+  const c = bg || '#3a3550';
+  return `<div class="ptf" style="width:${w}px;height:${Math.round(w * 1.5)}px;background:radial-gradient(circle at 50% 38%,${sprShade(c, 1.6)},${sprShade(c, .55)})"><img src="${ptDraw(o)}" alt="" style="width:100%;height:100%;image-rendering:pixelated;display:block"></div>`;
+}
+function ptUnit(u) {
+  const q = u.eq || {}, it = s => (q[s] ? (q[s].t || 1) : 0);
+  return { seed: u.pt || SH.ptSeed(u.id * 7 + 3), ah: it('casco'), ac: it('pechera'), hm: it('hombreras'), sh: it('escudo'), gl: it('guantes'), bt: it('botas'), w: q.arma ? q.arma.k : null, wt: q.arma ? q.arma.t : 0, sx: u.sx, vp: u.vp, hr: u.hr, cls: u.cls, hurt: u.e && u.hp < u.e.maxHp * .35 };
+}
 
 /* ---------- avisos (notificaciones push) ---------- */
 const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
