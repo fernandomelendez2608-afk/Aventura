@@ -21,7 +21,7 @@ Sin dependencias: solo Node.js 18+ (`npm start`). El cliente es una página web 
   | Médico | cura a aliados adyacentes 4% de su salud por punto, al inicio del turno |
   | Doble ataque | 2 ataques por turno (el 2.º al 60%). Solo 1 punto |
   | Defensa | +2 de defensa |
-  | General | aliados adyacentes ganan +2% de salud y defensa por punto |
+  | General | aliados a 1 casilla ganan +2% de salud y defensa por punto, y +1% a 2 casillas |
 
 - **Armas**: daga (ignora 25% defensa, +1 mov.), espada, arco (alcance 3), arco largo (alcance 5, no dispara a adyacentes), ballesta (alcance 4, ignora 40% defensa, un disparo por turno), escudo (solo con armas de una mano).
 - **Armaduras**: casco, guantes, hombreras, pechera, pantalones, botas.
@@ -735,6 +735,25 @@ Nuevo ajuste del mundo «Ciudadela: turnos entre oleadas (y hasta la primera)»:
 - El mapa muestra el **puesto** de cada escuadra (escudo de color) y un **distintivo de color con su número** en cada unidad; al tocar una unidad se ve la línea hacia su puesto.
 - Cada escuadra muestra su estado: unidades en su puesto, salud media, heridos, enemigos cerca del puesto.
 - Nuevo botón «🔁 Unidades nuevas se unen solas» (una escuadra a la vez): los reclutas, viajeros y clientes de la taberna entran en ella automáticamente.
+
+## v1.64.4 — Dejar ir
+
+- En la lista de **Caídos** de la ciudad (donde se resucita) hay un botón **🕊️ Dejar ir**: pide confirmación y borra al caído de la lista para siempre, sin gastar materiales. Útil cuando no quieres revivir a esa unidad y quieres despejar la lista.
+
+## v1.64.3 — General llega más lejos
+
+- La habilidad **General** ya no solo afecta a los aliados pegados: a **1 casilla** da el efecto completo (+2 % de salud y defensa por punto) y a **2 casillas** la mitad (+1 % por punto). Con 10 puntos: +20 % pegado, +10 % a 2 casillas.
+- El aura de clase (guardián, etc.) sigue siendo solo para aliados adyacentes.
+- Así cubre mejor a una escuadra en formación (frente/centro/retaguardia).
+
+## v1.64.2 — La escuadra explora la mazmorra en grupo
+
+Antes cada unidad iba por su cuenta hacia el enemigo más cercano: se separaban, entraban de una en una y morían rodeadas. Ahora:
+- **Entran juntas:** esperan en la entrada a que todo el grupo esté listo (máx. 8 turnos) y todas eligen la misma mazmorra. Después de una retirada esperan en la plaza a estar curadas (máx. 15 turnos) antes de volver.
+- **Avanzan juntas:** el grupo solo avanza cuando está reunido (radio de 3 casillas); quien se adelanta o se queda atrás vuelve con el grupo, y nadie persigue enemigos lejos del grupo.
+- **Salen juntas:** si hay enemigos cerca y alguien está por debajo de su umbral de retirada, se retira todo el grupo a la vez (nadie sale solo por pasillos con enemigos); también si la salud media es baja o hay 2 débiles. Si no hay enemigos cerca, el débil sale solo. Aviso «🚪 sale de la mazmorra».
+- **Umbral por defecto en mazmorra: 65 %** (defender sigue en 50 %). En una prueba de 16 partidas por ajuste con 5 unidades de nivel 6: con retirada al 35 % murieron 21 de 80, al 50 % 9 y al 65 % solo 2.
+- Antes de este cambio, con 5 unidades de nivel 4 u 8 morían unas 20 de 40 dentro de la mazmorra y llegaban a separarse hasta 16 casillas.
 
 ## v1.64.0 — Escuadras: reglas, comparativa, formación y avisos
 

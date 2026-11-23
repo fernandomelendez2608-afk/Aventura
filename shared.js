@@ -12,7 +12,7 @@
     medico:   { n: 'Médico',       cap: 10, d: 'Al iniciar el turno cura a los aliados adyacentes un 4% de su salud por punto' },
     doble:    { n: 'Doble ataque', cap: 1,  d: 'Ataca dos veces por turno (el segundo golpe hace 60%). Solo se aprende una vez' },
     defensa:  { n: 'Defensa',      cap: 10, d: '+2 de defensa por punto' },
-    general:  { n: 'General',      cap: 10, d: 'Aliados adyacentes ganan +2% de salud y defensa por punto' },
+    general:  { n: 'General',      cap: 10, d: 'Aliados a 1 casilla ganan +2% de salud y defensa por punto (+1% a 2 casillas)' },
   };
   const SKILL_ORDER = ['dano', 'salud', 'defensa', 'movilidad', 'medico', 'doble', 'general'];
 

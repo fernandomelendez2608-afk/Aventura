@@ -1103,7 +1103,7 @@ function citySheet() {
     h += `<h3 class="hint" style="margin-top:12px">🪦 Caídos</h3>` + S.graves.map(gr => {
       const hl = (c.b && c.b.iglesia) || 0, gc = {}; for (const m in gr.cost) gc[m] = (m === 'hueso' || m === 'alma') && hl ? Math.max(1, Math.ceil(gr.cost[m] * (1 - SH.CHURCH.disc * hl))) : gr.cost[m];
       const okr = SH.MAT_ORDER.every(m => !gc[m] || (c.st.m[m] || 0) >= gc[m]) && n < S.maxUnits;
-      return `<div class="line"><div class="g"><b>${esc(gr.name)}</b> <span class="dim">niv. ${gr.lv}</span><div>${SH.MAT_ORDER.filter(m => gc[m]).map(m => `<span class="chip ${(c.st.m[m] || 0) >= gc[m] ? 'ok' : 'lack'}">${SH.MATS[m].e} ${c.st.m[m] || 0}/${gc[m]}</span>`).join('')}</div></div><button class="btn sm ${okr ? 'gold' : ''}" ${okr ? '' : 'disabled'} data-c='${jattr({ a: 'revive', c: c.id, g: gr.id })}'>Resucitar</button></div>`;
+      return `<div class="line"><div class="g"><b>${esc(gr.name)}</b> <span class="dim">niv. ${gr.lv}</span><div>${SH.MAT_ORDER.filter(m => gc[m]).map(m => `<span class="chip ${(c.st.m[m] || 0) >= gc[m] ? 'ok' : 'lack'}">${SH.MATS[m].e} ${c.st.m[m] || 0}/${gc[m]}</span>`).join('')}</div></div><button class="btn sm ${okr ? 'gold' : ''}" ${okr ? '' : 'disabled'} data-c='${jattr({ a: 'revive', c: c.id, g: gr.id })}'>Resucitar</button><button class="btn sm" data-rel="${gr.id}" data-n="${esc(gr.name)}" title="Dejar ir">🕊️ Dejar ir</button></div>`;
     }).join('') + '<p class="hint">Vuelve en 2 turnos con 1 nivel menos. Si cayó ante una criatura, su equipo está en una tumba 🪦 en el mapa durante 30 turnos.</p>';
   }
   return h;
@@ -1443,6 +1443,8 @@ $('sheet').addEventListener('click', e => {
     else if (k === 'ok' && u) { const nm = $('dName'); act({ a: 'design', u: u.id, d: HD, name: nm ? nm.value : '' }); selId = u.id; HD = null; openSheet('unit'); }
     else if (k === 'back' && u) { selId = u.id; HD = null; openSheet('unit'); }
     return; }
+  const rel = e.target.closest('[data-rel]');
+  if (rel) { if (confirm('¿Dejar ir a ' + (rel.dataset.n || 'esta unidad') + '? Ya no podrás resucitarla.')) act({ a: 'release', g: +rel.dataset.rel }); return; }
   const c = e.target.closest('[data-c]');
   if (c) { act(JSON.parse(c.dataset.c)); return; }
   const ctb = e.target.closest('[data-cittab]'); if (ctb) { citTab = ctb.dataset.cittab; renderSheet(); return; }

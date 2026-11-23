@@ -422,8 +422,9 @@ function newUnit(g, owner, x, y) {
 function aura(g, u) {
   let a = 0;
   for (const v of g.units) {
-    if (v === u || v.o !== u.o || cheb(u, v) !== 1) continue;
-    const ga = 0.02 * v.sk.general + (v.cls ? (S.classMods(v).aura || 0) : 0);
+    if (v === u || v.o !== u.o) continue;
+    const d = cheb(u, v); if (d > 2) continue;
+    const ga = (d === 1 ? 0.02 * v.sk.general + (v.cls ? (S.classMods(v).aura || 0) : 0) : 0.01 * v.sk.general); // General: completo pegado, mitad a 2 casillas
     if (ga > a) a = ga;
   }
   return a;
@@ -2307,6 +2308,10 @@ function cmd(g, pid, m) {
       err = doRecruit(g, p, c, m.k || null); if (!err) msg = isKing(g, pid) ? 'Nueva bestia reclutada (descansa este turno)' : 'Nueva unidad reclutada (descansa este turno)';
       break;
     }
+    case 'release': { // dejar ir: el caído se borra de la lista y ya no se puede resucitar
+      const gr = (g.graves || []).find(x => x.id === (m.g | 0) && x.o === p.id); if (!gr) { err = 'Esa unidad no está entre los caídos'; break; }
+      g.graves.splice(g.graves.indexOf(gr), 1); msg = `${gr.name} descansa en paz`; break;
+    }
     case 'revive': {
       const c = cityOf(); if (!c) return { err: 'Ciudad no encontrada' };
       const r = doRevive(g, p, c, m.g | 0);
@@ -3837,25 +3842,60 @@ function doSquad(g, p, m) {
 function sqStat(g, pid, s) { // resumen para la pantalla de escuadras
   const us = g.units.filter(u => u.o === pid && u.sq === s.id && !isAux(u)), has = s.k === 'guard' && s.x !== undefined;
   const hpPct = us.length ? Math.round(100 * us.reduce((a, u) => a + u.hp / Math.max(1, eff(g, u).maxHp), 0) / us.length) : 0;
-  return { c: us.length, hp: hpPct, hurt: us.filter(u => u.hp / Math.max(1, eff(g, u).maxHp) < 0.5).length, pos: has ? us.filter(u => cheb(u, s) <= 3).length : 0, dg: us.filter(u => u.dg).length, rtr: us.filter(u => u.rtr).length, pw: Math.round(us.reduce((a, u) => { const q = eff(g, u); return a + q.dmg * q.attacks + q.maxHp * 0.2 + q.def * 1.5; }, 0)), fr: us.filter(u => sqRole(g, u) !== 'b').length, bk: us.filter(u => sqRole(g, u) === 'b').length, rt: s.rt === undefined ? 50 : s.rt, rb: s.rb || 80, foes: has ? g.creatures.filter(c => c.tg && cheb(c, s) <= 6).length : 0, ids: us.map(u => u.id) };
+  return { c: us.length, hp: hpPct, hurt: us.filter(u => u.hp / Math.max(1, eff(g, u).maxHp) < 0.5).length, pos: has ? us.filter(u => cheb(u, s) <= 3).length : 0, dg: us.filter(u => u.dg).length, rtr: us.filter(u => u.rtr).length, pw: Math.round(us.reduce((a, u) => { const q = eff(g, u); return a + q.dmg * q.attacks + q.maxHp * 0.2 + q.def * 1.5; }, 0)), fr: us.filter(u => sqRole(g, u) !== 'b').length, bk: us.filter(u => sqRole(g, u) === 'b').length, rt: s.rt === undefined ? (s.k === 'raid' ? 65 : 50) : s.rt, rb: s.rb || 80, foes: has ? g.creatures.filter(c => c.tg && cheb(c, s) <= 6).length : 0, ids: us.map(u => u.id) };
 }
-function raidUnit(g, p, u, sq) { // invadir la mazmorra: entra con otros hasta el cupo, lucha y sale si se hiere o la limpia
-  const e0 = eff(g, u), plaza = S.CIT.plaza; let did = false;
+function raidUnit(g, p, u, sq) { // invadir la mazmorra EN GRUPO: entran juntos, avanzan juntos, pelean cerca unos de otros y salen juntos si van mal
+  const e0 = eff(g, u), plaza = S.CIT.plaza, frac = u.hp / e0.maxHp * 100, rt = sq && sq.rt !== undefined ? sq.rt : 65, rb = sq && sq.rb || 80; let did = false; // en mazmorra se retiran antes (65 %)
+  const R = 3; // radio máximo del grupo
   if (u.dg) {
     const d = g.dungeons.find(x => x.id === u.dg); if (!d) return false;
     const foes = g.creatures.filter(c => c.dg === d.id), tre = g.sites.filter(q => q.dg === d.id && q.k === 'tesoro');
+    const gm = g.units.filter(x => x.o === p.id && x.dg === d.id && !isAux(x) && (!sq || x.sq === sq.id)), n = gm.length || 1;
+    if (!sq || !sq.gc || sq.gc.d !== d.id) { const c = { d: d.id, x: Math.round(gm.reduce((a, x) => a + x.x, 0) / n), y: Math.round(gm.reduce((a, x) => a + x.y, 0) / n) }; if (sq) sq.gc = c; }
+    const c = sq && sq.gc ? sq.gc : { x: u.x, y: u.y };
     if (sq && !foes.length && !tre.length && sq.nd !== d.id) { sq.nd = d.id; ev(g, `🗝️ ${sq.n} terminó la mazmorra: sin enemigos ni tesoros`, [p.id]); }
-    if (u.hp / e0.maxHp < 0.45 || (!foes.length && !tre.length)) { if (cheb(u, d.exit) <= 1) { doDungeon(g, p, { d: 'leave', u: u.id }); return true; } headTo(g, u, d.exit.x, d.exit.y); return true; }
-    const reach = u.mp + e0.range + 1, ok = new Set(foes.filter(c => cheb(c, u) <= reach).map(c => c.id)), sv = p._ok; p._ok = ok;
+    // ¿sale todo el grupo? sí si no queda nada, si la salud media es baja, o si una tercera parte ya está por debajo de su umbral
+    const hpAvg = gm.reduce((a, x) => a + x.hp / eff(g, x).maxHp * 100, 0) / n, low = gm.filter(x => rt > 0 && x.hp / eff(g, x).maxHp * 100 < rt).length;
+    const hot = foes.some(f => cheb(f, c) <= R + 3); // hay enemigos cerca del grupo: nadie sale solo, se retira todo el grupo a la vez
+    const leaveAll = !foes.length && !tre.length || (rt > 0 && (hpAvg < Math.max(55, rt) || low >= Math.max(2, Math.ceil(n / 3)) || (hot && low >= 1 && n > 1)));
+    if (leaveAll && sq && sq.lv !== d.id + ':' + g.turn && foes.length) { sq.lv = d.id + ':' + g.turn; ev(g, `🚪 ${sq.n} sale de la mazmorra: el grupo está muy herido`, [p.id]); }
+    if (leaveAll || (rt > 0 && frac < rt)) {
+      if (foes.length) u.rtr = 1;
+      if (cheb(u, d.exit) <= 1) { doDungeon(g, p, { d: 'leave', u: u.id }); return true; }
+      headTo(g, u, d.exit.x, d.exit.y); return true;
+    }
+    const formed = gm.every(x => cheb(x, c) <= R), far = cheb(u, c) > R;
+    const reach = u.mp + e0.range + 1; // solo ataca a lo que está cerca del grupo (nunca se aleja a perseguir)
+    const ok = new Set(foes.filter(f => cheb(f, c) <= R + 2 && (far ? cheb(f, u) <= Math.max(1, e0.range) : cheb(f, u) <= reach)).map(f => f.id)), sv = p._ok; p._ok = ok;
     try { const b = u.at; botStrike(g, p, u); if (u.at < b) did = true; } finally { p._ok = sv; }
     if (!g.units.includes(u)) return true;
-    if (u.at >= eff(g, u).attacks && u.mp > 0) { const tg = foes.concat(tre).sort((a, b) => cheb(a, u) - cheb(b, u))[0]; if (tg) { headTo(g, u, tg.x, tg.y); did = true; } }
+    if (u.at >= eff(g, u).attacks && u.mp > 0) {
+      if (far) { headTo(g, u, c.x, c.y); did = true; } // se despegó del grupo: vuelve con él
+      else if (formed) { const tg = foes.concat(tre).sort((a, b) => cheb(a, c) - cheb(b, c))[0]; if (tg) { headTo(g, u, tg.x, tg.y); did = true; } } // el grupo avanza solo cuando está junto
+      else if (cheb(u, c) > 1) { headTo(g, u, c.x, c.y); did = true; } // espera a los rezagados
+    }
     return did;
   }
+  { // fuera de la mazmorra también se defiende de lo que tenga cerca (esperando a su grupo en la entrada, o de camino)
+    const near = g.creatures.filter(c => !c.dg && cheb(c, u) <= u.mp + e0.range + 1);
+    if (near.length && u.at < eff(g, u).attacks) { const sv = p._ok; p._ok = new Set(near.map(c => c.id)); try { const b = u.at; botStrike(g, p, u); if (u.at < b) did = true; } finally { p._ok = sv; } if (!g.units.includes(u)) return true; }
+  }
   const useful = g.dungeons.filter(d => d.x >= 0 && (g.creatures.some(c => c.dg === d.id) || g.sites.some(q => q.dg === d.id && q.k === 'tesoro'))).sort((a, b) => cheb(a, u) - cheb(b, u));
-  if (u.hp / e0.maxHp < 0.7 || !useful.length) { if (cheb(u, plaza) > 4) { headTo(g, u, plaza.x, plaza.y); did = true; } return did; }
-  const d = useful[0];
-  if (cheb(u, d) <= 1) { const r = doDungeon(g, p, { d: 'enter', u: u.id, id: d.id }); if (typeof r === 'string') { if (cheb(u, plaza) > 4) headTo(g, u, plaza.x, plaza.y); } return true; }
+  if (u.rtr && frac >= rb) delete u.rtr;
+  if (frac < (u.rtr ? rb : 70) || !useful.length) { if (cheb(u, plaza) > 4) { headTo(g, u, plaza.x, plaza.y); did = true; } return did; }
+  if (sq && !g.units.some(x => x.o === p.id && x.sq === sq.id && x.dg)) { // empezar de cero: espera en la plaza a que todo el grupo esté curado (máx. 15 turnos)
+    const team = g.units.filter(x => x.o === p.id && x.sq === sq.id && !isAux(x) && !x.bs).sort((x, y) => x.id - y.id).slice(0, S.CIT.raid), sick = team.filter(x => x.hp / eff(g, x).maxHp * 100 < rb).length;
+    if (sick * 3 >= team.length) { if (sq.hwt !== g.turn) { sq.hwt = g.turn; sq.hw = (sq.hw || 0) + 1; } if (sq.hw < 15) { if (cheb(u, plaza) > 4) { headTo(g, u, plaza.x, plaza.y); did = true; } return did; } } else sq.hw = 0;
+  }
+  const d = (sq && useful.find(x => x.id === sq.td)) || useful[0]; // todos al mismo objetivo: el de la escuadra mientras siga teniendo algo
+  if (sq) sq.td = d.id;
+  if (cheb(u, d) <= 1) { // espera a que todo el grupo sano esté en la entrada para entrar a la vez
+    const mates = g.units.filter(x => x.o === p.id && !isAux(x) && (!sq || x.sq === sq.id) && !x.dg && !x.rtr && x.hp / eff(g, x).maxHp >= 0.7).slice(0, S.CIT.raid);
+    const ready = mates.every(x => cheb(x, d) <= 1);
+    if (sq && !ready && sq.go !== g.turn) { if (sq.wtt !== g.turn) { sq.wtt = g.turn; sq.wt = (sq.wt || 0) + 1; } if (sq.wt < 8) return true; sq.go = g.turn; } // si alguien tarda demasiado, entran sin él
+    if (sq && ready) sq.wt = 0;
+    const r = doDungeon(g, p, { d: 'enter', u: u.id, id: d.id }); if (typeof r === 'string') { if (cheb(u, plaza) > 4) headTo(g, u, plaza.x, plaza.y); } return true;
+  }
   headTo(g, u, d.x, d.y); return true;
 }
 function sqRole(g, u) { // frente 'f', centro 'c' o retaguardia 'b': lo que eligió el jugador o, si no, según el arma (a distancia y sanadores atrás)
@@ -3900,7 +3940,9 @@ function squadRun(g, p, only) {
   if (au) for (const u of g.units) if (u.o === p.id && !u.sq && !isAux(u) && !u.bs && !u.dg) u.sq = au.id;
   for (const sq of p.sq || []) {
     if (sq.k === 'free' || (only && sq !== only)) continue;
+    delete sq.gc; // el centro del grupo en la mazmorra se calcula una vez por ronda
     for (const u of g.units.filter(x => x.o === p.id && x.sq === sq.id && !isAux(x) && !x.bs)) { if (g.units.includes(u) && squadUnit(g, p, u, sq)) n++; }
+    delete sq.gc;
   }
   for (const sq of p.sq || []) { // avisos (solo al cerrar el turno, no con las órdenes manuales)
     if (sq.rn) { if (!only) ev(g, `🩹 ${sq.n}: ${sq.rn} ${sq.rn === 1 ? 'unidad se retira' : 'unidades se retiran'} a curarse`, [p.id]); sq.rn = 0; }
@@ -4354,7 +4396,7 @@ function deserialize(s) {
 }
 
 module.exports = {
-  citPlan,
+  citPlan, aura,
   rndLvTest: (g, t, x, y) => rndLv(g, t, x, y), createGame, addPlayer, addBot, joinWorld, removePlayer, startGame, cmd, advanceTurn, snapshot, serialize, deserialize,
   refreshUnits, newUnit, doMove, doAttack, score, COLORS, COLOR_NAMES, eff, cstats, idx, touch,
   chat, chatFor, botMem, botNote, reviveCost, holyCost, cityIncome, relinkStores, stationNear, builderOf, envFor, botMood, spawnCreature, spawnBoss, cstats, fillDungeon, dgName, gainXp, killUnit, killCreature, rareItem, addMats, capOf, invW, merchOffers, vampBite, markSeen, replaceableSlots, replaceBot, releasePlayer, pactOf,

@@ -42,7 +42,7 @@ ok(g.dungeons.every(x => g.creatures.some(c => c.dg === x.id) || g.units.some(u 
 { const h = E.createGame('CD2', 'Host', 't'); h.cfg.mode = 'ciudadela'; h.cfg.idleTurns = 0; h.cfg.sim = true; E.addBot(h, 'azar'); E.startGame(h);
   const us = h.units.filter(u => u.o === 0 && !u.sm); E.cmd(h, 0, { a: 'sq', d: 'new', n: 'Raid', ids: us.map(u => u.id) }); E.cmd(h, 0, { a: 'sq', d: 'ord', id: 1, k: 'raid' });
   ok(h.players[0].sq[0].k === 'raid', 'orden raid aceptada');
-  let e2 = null, went = false; try { for (let i = 0; i < 12; i++) { E.advanceTurn(h); if (h.units.some(u => u.o === 0 && u.dg)) went = true; } } catch (e) { e2 = e; }
+  let e2 = null, went = false; try { for (let i = 0; i < 45; i++) { E.advanceTurn(h); if (h.units.some(u => u.o === 0 && u.dg)) went = true; } } catch (e) { e2 = e; }
   ok(!e2, 'ejecutar la orden invadir varios turnos sin errores' + (e2 ? e2.message + e2.stack : '')); ok(went, 'la escuadra llega a entrar en una mazmorra');
   ok(h.units.filter(u => u.o === 0 && u.dg && !u.sm).length <= 5, 'nunca más de 5 dentro'); }
 console.log(fails ? '\n' + fails + ' FALLOS' : '\nTodo bien'); process.exit(fails ? 1 : 0);
