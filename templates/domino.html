@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Dominó{% endblock %}
+{% block content %}
+<h1>Dominó</h1>
+<p><a href="{{ url_for('domino_lobby') }}"><strong>Jugar en línea con otros miembros →</strong></a></p>
+<p class="muted">Para pasar el rato. Sin dinero ni apuestas: no tiene nada que ver con el pozo.</p>
+<section class="card dom">
+  <div class="dom-score" aria-live="polite">
+    <span>Nosotros (tú y tu compañero): <strong id="d-us">0</strong></span>
+    <span>Ellos: <strong id="d-them">0</strong></span>
+    <span class="muted">A 100 puntos · Mano <span id="d-round">1</span></span>
+  </div>
+  <div class="dom-seat" id="seat2"></div>
+  <div class="dom-mid">
+    <div class="dom-seat side" id="seat3"></div>
+    <div class="dom-table" id="table" aria-label="Mesa"></div>
+    <div class="dom-seat side" id="seat1"></div>
+  </div>
+  <p class="status" id="d-msg" aria-live="polite"></p>
+  <div id="d-ends" class="muted"></div>
+  <div class="dom-hand" id="hand" aria-label="Tus fichas"></div>
+  <div class="dom-choice" id="choice" hidden></div>
+  <div class="chess-btns">
+    <button type="button" id="d-next" hidden>Siguiente mano</button>
+    <button type="button" id="d-new">Nueva partida</button>
+  </div>
+</section>
+<p class="muted">Se juega como aquí: 28 fichas, 7 para cada uno, sin pozo. Abre quien tiene el doble seis y después quien ganó la mano. Si no tienes ficha, pasas. Quien se queda sin fichas se lleva los puntos de todas las fichas que quedan en la mesa. Si se tranca el juego, gana la pareja que tenga la mano con menos puntos; si empatan parejas, nadie suma.</p>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='domino-view.js') }}" defer></script>
+<script src="{{ url_for('static', filename='domino.js') }}" defer></script>
+<script src="{{ url_for('static', filename='domino-ui.js') }}" defer></script>
+{% endblock %}

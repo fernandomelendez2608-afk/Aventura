@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Entrar{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <h1>Entrar</h1>
+  <p class="muted">Acceso solo por invitación. Escribe el código personal que te dio el administrador.</p>
+  <form method="post" action="{{ url_for('login') }}">
+    {{ csrf_field() }}
+    <label for="code">Tu código</label>
+    <input id="code" name="code" type="password" autocomplete="off" autocapitalize="none" required autofocus>
+    <button class="btn" type="submit">Entrar</button>
+  </form>
+</section>
+{% endblock %}

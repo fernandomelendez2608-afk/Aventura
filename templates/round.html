@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% from "_macros.html" import spr %}
+{% block title %}Ronda {{ rnd.day }}{% endblock %}
+{% block content %}
+<section class="card">
+  <h1>Ronda del {{ rnd.day|fecha }}</h1>
+
+  {% if rnd.status == 'drawn' %}
+  <div class="ruleta" id="ruleta" data-numbers="{{ numbers_csv }}" data-winner="{{ rnd.winning_number }}">
+    <div class="ruleta-num" aria-live="polite">
+      {{ spr(rnd.winning_number, 'xl') }}
+      <span class="rn" id="rn">{{ rnd.winning_number }}</span>
+    </div>
+    <button class="btn secondary" id="repetir" type="button">Repetir animación</button>
+  </div>
+  <p class="big">Ganó {{ spr(rnd.winning_number, 'sm') }} <strong>{{ rnd.winning_number }}</strong> ({{ animal(rnd.winning_number).name }}) · {{ winner.name if winner else '—' }}</p>
+  <div class="stats">
+    <div><span class="k">Números pagados</span><span class="v">{{ rnd.pot_cents // rnd.price_cents }}</span></div>
+    <div><span class="k">Pozo</span><span class="v">{{ rnd.pot_cents|money }}</span></div>
+    <div><span class="k">Premio (50 %)</span><span class="v">{{ rnd.prize_cents|money }}</span></div>
+    <div><span class="k">Al banco</span><span class="v">{{ rnd.bank_cents|money }}</span></div>
+  </div>
+  <p class="muted small">Sorteo hecho el {{ rnd.drawn_at|hora }}.</p>
+  {% else %}
+  <p class="muted">Esta ronda sigue abierta. Cuando se sortee, aquí aparecerá el resultado y la prueba para verificarlo.</p>
+  <p class="muted small">Huella publicada:</p>
+  <code class="hash">{{ rnd.commitment }}</code>
+  {% endif %}
+</section>
+
+{% if rnd.status == 'drawn' %}
+<section class="card">
+  <h2>Verifícalo tú mismo</h2>
+  <p>Antes de vender el primer número se publicó la huella (SHA-256) de un secreto. Al sortear se revela ese secreto, y el ganador sale de una fórmula fija con los números pagados. Si algo no cuadra, el botón de abajo lo muestra.</p>
+  <dl class="proof">
+    <dt>Huella publicada antes de vender</dt><dd><code class="hash">{{ rnd.commitment }}</code></dd>
+    <dt>Secreto revelado</dt><dd><code class="hash">{{ rnd.seed }}</code></dd>
+    <dt>Números pagados (en orden)</dt><dd><code class="hash">{{ numbers_csv }}</code></dd>
+    <dt>Fórmula</dt>
+    <dd>posición = SHA-256(<code>secreto|{{ rnd.day }}|números</code>) como número entero, módulo la cantidad de números pagados. Gana el número en esa posición (la primera es la 0).</dd>
+  </dl>
+  <button class="btn" id="verificar" type="button"
+          data-seed="{{ rnd.seed }}" data-commitment="{{ rnd.commitment }}"
+          data-day="{{ rnd.day }}" data-numbers="{{ numbers_csv }}"
+          data-winner="{{ rnd.winning_number }}">Verificar en mi navegador</button>
+  <pre id="verificacion" class="proof-out"></pre>
+</section>
+{% endif %}
+
+{% if tickets %}
+<section class="card">
+  <h2>Números de la ronda</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Número</th><th>Persona</th><th>Estado</th></tr></thead>
+      <tbody>
+      {% for t in tickets %}
+        <tr{% if rnd.winning_number == t.number %} class="win"{% endif %}>
+          <td>{{ spr(t.number, 'sm') }} {{ t.number }} · {{ animal(t.number).name }}</td><td>{{ t.name }}</td>
+          <td>{% if t.paid %}pagado{% else %}sin pagar{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

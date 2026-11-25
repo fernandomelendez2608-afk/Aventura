@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "_macros.html" import spr %}
+{% block title %}Historial{% endblock %}
+{% block content %}
+<section class="card">
+  <h1>Historial de rondas</h1>
+  {% if rows %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Día</th><th>Números</th><th>Pozo</th><th>Ganador</th><th>Premio</th><th>Al banco</th><th>Premio entregado</th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td><a href="{{ url_for('round_page', day=r.day) }}">{{ r.day|fecha }}</a></td>
+          <td>{{ r.pot_cents // r.price_cents }}</td>
+          <td>{{ r.pot_cents|money }}</td>
+          <td>{{ spr(r.winning_number, 'sm') }} #{{ r.winning_number }} {{ animal(r.winning_number).name }} · {{ r.winner_name or '—' }}</td>
+          <td>{{ r.prize_cents|money }}</td>
+          <td>{{ r.bank_cents|money }}</td>
+          <td>{% if r.prize_paid %}sí{% else %}pendiente{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">Todavía no se ha sorteado ninguna ronda.</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,4 @@
+{# Dibujo en pixel art del animal del número n. size: '' (64 px), 'sm' (32), 'lg' (96), 'xl' (128). #}
+{% macro spr(n, size='') -%}
+<span class="sprite {{ size }} a{{ n }}" role="img" aria-label="{{ animal(n).name }}"></span>
+{%- endmacro %}

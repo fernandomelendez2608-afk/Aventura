@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Código de {{ name }}{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <h1>{% if regenerated %}Código nuevo{% else %}Miembro creado{% endif %}</h1>
+  <p>Código personal de <strong>{{ name }}</strong>:</p>
+  <p><code id="codigo" class="hash big">{{ code }}</code></p>
+  <p class="muted">Pásaselo por privado. No se vuelve a mostrar: si lo pierde, genera uno nuevo y el anterior deja de funcionar. No recargues esta página.</p>
+  <p><a class="btn" href="{{ url_for('admin') }}">Volver al panel</a></p>
+</section>
+{% endblock %}

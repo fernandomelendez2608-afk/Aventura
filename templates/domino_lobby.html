@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Dominó en línea{% endblock %}
+{% block content %}
+<h1>Dominó en línea</h1>
+<p class="muted">Mesas de cuatro: dos parejas. Los lugares que queden vacíos los juega la computadora. <a href="{{ url_for('domino') }}">Volver al dominó contra la computadora</a></p>
+
+<section class="card">
+  <h2>Crear una mesa</h2>
+  <form method="post" action="{{ url_for('domino_create') }}" class="chess-btns">
+    {{ csrf_field() }}
+    <button type="submit">Crear mesa</button>
+  </form>
+  <p class="muted">Tú te sientas primero. Tu compañero se sienta frente a ti y los rivales a los lados.</p>
+</section>
+
+<section class="card">
+  <h2>Mesas con lugares libres</h2>
+  {% if open_games %}
+  <ul class="glist">
+    {% for g in open_games %}
+    <li>
+      <span>Mesa de {{ g.owner }} · sentados: {{ g.humans|join(', ') }}</span>
+      <form method="post" action="{{ url_for('domino_join', game_id=g.id) }}" class="inline">
+        {{ csrf_field() }}
+        <select name="seat">{% for s, label in g.free %}<option value="{{ s }}">{{ label }}</option>{% endfor %}</select>
+        <button type="submit">Sentarme</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}<p class="muted">No hay mesas esperando jugadores.</p>{% endif %}
+</section>
+
+<section class="card">
+  <h2>Mis mesas</h2>
+  {% if mine %}
+  <ul class="glist">
+    {% for g in mine %}
+    <li>
+      <a href="{{ url_for('domino_table', game_id=g.id) }}">Mesa de {{ g.owner }} · {{ g.humans|join(', ') }}</a>
+      <span class="muted">{{ 'esperando jugadores' if g.status == 'open' else ('en juego' if g.status == 'playing' else 'terminada') }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}<p class="muted">Todavía no tienes mesas.</p>{% endif %}
+</section>
+{% endblock %}

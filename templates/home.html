@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% from "_macros.html" import spr %}
+{% block title %}Hoy{% endblock %}
+{% block content %}
+<section class="card">
+  <div class="row between">
+    <h1>Ronda de hoy · {{ rnd.day|fecha }}</h1>
+    {% if rnd.status == 'open' %}
+      <span class="badge open">Ventas abiertas</span>
+    {% else %}
+      <span class="badge done">Sorteada</span>
+    {% endif %}
+  </div>
+
+  {% if rnd.status == 'open' %}
+  <div class="stats">
+    <div><span class="k">Precio por número</span><span class="v">{{ rnd.price_cents|money }}</span></div>
+    <div><span class="k">Números pagados</span><span class="v">{{ paid_count }}</span></div>
+    <div><span class="k">Pozo hasta ahora</span><span class="v">{{ pot|money }}</span></div>
+    <div><span class="k">Premio (50 %)</span><span class="v">{{ (pot // 2)|money }}</span></div>
+  </div>
+  {% if auto_time and rnd.status == 'open' %}<p class="small"><strong>El sorteo se hace solo hoy a las {{ auto_time }}</strong> (hora de Ecuador). Paga antes para entrar.</p>{% endif %}
+  <p class="muted small">Huella del sorteo, publicada antes de vender el primer número (<a href="{{ url_for('rules') }}">cómo se verifica</a>):</p>
+  <code class="hash">{{ rnd.commitment }}</code>
+  {% else %}
+  <div class="stats">
+    <div><span class="k">Número ganador</span><span class="v">{{ spr(rnd.winning_number, 'sm') }} {{ rnd.winning_number }}</span></div>
+    <div><span class="k">Ganó</span><span class="v">{{ winner.name if winner else '—' }}</span></div>
+    <div><span class="k">Premio</span><span class="v">{{ rnd.prize_cents|money }}</span></div>
+    <div><span class="k">Al banco</span><span class="v">{{ rnd.bank_cents|money }}</span></div>
+  </div>
+  <p><a class="btn secondary" href="{{ url_for('round_page', day=rnd.day) }}">Ver el sorteo y verificarlo</a></p>
+  <p class="muted small">Las ventas de hoy están cerradas. La próxima ronda se abre mañana.</p>
+  {% endif %}
+</section>
+
+{% if rnd.status == 'open' %}
+  {% if user.role == 'member' %}
+  <section class="card">
+    <h2>Elige tus números</h2>
+    <p class="muted">Puedes tener hasta {{ max_tickets }} por ronda (te quedan {{ max_tickets - mine|length }}). Reserva aquí, paga al administrador y él los marcará como pagados. Solo los pagados entran al sorteo.</p>
+    <form method="post" action="{{ url_for('reserve') }}">
+      {{ csrf_field() }}
+      <div class="grid">
+        {% for n in range(1, number_range + 1) %}
+          {% set t = by_number.get(n) %}
+          {% set a = animal(n) %}
+          {% if not t %}
+            <label class="cell free c{{ n % 12 }}" title="{{ a.name }}"><input type="checkbox" name="n" value="{{ n }}">{{ spr(n) }}<span class="nu">{{ n }}</span><span class="nm">{{ a.name }}</span></label>
+          {% else %}
+            <span class="cell {{ 'mine' if t.member_id == user.id else 'taken' }} {{ 'paid' if t.paid else 'unpaid' }}"
+                  title="{{ a.name }} · {{ t.name }}{{ ' · pagado' if t.paid else ' · sin pagar' }}">{{ spr(n) }}<span class="nu">{{ n }}</span><span class="nm">{{ a.name }}</span></span>
+          {% endif %}
+        {% endfor %}
+      </div>
+      <p class="legend small muted">
+        <span class="swatch free"></span> libre
+        <span class="swatch mine"></span> tuyo
+        <span class="swatch taken"></span> de otra persona
+        · borde sólido = pagado
+      </p>
+      <button class="btn" type="submit">Reservar seleccionados</button>
+    </form>
+  </section>
+  {% else %}
+  <section class="card"><p class="muted">Entraste como administrador: las reservas se hacen con un código de miembro. Gestiona los pagos y el sorteo en <a href="{{ url_for('admin') }}">Admin</a>.</p></section>
+  {% endif %}
+{% endif %}
+
+{% if mine %}
+<section class="card">
+  <h2>Mis números de hoy</h2>
+  <ul class="plain">
+    {% for t in mine %}
+    <li>
+      {{ spr(t.number, 'sm') }} <strong>{{ t.number }}</strong> {{ animal(t.number).name }}
+      {% if t.paid %}
+        <span class="badge done">pagado</span>
+      {% else %}
+        <span class="badge warn">sin pagar</span>
+        {% if rnd.status == 'open' %}
+        <form method="post" action="{{ url_for('cancel_ticket', tid=t.id) }}" class="inline">
+          {{ csrf_field() }}<button class="link" type="submit">cancelar</button>
+        </form>
+        {% endif %}
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{% if tickets %}
+<section class="card">
+  <h2>Quién tiene qué hoy</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Número</th><th>Persona</th><th>Estado</th></tr></thead>
+      <tbody>
+      {% for t in tickets %}
+        <tr><td>{{ spr(t.number, 'sm') }} {{ t.number }} · {{ animal(t.number).name }}</td><td>{{ t.name }}</td>
+            <td>{% if t.paid %}pagado{% else %}sin pagar{% endif %}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+<p class="muted small">Banco grupal: <strong>{{ totals.balance|money }}</strong> · <a href="{{ url_for('bank') }}">ver movimientos</a></p>
+{% endblock %}

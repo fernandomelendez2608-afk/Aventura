@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Ajedrez{% endblock %}
+{% block content %}
+<h1>Ajedrez</h1>
+<p class="muted">Para pasar el rato. Sin dinero ni apuestas: no tiene nada que ver con el pozo.</p>
+<p><a href="{{ url_for('chess_lobby') }}"><strong>Jugar en línea contra otro miembro →</strong></a></p>
+<div class="chess" id="chess">
+  <div class="board-wrap">
+    <div class="board" id="board" role="grid" aria-label="Tablero de ajedrez"></div>
+    <div class="promo" id="promo" hidden>
+      <span>Coronar en:</span>
+      <button type="button" data-p="5"><i class="pc wq"></i> Dama</button>
+      <button type="button" data-p="4"><i class="pc wr"></i> Torre</button>
+      <button type="button" data-p="3"><i class="pc wb"></i> Alfil</button>
+      <button type="button" data-p="2"><i class="pc wn"></i> Caballo</button>
+    </div>
+  </div>
+  <aside class="chess-side">
+    <p class="status" id="cstatus" aria-live="polite"></p>
+    <div class="chess-opts">
+      <label>Rival
+        <select id="mode">
+          <option value="ai">La computadora</option>
+          <option value="two">Dos jugadores (mismo dispositivo)</option>
+        </select>
+      </label>
+      <label id="lvlbox">Nivel
+        <select id="level">
+          <option value="1">Fácil</option>
+          <option value="2" selected>Medio</option>
+          <option value="3">Difícil</option>
+        </select>
+      </label>
+      <label id="sidebox">Juego con
+        <select id="side">
+          <option value="1">Blancas</option>
+          <option value="-1">Negras</option>
+        </select>
+      </label>
+    </div>
+    <div class="chess-btns">
+      <button type="button" id="cnew">Nueva partida</button>
+      <button type="button" id="cundo">Deshacer</button>
+      <button type="button" id="cflip">Girar tablero</button>
+    </div>
+    <h2>Jugadas</h2>
+    <ol class="moves" id="moves"></ol>
+  </aside>
+</div>
+<p class="muted">Notación en español: R rey, D dama, T torre, A alfil, C caballo. Las tablas se dan por rey ahogado, repetición, 50 jugadas o falta de material.</p>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='chess.js') }}" defer></script>
+<script src="{{ url_for('static', filename='chess-ui.js') }}" defer></script>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Reglas{% endblock %}
+{% block content %}
+<section class="card prose">
+  <h1>Reglas del grupo</h1>
+  {% for kind, content in blocks %}
+    {% if kind == 'h2' %}
+      <h2>{{ content }}</h2>
+    {% elif kind == 'ul' %}
+      <ul>{% for item in content %}<li>{{ item }}</li>{% endfor %}</ul>
+    {% elif kind == 'ol' %}
+      <ol>{% for item in content %}<li>{{ item }}</li>{% endfor %}</ol>
+    {% else %}
+      <p>{{ content }}</p>
+    {% endif %}
+  {% endfor %}
+
+  {% if user.role == 'member' and not user.accepted %}
+  <form method="post" action="{{ url_for('accept_rules') }}" class="accept">
+    {{ csrf_field() }}
+    <p><strong>Para continuar, confirma que leíste las reglas.</strong></p>
+    <button class="btn" type="submit">Las leí y estoy de acuerdo</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

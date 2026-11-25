@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Partida de ajedrez{% endblock %}
+{% block content %}
+<h1>Partida de ajedrez</h1>
+<p class="muted"><a href="{{ url_for('chess_lobby') }}">← Todas las partidas</a></p>
+<div class="chess" id="chess" data-game="{{ game.id }}"
+     data-token="{{ csrf_token() }}" data-state-url="{{ url_for('chess_state', game_id=game.id) }}"
+     data-move-url="{{ url_for('chess_move', game_id=game.id) }}">
+  <div class="board-wrap">
+    <div class="board" id="board" role="grid" aria-label="Tablero de ajedrez"></div>
+    <div class="promo" id="promo" hidden>
+      <span>Coronar en:</span>
+      <button type="button" data-p="5"><i class="pc wq"></i> Dama</button>
+      <button type="button" data-p="4"><i class="pc wr"></i> Torre</button>
+      <button type="button" data-p="3"><i class="pc wb"></i> Alfil</button>
+      <button type="button" data-p="2"><i class="pc wn"></i> Caballo</button>
+    </div>
+  </div>
+  <aside class="chess-side">
+    <p class="status" id="cstatus" aria-live="polite">Cargando…</p>
+    <p id="players" class="muted"></p>
+    <div class="chess-btns">
+      <button type="button" id="cflip">Girar tablero</button>
+      {% if you %}
+      <form method="post" action="{{ url_for('chess_resign', game_id=game.id) }}" class="inline" id="resign">
+        {{ csrf_field() }}
+        <button type="submit" id="resignbtn">{{ 'Cancelar partida' if game.status == 'open' else 'Rendirme' }}</button>
+      </form>
+      {% endif %}
+    </div>
+    <h2>Jugadas</h2>
+    <ol class="moves" id="moves"></ol>
+  </aside>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='chess.js') }}" defer></script>
+<script src="{{ url_for('static', filename='chess-online.js') }}" defer></script>
+{% endblock %}

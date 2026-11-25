@@ -1,799 +1,137 @@
-# Aventura de almas
+# Pozo de amigos (versión cerrada)
 
-Juego de estrategia por turnos tipo Civ, pensado para **celular** y para jugar con amigos durante días (hasta 10 jugadores, con bots para completar la sala).
+Web para un grupo pequeño y cerrado: cada día se venden números, la mitad del pozo es el premio de un sorteo verificable y la otra mitad va a un banco grupal con libro de movimientos visible para todos.
 
-Sin dependencias: solo Node.js 18+ (`npm start`). El cliente es una página web que se abre desde el navegador del celular.
+## Antes de empezar: tres cosas importantes
 
-## Cómo se juega
+1. **En el plan gratis de Render los datos se borran.** Un servicio gratuito no admite disco persistente y pierde sus archivos en cada reinicio, en cada redeploy y cada vez que se "duerme" (15 minutos sin visitas). Aquí los datos viven en un archivo SQLite, así que se pierden los miembros y sus códigos, las reservas y el libro del banco. El plan gratis sirve para probar, no para llevar el registro real: mientras lo usen así, anoten el saldo del banco y los premios en una hoja propia y descarguen el respaldo después de cada sorteo. Para que los datos se guarden de verdad hace falta un plan de pago con disco (ver "Pasar al plan de pago").
+2. **La web no cobra.** Reservas en la web, pagas al administrador por fuera (efectivo o transferencia) y él marca el número como pagado. Así no se manejan tarjetas ni datos de pago.
+3. **Qué no resuelve el sorteo verificable.** Impide cambiar el resultado después de ver los números. No impide que el administrador marque mal un pago o no sortee: eso se controla entre todos con la lista de números y el historial. Y esto no es asesoría legal: es un juego entre conocidos, con montos pequeños; si crece o se abre al público, consulta a un abogado.
 
-- Cada jugador empieza con **una capital y 4 unidades idénticas** (sin armas ni armadura, 1 punto de habilidad).
-- Los turnos son **simultáneos**: todos mueven a la vez. El turno termina cuando todos los humanos pulsan **Fin de turno** o cuando se acaba el tiempo (configurable de 3 min a 24 h).
-- **Mundo vivo**: aparecen criaturas con el tiempo (ciervos, jabalíes, lobos, osos, goblins, esqueletos, orcos, trolls) que **suben de nivel** cada 10 turnos, y **jefes** (Rey Lobo, Liche, Dragón de Ceniza) que dan almas y acero. Cuanto más lejos de tu capital, más peligro.
-- **Botín**: cada criatura suelta cuero, hueso, hierro, acero y (las fuertes) **almas**. El botín va a la **mochila de la unidad** que la derrota (45 de peso).
-- **Ciudades**: junto a una ciudad tuya (casilla adyacente) la unidad deposita el botín, toma materiales, se equipa y se cura. En la ciudad se **forja** el equipo (hasta 4 objetos por turno) y se **reclutan** más unidades (hasta 14). Las aldeas sin dueño se conquistan entrando en ellas.
-- **Subir de nivel** (+1 punto por nivel, hasta nivel 20), cada punto a elegir:
-
-  | Habilidad | Efecto |
-  |---|---|
-  | Daño | +2 de daño |
-  | Salud | +6 de salud máxima |
-  | Movilidad | +1 casilla (máx. 2 puntos) |
-  | Médico | cura a aliados adyacentes 4% de su salud por punto, al inicio del turno |
-  | Doble ataque | 2 ataques por turno (el 2.º al 60%). Solo 1 punto |
-  | Defensa | +2 de defensa |
-  | General | aliados a 1 casilla ganan +2% de salud y defensa por punto, y +1% a 2 casillas |
-
-- **Armas**: daga (ignora 25% defensa, +1 mov.), espada, arco (alcance 3), arco largo (alcance 5, no dispara a adyacentes), ballesta (alcance 4, ignora 40% defensa, un disparo por turno), escudo (solo con armas de una mano).
-- **Armaduras**: casco, guantes, hombreras, pechera, pantalones, botas.
-- **Materiales → calidad**: Hueso/Cuero → Hierro → Acero → **Alma** (cada escalón multiplica el daño/defensa).
-- Niebla de guerra: solo ves lo que tus unidades y ciudades alcanzan a ver.
-- Ganas siendo el último en pie, o por puntos si pusiste límite de turnos.
-
-## Varias partidas y menú principal
-
-- Puedes tener **varias partidas a la vez** (cada una con su código). En el menú, *Tus partidas* muestra el estado de cada una: en sala, turno actual, si **te toca jugar**, si ya terminaste, si un bot juega por ti, cuánto falta para que cierre el turno, o si terminó.
-- Dentro de una partida, el botón **☰** (arriba a la izquierda) te lleva al menú sin salirte de ella. Desde ahí puedes crear otra, unirte a otra con código o **Entrar** de nuevo. La **✕** quita una partida de tu lista (la partida sigue en el servidor).
-- Al recargar la página vuelves a la última partida abierta; si saliste al menú, te quedas en el menú.
-- Mientras estás en el menú no cuentas como «presente»: si pasan los turnos que elegiste en la sala, un bot dirige tu ejército hasta que vuelvas.
-
-## Mundo vivo: estaciones, élites, hordas y tesoros
-
-- **Estaciones** (cada 12 turnos, el icono sale junto al turno): 🌸 *primavera* más animales · ☀️ *verano* tranquilo · 🍂 *otoño* las criaturas sueltan +25 % de botín · ❄️ *invierno* criaturas más agresivas (+15 % daño, ven más lejos) y hordas más seguidas.
-- **Criaturas élite** ⭐ (aro morado, con nombre propio como «Furia Gris»): más fuertes, **botín doble** y siempre sueltan un **objeto raro**. Se anuncian en el registro con su zona del mapa.
-- **Hordas** 🐺 (aro naranja): desde el turno 10, un grupo de criaturas avanza hacia una de las ciudades (se avisa al dueño, también por notificación). Defiende con tus unidades: se quedan unos 14 turnos y luego se dispersan.
-- **Cofres** 🎁 y **ruinas** 🏛️: mueve una unidad encima para abrirlos (necesita espacio en la mochila). Los cofres dan materiales y a veces un objeto raro; las ruinas dan un objeto raro seguro y almas, pero tienen guardianes.
-
-## Clases y especializaciones
-
-A **nivel 6** cada unidad puede elegir una **clase** permanente (pestaña *Clase* de su ficha) y a **nivel 12** una **especialización**. Las unidades con ⭐ tienen una elección pendiente.
-
-| Clase | Efecto base | Especializaciones |
-|---|---|---|
-| 🛡️ Guardián | +15 % salud, +4 defensa, aura +3 % | 🧱 Muralla (+6 def, espinas) · 💞 Protector (cura 10 %/turno, aura +4 %) |
-| ⚔️ Duelista | +15 % daño, +20 % contra heridos | 🪓 Verdugo (+40 % contra heridos) · 🩸 Sanguinario (robo de vida) |
-| 🏹 Cazador | +1 alcance a distancia, +1 mov., +30 % a criaturas | 🎯 Francotirador (+1 alcance, ignora defensa) · 🐾 Rastreador (+30 % criaturas, +1 mov.) |
-| ✚ Sanador | +2 puntos de Médico, se cura 5 % | ⛑️ Médico de campaña (+3 Médico) · 💠 Custodio (def, aura, Médico) |
-| 🗡️ Asesino | primer ataque +50 %, +1 mov., ignora 20 % defensa | 🌑 Sombra (más primer golpe y mov.) · ☠️ Envenenador (veneno) |
-
-## Edificios en las ciudades
-
-Pestaña **Construir** de cada ciudad (una construcción por ciudad y turno, nivel máximo 2, se paga con el almacén): 🔨 **Herrería** (+2 trabajos de forja/mejora por turno por nivel) · 🏕️ **Cuartel** (reclutar 20 % más barato por nivel; nivel 2: las unidades llegan a nivel 2) · 🧱 **Muralla** (+5 defensa por nivel dentro de la ciudad, +3 a las unidades pegadas) · 🔭 **Atalaya** (+2 casillas de visión por nivel). Si un enemigo conquista la ciudad, cada edificio baja un nivel. Los bots (Normal y Difícil) también construyen.
-
-## Órdenes en cola y resumen al volver
-
-- En la ficha de una unidad (pestaña *Estado*): **📍 Ir a…** (toca la casilla de destino; avanza sola cada turno y se detiene si queda muy herida), **🏠 Volver y depositar** (va a la ciudad más cercana y deja el botín) y **🛡️ Vigilar** (se queda quieta y ataca criaturas a su alcance al empezar cada turno). Moverla o atacar a mano cancela la orden. Las unidades con orden no cuentan en el botón 🛡️ de «siguiente unidad».
-- Al abrir el juego después de varios turnos aparece **📜 Mientras no estabas**: unidades perdidas, ataques, botines, subidas de nivel, ciudades conquistadas, pactos, hordas y avisos de órdenes. Si ves el cambio de turno en vivo no se muestra.
-
-## Equipo raro, mejorar y encantar
-
-- Los objetos **raros** 🔷 (un efecto) y **épicos** 🟣 (dos efectos) salen de élites, jefes, cofres y ruinas. Efectos de arma: 🩸 robo de vida, ☠️ veneno (3 turnos), 🗡️ afilado, 🎯 certero. Efectos de armadura: 🌿 regeneración, 🌵 espinas, 🧱 dureza, 💨 ágil.
-- En la ciudad, pestaña **Mejorar**: *⬆ calidad* sube un objeto al siguiente material por ~60 % del coste de forjarlo y **conserva sus efectos**; *✨ Encantar* añade un efecto elegido por ti (o al azar) por 3 almas, máximo 2 efectos. Cada trabajo cuenta como una forja del turno.
-
-## Diplomacia
-
-En *Jugadores* verás cada pacto y podrás proponer **paz** o **alianza** (la alianza exige paz antes). Con paz no pueden atacarse ni pisar sus ciudades; con alianza además comparten visión y sus unidades pueden cruzarse. **Si todos los que quedan son aliados, ganan juntos.** Romper la alianza vuelve a la paz; romper la paz avisa y la guerra empieza 2 turnos después. Las propuestas caducan a los 5 turnos y llegan por notificación. Los bots responden según su personalidad (un humano ausente solo acepta paz).
-
-## Bots: personalidad y dificultad
-
-Al agregar un bot eliges su **personalidad**: 🌾 *Granjero* (caza y construye; solo ataca a quien lo ataca), ⚖️ *Equilibrado* o ⚔️ *Conquistador* (agresivo desde el turno 1), o al azar. La **dificultad** de los bots se elige en los ajustes: *Fácil* (pocos soldados, equipo básico, muy cautos), *Normal* y *Difícil* (más ejército, mejor equipo y encantan objetos).
-
-## Mapa y navegación
-
-Arriba a la derecha hay un **minimapa** (toca o arrastra para ir a ese lugar; muestra ciudades, tus unidades, criaturas, jefes y tesoros). Debajo: 🏠 salta a tu capital (toca otra vez para pasar por tus otras ciudades) y 🛡️ va a la siguiente unidad con acciones disponibles (el número indica cuántas).
-
-## Ajustes del mundo (v1.5)
-
-Al crear la partida, el anfitrión puede elegir en el lobby, bajo «🌍 Ajustes del mundo»:
-
-| Ajuste | Opciones |
-|---|---|
-| Tamaño del mapa | Pequeño · Normal · Grande · Enorme |
-| Ciudades neutrales (aldeas) | Pocas · Normal · Muchas · Abundantes |
-| Bioma | Mixto (al azar) · Solo bosque · Solo pradera · Solo desierto |
-| Criaturas | Más pacíficas · Normal · Más agresivas (también cambia la frecuencia de hordas) |
-| Unidades iniciales | 4 · 8 · 14 (máximo) |
-| Nivel inicial | 1 · 3 · 6 · 10 |
-| Armadura inicial | Ninguna · Hierro completa · Acero completa |
-
-Notas: el desierto es un terreno nuevo (arena, se camina como la pradera). En «solo bosque» los caminos entre ciudades quedan despejados. Los sitios (cofres y ruinas) y las criaturas escalan con el tamaño del mapa. Las partidas guardadas antiguas reciben los valores normales.
-
-## Bots que hablan (v1.13)
-
-Los bots escriben en el chat con una etiqueta 🤖 y frases propias según su personalidad (granjero, equilibrado, conquistador). Es un guion, no una IA: reconocen palabras clave.
-
-- **Hablarles:** escribe su nombre en el mensaje («Vlad, hagamos la paz») o la palabra «bots» (contesta uno al azar). Reconocen saludos, paz, alianza, amenazas, insultos, agradecimientos, peticiones de ayuda y «¿cómo vas?». Si no los nombras, no contestan.
-- **Paz y alianza:** el chat no firma pactos (eso se hace en «Jugadores» 🤝), pero el bot te dice la verdad sobre su ánimo: si hubo guerra reciente se niega; si no, te invita a mandarle la propuesta. Cuando le mandas una propuesta, contesta en el chat si la acepta o la rechaza (y por qué).
-- **Solos:** saludan al empezar y comentan de vez en cuando cuando matan o pierden una unidad contigo, conquistan o pierden una ciudad, aparece un jefe o una horda, los eliminan o termina la partida. Máximo 2 comentarios de bots por turno y cada bot calla al menos 3 turnos entre comentarios.
-- **Canal de aliados:** solo lo leen y contestan los bots que son tus aliados.
-- El anfitrión puede apagarlo en «Ajustes del mundo» (Los bots hablan en el chat: Sí/No). Las partidas empezadas antes de la v1.13 lo tienen apagado.
-
-## Carreta (v1.12)
-
-Una mejora de ciudad (pestaña **Construir** de la ciudad, abajo del todo) que crea una **carreta**: un almacén móvil.
-
-- **Coste:** 8 cuero, 8 hueso y 3 hierro del almacén de la ciudad.
-- **Carga:** hasta **150** (una mochila normal lleva 45), con materiales y objetos. Cárgala o descárgala junto a una ciudad tuya desde su pestaña «Carga» (botones +1, Todo y «Depositar todo»).
-- **Movilidad 6** (una unidad normal tiene 3).
-- **No cuenta como unidad:** no ocupa puestos del tope de 14/20.
-- **Máximo una por ciudad.** Si la destruyen, la ciudad puede construir otra. Si te la matan, el enemigo se queda con parte de la carga (lo que le quepa en la mochila).
-- Frágil: 80 de salud, 2 de defensa. No ataca, no sube de nivel, no usa equipo ni habilidades. Si un bot toma el control de tu ejército por ausencia, no la mueve.
-- No está disponible en el reto de una unidad.
-
-## Reto de una unidad (v1.11)
-
-En «Ajustes del mundo» → **Modo de juego: Reto de una unidad**:
-
-- Cada jugador y cada bot tiene **una sola unidad** en toda la partida (ignora «unidades iniciales»).
-- No se puede reclutar, invocar ni tener crías, y no hay protagonista (tu única unidad ya lo es).
-- **Si tu unidad cae, quedas eliminado** y tus ciudades quedan libres, aunque tengas materiales.
-- Sigue valiendo el nivel inicial y la armadura inicial, el tamaño del mapa, el bioma, las criaturas, etc. Una combinación divertida: nivel 6 + armadura de hierro. Las ciudades siguen sirviendo para forjar, mejorar y guardar equipo.
-- Los bots no eligen invocador en este modo.
-
-## Protagonista (v1.10)
-
-Cada jugador (y cada bot) empieza con un **protagonista**: una de sus unidades, marcada con una corona 👑 (o el emblema que elijas).
-
-- **Elegirlo:** en el turno 1, abre la ficha de cualquier unidad y toca «👑 Elegir como protagonista». Ahí mismo eliges el emblema (👑 🦅 🐉 🦁 🔥 ⚜️ 🌟 🛡️). Desde el turno 2 queda fijo. Puedes ponerle nombre con ✏️ en cualquier momento.
-- **Bonos:** gana **+50% de experiencia** y da un **aura de +10% de daño y defensa** a tus demás unidades a 2 casillas o menos (se suma al aura de general/guardián).
-- **Si cae:** vuelve a tu capital (o a otra ciudad tuya) **3 turnos después, con 2 niveles menos** y la salud llena. Si lo mató una criatura conserva su equipo; si lo mató otro jugador, ese jugador se queda con su botín como con cualquier unidad. Mientras tanto, la lista de jugadores muestra «☠️ vuelve en N turnos».
-- Cuenta como una unidad más para el tope de unidades.
-- El anfitrión puede desactivarlo en «Ajustes del mundo». Las partidas empezadas antes de la v1.10 no lo tienen.
-
-## Chat de la partida (v1.9)
-
-- Botón 💬 en la columna de botones junto al minimapa (🏠, 💬…). Muestra un número rojo con los mensajes sin leer y un aviso breve cuando llega uno nuevo.
-- Mensajes de hasta 200 letras, para todos los jugadores o «solo para mis aliados 🤝» (los ve quien tenga alianza contigo).
-- Se guardan con la partida (los últimos 80; se muestran 60) y también al reiniciar el servidor.
-- Límite anti-spam: 5 mensajes cada 10 segundos. Los bots no escriben. Se abre cuando empieza la partida (no en la sala de espera).
-- Si tienes los avisos activados y no estás mirando la partida, te llega un aviso al celular (máx. uno cada 3 minutos por partida).
-
-## Ajustes de equilibrio (v1.8.1)
-
-- Cuando las criaturas suben de nivel (cada 10 turnos) **ya no se curan por completo**: conservan su proporción de salud. Antes un jefe casi muerto se recuperaba entero al subir de nivel.
-- El **Liche** es algo más débil: 230 de salud (antes 260) y 20 de daño (antes 24). Sigue disparando a distancia 4. Contra su defensa alta funcionan bien la ballesta (ignora 40%), el báculo/varita y los magos, y poner invocaciones delante.
-
-## Mago, invocador y nigromante (v1.8)
-
-Tres clases nuevas que se eligen a nivel 6 (con especialización a nivel 12), como las demás:
-
-| Clase | Qué hace |
-|---|---|
-| 🔮 **Mago** | +30% de daño con báculo y varita y +1 alcance. Especializaciones: Hechicero, Arcano |
-| 🐾 **Invocador** | +10% salud y +2 defensa. Invoca **lobos** (4 huesos) u **osos** (7 huesos). Especializaciones: Domador (+30% daño a sus invocaciones), Alfa (+35% salud) |
-| 💀 **Nigromante** | +15% de daño mágico. Invoca **esqueletos** (4 huesos). Especializaciones: Señor de huesos (+35% salud), Maldito (+30% daño) |
-
-**Armas mágicas nuevas:** 🪄 Báculo (dos manos, alcance 3, ignora 25% de defensa) y ✨ Varita (una mano, alcance 2, ignora 20% de defensa, admite escudo). Cualquiera puede usarlas, pero solo el mago y el nigromante reciben el bono mágico.
-
-**Invocaciones**
-- Solo se invoca a 2 casillas o menos de una ciudad tuya, gastando huesos de su almacén (botón «Invocar» en la ficha).
-- **Máximo 2 invocaciones por invocador/nigromante** (desde v1.50; antes era un límite de 2 por jugador).
-- Son unidades que controlas como las demás, pero no cuentan para el tope de 14/20 unidades, no tienen habilidades ni equipo y no suben de nivel solas: su nivel es el de su invocador (con el tope de la criatura).
-- Si el invocador cae, sus invocaciones desaparecen. Puedes despedirlas desde su ficha.
-- Los bots también eligen estas clases y las usan.
-
-## Crías (v1.7)
-
-Si dos unidades tuyas están **una junto a la otra y a 2 casillas o menos de una ciudad tuya** durante 5 turnos seguidos (ambas con al menos 50% de salud), nace una cría:
-
-- Nivel 1, con un bono fijo de nacimiento: **+10 salud y +2 daño**. Nace con la salud llena y descansa ese turno.
-- Los dos padres (y la cría) deben esperar **15 turnos** antes de otra cría.
-- Tope de **20 unidades** por jugador (el reclutamiento normal sigue limitado a 14). Si hay 20, la pareja espera a que haya sitio.
-- Si se separan, se alejan de la ciudad o una queda herida, la cuenta vuelve a 0.
-- El anfitrión lo ajusta en «Ajustes del mundo»: desactivadas, 5 turnos o 3 turnos. Las partidas ya empezadas antes de la v1.7 lo tienen desactivado.
-- En la ficha de cada unidad se ve el progreso («💞 Junto a Nombre: 3/5 turnos»).
-
-## Armas (v1.6)
-
-| Arma | Daño base | Alcance | Manos | Particularidad |
-|---|---|---|---|---|
-| Daga | 4 | 1 | 1 | Ignora 25% de defensa, +1 movimiento |
-| Espada | 7 | 1 | 1 | Equilibrada |
-| **Hacha** | 8 | 1 | 1 | Más daño que la espada, admite escudo |
-| **Katana** | 9 | 1 | 1 | Ignora 20% de defensa |
-| **Hacha de batalla** | 13 | 1 | 2 | Ignora 15% de defensa, pesada: −1 movimiento |
-| **Lanza** | 8 | 1–2 | 2 | Alcance 2 y sin penalización a quemarropa |
-| Arco / Arco largo / Ballesta | 5 / 6 / 10 | 3 / 2–5 / 4 | 2 | Como antes |
-
-Se fabrican en las ciudades (pestaña forja), caen como objetos raros con efectos, y los bots también las usan.
-
-## Renombrar unidades
-
-En la ficha de una unidad, el botón ✏️ (arriba a la derecha) permite cambiarle el nombre (máx. 16 letras). Solo puedes renombrar las tuyas.
-
-## Partidas de días: ausencias, relevos y avisos
-
-**Si alguien deja de jugar.** Si una persona pasa varios turnos sin abrir el juego (se elige en la sala: 1, 2, 3, 5 turnos o nunca), **un bot dirige su ejército** para que no se quede quieto. Ese bot es cauto: farmea criaturas, defiende, forja y recluta, pero **no ataca a otros jugadores**. En cuanto la persona vuelve a abrir el juego **recupera el mando**. Mientras está ausente ya no se espera su «Fin de turno». Ojo: el bot gasta los puntos de habilidad y equipa mejor equipo según su criterio.
-
-**Entrar con la partida empezada.** Con el código, cualquiera puede **ocupar el lugar de un bot** (conserva su ejército, ciudades y progreso). La app muestra la lista de bots disponibles con sus unidades, ciudades y puntos. Si un amigo desapareció del todo, el anfitrión puede pulsar **Liberar plaza** en la lista de jugadores: queda como bot y otra persona puede ocuparla.
-
-**Avisos al celular (notificaciones).** Al empezar a jugar aparece «¿Quieres que te avise…?». Con avisos activados recibes:
-- ⏰ cuando empieza tu turno (con resumen de lo que pasó: unidades perdidas, ataques, puntos por gastar),
-- ⚔️ cuando otro jugador te ataca (máximo uno cada 5 minutos),
-- ⏳ cuando se acaba el tiempo del turno y aún no pulsaste «Fin de turno» (turnos de 2 h o más),
-- 📨 cuando te proponen un pacto (y 🤝 cuando se firma o se rompe), 🐺 cuando una horda se dirige a tu ciudad,
-- 🤖 cuando un bot toma tu ejército, y 🏁 al terminar la partida.
-
-Requisitos: HTTPS (Render ya lo da). **Android/Chrome**: funciona directo. **iPhone/iPad** (iOS 16.4 o más): hay que **instalar el juego**: Compartir → *Añadir a pantalla de inicio*, y abrirlo desde ese icono; Safari normal no permite avisos. Se pueden desactivar en *Jugadores → Desactivar avisos*.
-
-## Probarlo en tu computador
+## Probarla en tu computadora
 
 ```bash
-npm start
-# abre http://localhost:3000 en el navegador (o en el celular, con la IP de tu PC)
+cd pozo
+python -m venv .venv
+source .venv/bin/activate        # en Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+ADMIN_CODE=un-codigo-largo-123 python app.py
 ```
 
-Pruebas: `npm test` (flujo de un jugador, cifrado de avisos contra el vector oficial, guardado en la nube simulado, ausencias, relevos y avisos, y las reglas nuevas: bots, estaciones, élites, hordas, tesoros, equipo raro, diplomacia, clases, edificios, órdenes, resumen y partidas antiguas) y `npm run sim` (10 bots jugando 150 turnos). Además `node test/e2e.js`, `node test/cdp.js` y `node test/cdp2.js` y `node test/cdp3.js` (interfaz en Chrome).
+En Windows (PowerShell): `$env:ADMIN_CODE="un-codigo-largo-123"; python app.py`
 
-## Desplegar en Render (gratis)
+Abre http://127.0.0.1:5000 y entra con ese código. Para correr las pruebas: `python -m unittest -v test_app`.
 
-1. Sube **todo el contenido** de esta carpeta a un repositorio de GitHub (`shared.js`, `engine.js`, `server.js`, `store.js`, `push.js`, `ws-lite.js`, `package.json` y la carpeta `public`).
-2. En Render: **New → Web Service**, elige el repositorio.
-   - Runtime: **Node** · Build command: *(vacío)* · Start command: `npm start` · Plan: Free
-3. Abre la URL que te da Render en el celular de cada amigo. Uno crea la partida y comparte el **código de 5 letras**.
+## Subirla a Render, paso a paso
 
-> Variables de entorno (en Render → *Environment*): `ADMIN_KEY` (una clave tuya, para descargar/restaurar copias), `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN` (guardado permanente, ver abajo). Opcional: `VAPID_SUBJECT` (tu correo como `mailto:tu@correo.com`, o la URL de tu app; por defecto se usa la URL de Render).
+1. **GitHub:** crea un repositorio **privado** y sube esta carpeta.
+   ```bash
+   git init
+   git add .
+   git commit -m "Pozo de amigos"
+   git branch -M main
+   git remote add origin https://github.com/TU-USUARIO/pozo.git
+   git push -u origin main
+   ```
+   El `.gitignore` ya evita subir la base de datos.
+2. **Render:** *New → Blueprint*, conecta el repositorio y Render leerá `render.yaml`. Te pedirá `ADMIN_CODE`: escribe un código largo (16 caracteres o más) que no uses en ningún otro sitio. El plan ya viene en gratis, así que no tiene costo.
+   - Si prefieres hacerlo a mano (*New → Web Service*): runtime Python, build `pip install -r requirements.txt`, start `gunicorn app:app --workers 1 --threads 4 --bind 0.0.0.0:$PORT`, plan Free y las variables de la tabla de abajo.
+3. Cuando diga **Live**, abre la URL `.onrender.com` y entra con tu `ADMIN_CODE`.
+4. **Apaga la web vieja:** en Render, abre el servicio anterior → *Settings* → *Suspend* (o *Delete*). Era pública y no debe seguir vendiendo números.
 
-## Guardado en la nube (para que la partida no se pierda)
+## Pasar al plan de pago (cuando entren los 8)
 
-El plan gratis de Render **duerme el servicio sin visitas y borra los archivos al reiniciar o desplegar**. Para que las partidas de días sobrevivan, el juego puede guardarse en **Upstash Redis** (gratis, sin tarjeta):
+1. Descarga el respaldo desde el panel de admin y guárdalo. No hay función de restaurar: los miembros y el saldo se vuelven a cargar a mano.
+2. En el servicio de Render cambia el tipo de instancia a uno de pago (revisa el costo que te muestre), agrega un disco (*Disks → Add Disk*) montado en `/var/data` de 1 GB y define la variable `DB_PATH` con el valor `/var/data/pozo.db`. En `render.yaml` hay un bloque comentado con esos mismos datos.
+3. Cuando termine el redeploy, crea de nuevo a los miembros (códigos nuevos) y registra el saldo actual del banco con un movimiento de tipo "Ajuste". Desde ese momento los datos ya no se borran.
 
-1. Crea una cuenta en [upstash.com](https://upstash.com) → **Create Database** (Redis), plan **Free**, región cercana a la de Render.
-2. En la base de datos, pestaña **REST API**: copia `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN`.
-3. En Render → tu servicio → **Environment**: agrega esas dos variables y guarda (Render redespliega).
-4. Abre `https://TU-APP.onrender.com/vigia`: debe decir **«☁️ Guardado en la nube: correcto»**.
+## Mantenerla despierta con un vigía (solución temporal)
 
-Cómo funciona: cada partida se guarda comprimida (unos pocos KB) como máximo cada 30 s **y solo si cambió**, y al instante cuando cambia el turno y al cerrar el servidor. Al arrancar, el servidor la recupera y todos entran con su sesión anterior. Si Upstash no responde, el juego sigue funcionando y reintenta. También se guardan ahí las claves de los avisos (si se perdieran, los avisos dejarían de llegar hasta que cada persona vuelva a abrir el juego). Revisa en tu panel de Upstash el límite mensual de comandos: con una partida activa las 24 h y cambios constantes serían unos 86.000 comandos al mes.
+El plan gratis duerme el servicio tras 15 minutos sin visitas (y tarda cerca de un minuto en despertar). Un vigía externo gratuito puede visitar la web cada 5 minutos para que no se duerma. La web ya tiene una dirección ligera para eso: `https://TU-SERVICIO.onrender.com/salud` (responde "ok", no pide login y no toca la base de datos).
 
-Sin Upstash todo sigue funcionando como antes, pero el guardado vive en disco y **se pierde al reiniciar**. Copias manuales (opcional, con `ADMIN_KEY`): descargar `https://TU-APP.onrender.com/api/backup?key=TU_ADMIN_KEY`; restaurar con `curl -X POST --data-binary @aventura-de-almas-backup.json "https://TU-APP.onrender.com/api/restore?key=TU_ADMIN_KEY"`.
+1. Crea una cuenta gratuita en UptimeRobot o en cron-job.org (revisa sus condiciones actuales).
+2. Crea un monitor de tipo HTTP(s) con esa dirección y un intervalo de 5 minutos.
+3. Listo. El vigía no puede vivir en Render (se dormiría igual y gastaría horas): tiene que ser un servicio externo.
 
-Durante un redespliegue pueden perderse los últimos segundos de acciones. Tras un reinicio, el turno en curso recibe unos minutos extra en lugar de avanzar de golpe.
+Límites que debes conocer:
 
-## Mantener el servidor despierto (el celular vigía)
+- **No evita que se borren los datos.** Render puede reiniciar un servicio gratuito en cualquier momento, y cada reinicio y cada redeploy borran la base de datos. El vigía solo evita los borrados por inactividad. Descarga el respaldo desde Admin después de cada sorteo.
+- **Gasta las horas gratis.** Render da 750 horas gratis al mes por espacio de trabajo, compartidas entre todos tus servicios gratuitos. Un servicio encendido todo el mes consume casi todas (un mes de 31 días tiene 744). Si dejas otro servicio gratuito encendido, se acaban las horas y Render suspende todos hasta el mes siguiente. Suspende o borra la web vieja.
+- Render no menciona estos vigías en su documentación, así que no hay garantía de que funcione siempre.
 
-1. En un celular que quede enchufado abre `https://TU-APP.onrender.com/vigia` y pulsa *Mantener pantalla encendida*. Esa página avisa al servidor cada minuto y muestra si el guardado en la nube y los avisos están bien. (El servidor también se auto-avisa cada 9 minutos usando `RENDER_EXTERNAL_URL`.)
-2. Alternativa sin celular: un monitor gratuito (p. ej. UptimeRobot) que visite `/health` cada 5 minutos.
+## Ajedrez (para pasar el rato)
 
-## Estructura
+En el menú, **Ajedrez**: juegas contra la computadora (fácil, medio o difícil) o dos personas en el mismo dispositivo. Tiene todas las reglas (enroque, al paso, coronación, jaque mate, tablas), deshacer, girar el tablero y la lista de jugadas en español. Esa parte funciona en tu navegador y no guarda nada en el servidor.
 
-```
-server.js          HTTP + WebSocket, salas, reloj de turnos, relevos, avisos
-engine.js          reglas del juego, mapa, combate, criaturas, bots, ausencias
-store.js           guardado (disco y Upstash)
-push.js            avisos push (VAPID + cifrado), sin dependencias
-ws-lite.js         WebSocket mínimo (sin dependencias)
-shared.js          datos compartidos (armas, recetas, criaturas, pathfinding)
-public/            index.html (juego), vigia.html, sw.js, manifest, iconos
-test/              pruebas
-```
+**En línea (otro dispositivo):** en Ajedrez → *Jugar en línea*, un miembro crea una partida (blancas, negras o al azar) y otro se une desde su cuenta. Cada navegador consulta la partida cada 2,5 segundos. Hasta 5 partidas activas por persona; las partidas de más de 14 días se borran. El servidor controla de quién es el turno, pero las reglas de ajedrez las verifica cada navegador. Sirve entre amigos; alguien que manipule su navegador podría forzar una jugada ilegal. Con el plan gratis, las partidas se pierden si Render reinicia el servicio. Nada de esto toca el dinero. Para verificar el motor: `node tools/test_chess.js`. Las piezas las dibuja `tools/chess_sprites.py` (requiere Pillow, solo en tu PC).
 
-## Controles en el celular
+## Dominó (para pasar el rato)
 
-- **Tocar una unidad**: la selecciona (casillas azules = a dónde puede moverse, borde rojo = enemigos que puede atacar).
-- **Tocar una casilla azul**: mover. **Tocar un enemigo marcado**: atacar (si está lejos, la unidad se acerca sola).
-- **Tocar una de tus ciudades**: almacén, forja y reclutamiento.
-- Arrastrar para desplazar el mapa; pellizcar para acercar/alejar.
-- Barra inferior: unidades (el número rojo = unidades con puntos por gastar), ciudades, registro, jugadores y **Fin de turno**.
+En el menú, **Dominó**: doble seis, 4 jugadores en parejas (tú y tu compañero contra dos rivales), 7 fichas para cada uno, sin pozo, a 100 puntos. Tu compañero y los rivales los juega la computadora. Abre quien tiene el doble seis y después quien ganó la mano; si no tienes ficha, pasas solo. Quien se queda sin fichas se lleva los puntos de todas las que quedan; si se tranca, gana la pareja con la mano más baja (si empatan parejas, nadie suma). Funciona en el navegador, no guarda nada y no toca el dinero. Pruebas del motor: `node tools/test_domino.js`.
 
-## Ajustar el equilibrio
+**Dominó en línea:** en Dominó → *Jugar en línea con otros miembros*, alguien crea una mesa y los demás se sientan (compañero o rival). Cuando el anfitrión toca *Empezar*, la computadora ocupa los lugares vacíos, así que se puede jugar con 2 o 3 personas. El servidor reparte y valida cada jugada, y cada persona solo recibe sus propias fichas. Si alguien sale de la mesa, la computadora juega por él. El tablero se actualiza cada 1,5 segundos; las jugadas de la computadora avanzan mientras alguien tenga la mesa abierta. Máximo 3 mesas activas por persona; las mesas de más de 14 días se borran. Con el plan gratis, las mesas se pierden si Render reinicia el servicio.
 
-Casi todo está en `shared.js` (armas, criaturas, recetas) y al inicio de `engine.js` (límites, pesos de habilidades de los bots, fórmulas de daño en `calcDamage`).
+## Primer uso
 
-## 9 personalidades de bots (v1.14)
-Ahora hay 9 personalidades, una por cada bot posible de la sala (anfitrión + 9 bots). Cada una cambia cómo construye, a quién ataca, cómo acepta pactos y qué dice en el chat:
-- 🌾 Granjero · ⚔️ Conquistador · ⚖️ Equilibrado (las originales)
-- 🏹 Cazador: vive de cazar criaturas, rara vez ataca a jugadores.
-- 🕊️ Diplomático: acepta casi siempre paz y alianzas.
-- 🛡️ Defensor: murallas primero, mucho ejército en casa.
-- 🗡️ Saqueador: oportunista, desde el turno 15 ataca a los débiles y a unidades sueltas.
-- 🔨 Forjador: herrería primero; ataca cuando ya está bien armado (turno 60).
-- 🐉 Cazajefes: va por el Rey Lobo, el Liche y el Dragón.
-Al elegir «Personalidad al azar» se reparten sin repetir mientras queden libres (9 bots = 9 personalidades distintas). Los parámetros están en `shared.js` (`PERS[...].b`) y las frases en `botchat.js`.
+1. En **Admin → Miembros** crea a cada persona. La web muestra su código **una sola vez**: pásalo por privado.
+2. Abre `rules.txt`, completa la sección "Decisiones del grupo" (quién guarda el dinero, quién decide inversiones, cómo se reparten ganancias, qué pasa si alguien se sale) y súbelo de nuevo (`git push`). Cada miembro debe aceptar las reglas en su primer ingreso.
+3. Ajusta el precio por número en el panel de admin.
 
-## Jefes que se recuperan menos (v1.14.1)
-Los jefes (Rey Lobo, Liche, Dragón) ahora recuperan solo un 3% de su salud por turno cuando no los golpean (antes 10%, igual que cualquier criatura). Así, un aventurero solo que se retira a curarse ya no ve al jefe volver casi a tope, como pasaba en el reto de una unidad. Las criaturas normales no cambian.
+## Sorteo automático a las 19:00
 
-## Jefes ajustables (v1.15)
-- Nuevo ajuste del mundo «Recuperación de los jefes»: Lenta (3% por turno, por defecto), Normal (10%) o Ninguna.
-- En el reto de una unidad los jefes (Rey Lobo, Liche, Dragón) tienen 60% de vida y 80% de daño.
+Todos los días a las 19:00 (hora de Ecuador) la web cierra las ventas y sortea sola la ronda de hoy, con la misma fórmula verificable. Cambias la hora o lo apagas en **Admin → Sorteo automático**; el valor inicial sale de `AUTO_DRAW_TIME` y `AUTO_DRAW_ENABLED`. Lo que tienes que saber:
 
-## Más armas y armaduras (v1.16)
-- **Calidad Dracónica** (5.ª): daño ×4,1 y defensa ×5,3 (el Alma era ×3,0 y ×3,8). Se forja o se mejora con 🐉 **escamas de dragón** (las suelta el Dragón de Ceniza; los demás jefes a veces sueltan 1) + almas. El Dragón también puede soltar objetos dracónicos.
-- **8 efectos nuevos** (ahora hay 16): armas → 🔥 Fuego (quema 2 turnos), ❄️ Hielo (ralentiza −2 de movimiento un turno), 💥 Crítico (×1,8), 💀 Ejecutor (+daño a enemigos bajo la mitad de vida), 🐺 Cazabestias (+daño a criaturas); armaduras → 💪 Vigor (+% salud), 📚 Erudito (+% experiencia), 🛡️ Bloqueo (probabilidad de reducir a la mitad un golpe).
-- **Rareza Legendaria** 🟠: tres efectos, con la potencia más alta. El tercer efecto se añade en la forja (calidad Alma o superior) por 6 almas + 2 escamas. Los jefes, y con poca probabilidad las ruinas y élites, pueden soltar equipo legendario ya hecho.
-- **Reforjar** 🔄: cambia un efecto del objeto por otro al azar (2 almas).
-- **Sets de armadura** 🧩: 3 piezas de la misma calidad (de las 7 ranuras de defensa, calidad hierro o mejor) dan +salud; 6 piezas dan además defensa, regeneración y (dracónico) espinas. Se ve en la hoja de la unidad.
-- Lo que sigue pendiente: engarces/gemas.
+- **Solo entran los números pagados antes de la hora.** Marca los pagos a tiempo en Admin. Las reservas sin pagar se anulan, igual que en el sorteo manual.
+- **Si a la hora no hay ningún número pagado, ese día no se sortea solo.** Queda abierto para el sorteo manual (así no se sortea con un solo número en cuanto alguien paga a las 19:05).
+- **Una ronda de un día anterior que quedó abierta con números pagados se sortea sola** apenas la web vuelva a estar despierta.
+- **En el plan gratis hace falta el vigía.** Si Render duerme el servicio a las 19:00, el sorteo ocurre cuando alguien lo despierte. Con el vigía de `/salud` cada 5 minutos, ocurre como mucho 5 minutos tarde. El sorteo manual sigue funcionando.
+- Después del sorteo ya no se puede reservar hasta mañana, como siempre.
 
-## Nueva escala de rareza (v1.17)
-La rareza ahora es el número de efectos del objeto (reemplaza la de la v1.16):
-| Rareza | Color | Efectos | Para añadir el efecto |
-|---|---|---|---|
-| Común | ⚪ gris | 0 | — |
-| Poco común | 🟢 verde | 1 | 3 almas |
-| Raro | 🔵 azul | 2 | 3 almas |
-| Épico | 🟣 morado | 3 | 4 almas · calidad Acero o superior |
-| Legendario | 🟡 amarillo | 4 | 6 almas + 2 escamas · calidad Alma o superior |
-| Mítico | 🔴 rojo | 5 | 9 almas + 4 escamas · calidad Dracónica |
-Cada efecto gana potencia con la rareza (sus 5 valores están en `shared.js`, `AFFIX[...].v`). El botín de cofres da sobre todo Poco común/Raro; ruinas y élites un poco más; los jefes dan Épico, Legendario y, con poca probabilidad, Mítico. Los objetos guardados de versiones anteriores conservan sus efectos (la rareza se calcula por el nº de efectos).
+## Día a día
 
-## Reto del Rey Demonio (v1.18)
-Nuevo modo de juego (se elige en «Ajustes del mundo → Modo de juego»):
-- Al empezar, **un jugador al azar** (humano o bot) es el 👑 Rey Demonio. Los demás jugadores quedan **aliados entre sí automáticamente** y en guerra con el Rey; las alianzas no se pueden cambiar ni negociar en este modo.
-- El Rey **solo recluta bestias** (Lobo, Oso, Goblin, Esqueleto, Orco, Troll; cada una con su coste en la ciudad) y empieza con 6 bestias de nivel 3. Las bestias no usan equipo ni clases ni protagonista, pero suben de nivel, gastan puntos de habilidad, cargan botín y se curan en ciudad como cualquier unidad.
-- **Victoria**: si el Rey cae (sin unidades ni forma de reclutar), gana la alianza (victoria compartida). Si el Rey elimina a todos los demás, gana el Rey.
-- Los bots lo entienden: el bot Rey recluta bestias y ataca a todos; los bots aliados siempre atacan al Rey.
-- Parámetros en `shared.js` (`KING`): bestias, costes, unidades y nivel iniciales.
+1. Cada miembro reserva sus números (hasta 10 por ronda).
+2. Pagan al administrador, que los marca como pagados en **Admin → Rondas abiertas**.
+3. **Cerrar ventas y sortear** (o dejar que lo haga solo a las 19:00). Las reservas sin pagar se anulan. Todos ven el resultado con la animación y pueden verificarlo con un botón.
+4. Entrega el premio y márcalo como entregado.
+5. Cuando el grupo invierta, cobre un retorno o reparta ganancias, regístralo en **Admin → Registrar movimiento del banco**. Nada se edita ni se borra: los errores se corrigen con un ajuste.
+6. Cada semana, descarga el respaldo (`Admin → Descargar respaldo`) y guárdalo fuera de la web.
 
-### Protagonista del Rey Demonio (v1.18.1)
-El Rey Demonio también tiene protagonista (si «Protagonista» está en Sí): al empezar le toca **al azar uno de los tres jefes** (🐺 Rey Lobo, 🧙 Liche o 🐉 Dragón de Ceniza) como su unidad inicial. Tiene la mitad de la vida y el 60% del daño de un jefe salvaje (`KING.boss` en `shared.js`), da +10% de daño y defensa a las bestias cercanas, gana +50% de experiencia y, si cae, vuelve a su ciudad en 3 turnos con 2 niveles menos. No se puede cambiar de protagonista. Sustituye a una de las 6 bestias iniciales.
+## Variables de entorno
 
-## Modo «Por equipos» (v1.19)
-En «Ajustes del mundo → Modo de juego» elige **Por equipos** y, en el ajuste **Equipos**, si serán **2 equipos** o **5 equipos**.
-- Al empezar, los jugadores (humanos y bots) se reparten **al azar y de forma equilibrada** (10 jugadores: 2 equipos de 5, o 5 equipos de 2; con menos jugadores los equipos quedan lo más parejos posible y nunca hay más equipos que jugadores).
-- Los compañeros quedan **aliados automáticamente** y los otros equipos son enemigos; las alianzas y pactos no se pueden cambiar en este modo. En «Jugadores» cada uno muestra su equipo (🔶 🔷 🟩 🟪 🟫).
-- **Gana el último equipo con jugadores vivos** (victoria compartida para todo el equipo). Los bots atacan siempre a los otros equipos, sea cual sea su personalidad.
+| Variable | Para qué | Valor por defecto |
+|---|---|---|
+| `ADMIN_CODE` | Código del administrador (obligatorio, mínimo 10 caracteres) | — |
+| `SECRET_KEY` | Firma de las sesiones (Render la genera sola) | aleatoria en cada arranque |
+| `DB_PATH` | Ruta del archivo de base de datos | `pozo.db` junto a `app.py` |
+| `AUTO_DRAW_TIME` | Hora inicial del sorteo automático (se cambia en Admin) | `19:00` |
+| `AUTO_DRAW_ENABLED` | `0` para empezar con el sorteo automático apagado | `1` |
+| `PRICE_CENTS` | Precio inicial por número, en centavos | `100` |
+| `NUMBER_RANGE` | Los números van de 1 a este valor | `100` |
+| `MAX_TICKETS_PER_MEMBER` | Máximo de números por persona y ronda | `10` |
 
-## Modo Historia (v1.20)
-Nuevo modo cooperativo: «Ajustes del mundo → Modo de juego → Historia». Es una campaña de **8 capítulos (6 hasta v1.37)) dentro de una sola partida**, «La Ceniza del Dragón». Todos los jugadores (humanos y bots) están **aliados contra el mundo** (sin PvP ni diplomacia) y los jefes aleatorios no aparecen: solo los que manda la historia.
+## Cómo se decide el ganador
 
-| Capítulo | Objetivo (entre todos) |
-|---|---|
-| 1. El eco de la ceniza | Derrotar 12 criaturas |
-| 2. Tierras propias | Que el grupo tenga (jugadores + 3) ciudades |
-| 3. Acero y leyenda | Una unidad de nivel 8 y equipar algo de calidad Acero o mejor |
-| 4. El rey de los lobos | Derrotar al Rey Lobo (aparece al empezar el capítulo) |
-| 5. La noche del Liche | Derrotar al Liche |
-| 6. El Dragón de Ceniza | Derrotar al Dragón → **victoria compartida** |
+- Al abrir la ronda, el servidor crea un secreto y publica su huella SHA-256 (antes de que exista cualquier reserva).
+- Al sortear, se ordenan los números **pagados** y se calcula `SHA-256("secreto|día|n1,n2,...")`. Ese resultado, como número entero, módulo la cantidad de números pagados, da la posición del ganador.
+- Se revela el secreto. En la página de la ronda, el botón "Verificar en mi navegador" recalcula todo sin pedirle nada al servidor.
 
-- Al completar un capítulo, **cada capital recibe materiales y un objeto de botín** (mejor cuanto más avanzado), y se cuenta el siguiente capítulo.
-- Los jefes salen con un nivel parecido al de tu mejor unidad (con mínimos y máximos por capítulo); si el jefe de un capítulo desaparece, vuelve a aparecer.
-- Si cae todo el grupo, la historia termina en derrota.
-- Botón 📖 en el mapa: capítulo actual, objetivos con progreso, capítulos anteriores y prólogo. Se abre solo al empezar y al cambiar de capítulo.
-- Todos los textos y objetivos están en `shared.js` (`STORY`): se pueden editar o añadir capítulos sin tocar el motor.
+## Límites conocidos
 
-## Mundo abierto (v1.21) — fase 1
-Modo para un mundo **siempre abierto entre amigos**: «Ajustes del mundo → Modo de juego → Mundo abierto». El anfitrión crea la partida, la inicia (aunque esté solo) y los demás **entran cuando quieran** con el código, incluso días después; cada uno nace en un sitio libre y lejos de los demás (con una zona sin monstruos alrededor).
-- **Tamaño:** Grande 120×120, Enorme 160×160 (por defecto) o Gigante 220×220, con más de 100 ciudades neutrales y mucha fauna. Hasta **24 jugadores**, sin bots, sin fin de partida y sin eliminar a nadie.
-- **Tiempo:** el mundo avanza solo con el reloj (no hay «Fin de turno»). Al elegir este modo el turno pasa a 1 hora (se puede cambiar). Los jugadores actúan cuando entran; sus unidades se recuperan en cada turno.
-- **Sin reclutar:** solo hay **crías** (dos unidades juntas junto a una ciudad tuya; viene activado). Si te quedas sin unidades, unos refugiados te acompañan; si pierdes también tus ciudades, vuelves a nacer en otro lugar.
-- **Ciudades:** se pueden conquistar, pero **si pasan N turnos sin unidades tuyas cerca (≤ 2 casillas) vuelven a ser neutrales** (12, 24, 48 o 96 turnos; avisa 3 turnos antes). Una capital abandonada queda como «Ruinas de …».
-- **Monstruos:** salen de **cualquier nivel al azar** (más bajos que altos) y **ya no suben con el tiempo**; los jefes salen con nivel al azar entre 5 y 15.
-- La diplomacia (paz y alianzas) sigue disponible. El chat funciona para todo el mundo.
-- Recomendaciones: un celular o computador «vigía» conectado mantiene Render despierto, pero **si el servidor se reinicia o subes una versión nueva, el mundo se reinicia** (en Render gratis el disco es temporal). Con «Gigante» cada actualización de estado pesa ~100 KB: para muchos jugadores es mejor «Enorme».
-
-## Tutorial, modos rápidos y resumen final (v1.22)
-
-- **Tutorial**: la primera vez que entras a una partida aparece una guía de 7-8 pasos (mover, combatir, ciudades, crías, fin de turno, y un paso extra según el modo). Se puede saltar y se recuerda en el dispositivo. El botón ❓ la vuelve a abrir.
-- **Modos rápidos** (lobby, anfitrión): Clásica, Rápida, Épica, Reto, Equipos, Rey Demonio, Historia y Mundo abierto. Un toque aplica todos los ajustes del modo; los ajustes no nombrados vuelven a su valor por defecto y se pueden afinar después. Definidos en `PRESETS` (shared.js).
-- **Resumen final**: al terminar la partida aparece 📊 con clasificación (puntos, criaturas, jefes, jugadores derrotados, ciudades, mejor unidad) y premios. El servidor lo calcula en `summary(g)` (engine.js) y viaja en el estado como `sum`.
-
-## Engarces, gemas y tipos de final (v1.23)
-
-**Gemas y engarces**
-- 6 gemas (🔴 rubí, 🔵 zafiro, 🟢 esmeralda, 🟡 topacio, 🟣 amatista, ⚪ diamante) en 3 calidades (astillada, normal, perfecta). Se guardan como materiales (`rubi1`, `rubi2`, `rubi3`…), así que se llevan en la mochila, se depositan y se retiran como el resto.
-- Cada gema da un efecto distinto en armas y en armaduras (ej. rubí: +daño en arma, +salud en armadura).
-- Los objetos raros salen con 0-3 engarces según su rareza; los demás se perforan en la forja (pestaña Mejorar; cuesta acero/alma y exige calidad mínima). Máximo 3.
-- Se engasta una gema del almacén en un engarce libre; si no hay, se elige cuál sustituir (la vieja se pierde). 3 gemas iguales se funden en 1 de la calidad siguiente.
-- Botín: jefes (casi siempre, 2), élites y criaturas normales (a veces, más con el nivel), cofres y ruinas. Las gemas se guardan antes que los materiales para que no se pierdan con la mochila llena. Los bots también las engastan.
-
-**Tipos de final** (ajuste «Tipo de final», modos Normal y Reto de una unidad)
-- Último en pie (por defecto), Por tiempo (40 turnos si no hay otro límite), Dominación (la mitad de las ciudades 4 turnos seguidos), Cazajefes (2 jefes; aparecen más a menudo), Campeón (unidad a nivel 12) y Carrera de puntos (600).
-- El progreso se muestra en la hoja de Jugadores y se avisa en el registro.
-
-## v1.23.1
-- Nivel máximo de unidad: de 20 a **53**, justo lo necesario para llenar todas las habilidades (suma de topes = 53, 1 punto por nivel).
-
-## Crías con herencia (v1.24)
-- La cría hereda el mejor bonus de nacimiento de sus dos padres y le suma el bonus base (+10 salud, +2 daño): cada generación es más fuerte que la anterior (gen. 1: +10/+2, gen. 2: +20/+4, …). Se muestra la generación en la hoja de la unidad y en el aviso de nacimiento. El protagonista que reaparece conserva su generación.
-
-## Comercio entre jugadores (v1.25)
-- En la hoja de Jugadores, junto a quien tengas en paz o alianza, aparece 🛒 Comerciar: eliges tu ciudad de salida, lo que das (materiales, gemas y/o un objeto) y lo que pides (materiales y gemas).
-- Lo que ofreces queda en depósito (sale de tu ciudad). El otro jugador acepta (la mercancía llega a la ciudad suya que tenga lo que pides; lo que pides llega a tu ciudad de salida), rechaza, o la oferta caduca a los 5 turnos; en los dos últimos casos se devuelve todo. Máx. 3 ofertas pendientes por jugador. No hay comercio en el Reto de una unidad.
-- Los bots (y los jugadores ausentes) aceptan tratos que valgan al menos un 90% de lo que piden (valores: cuero/hueso 1, hierro 1,5, acero 3, alma 4, escama 8, gemas 5/14/40) y rechazan los abusivos. Los bots no proponen tratos.
-- Código: `doTrade`, `tradeAccept`, `tradeTick` (engine.js); estado `trades` en el snapshot.
-
-## Eventos del mundo: clima, torneos y mercaderes (v1.26)
-Ajuste «Eventos del mundo»: Clima + torneos + mercaderes (por defecto) / Solo clima / Nada.
-- **Clima** (☀️ despejado, 🌧️ lluvia, ⛈️ tormenta, 🌫️ niebla, 🌨️ ventisca): cambia cada 2-4 turnos según la estación y se ve junto al turno. Lluvia: armas a distancia −25% y el fuego no quema. Tormenta: −1 de movimiento, distancia −35%, magia (bastón/varita) +25%. Niebla: sin críticos y la distancia alcanza 1 casilla menos. Ventisca (solo invierno): −1 de movimiento y el hielo ralentiza siempre. Las armas cuerpo a cuerpo no se ven afectadas por la lluvia.
-- **Torneos** 🏟️: desde el turno 10 y cada 18 turnos aparece una arena en el mapa (visible para todos) durante 4 turnos. Al terminar gana la mejor unidad (nivel, daño, defensa, salud) que esté en la arena o pegada a ella: 2 gemas, un objeto raro y experiencia (lo que no cabe en la mochila va a la capital). Los bots no acuden (todavía). Sin torneos en Historia.
-- **Mercaderes ambulantes** 🛒: cada 8 turnos aparece uno (hasta 3; más en Mundo abierto), se queda 7 turnos y deambula. Con una unidad pegada a él, toca el mercader para ver sus ofertas: gemas, lotes de materiales, un objeto raro y un mapa del tesoro (crea un cofre cercano). Se paga con lo que lleva la unidad en la mochila; cada oferta se vende una sola vez. Los bots no compran.
-
-## Ciudades de 3×3 con edificios visibles (v1.27)
-- Cada ciudad ocupa un **solar de 3×3** (el centro sigue siendo la casilla de la ciudad; el solar nunca es agua ni montaña). En el mapa se dibuja el suelo, la torre del homenaje (crece con las mejoras) y los edificios: 🔨 herrería (oeste), 🏕️ cuartel (este), 🐴 establo (norte, cuando la ciudad tiene su carreta), 🧱 murallas de piedra alrededor con puerta al sur y 🔭 atalayas en las esquinas. Cada edificio cambia de aspecto en el nivel 2 (herrería con chimenea, cuartel con tienda de guerra, muralla más gruesa con torreones, atalaya más alta con tejado dorado y bandera).
-- Las **mejoras no se pierden al conquistar** una ciudad ni cuando vuelve a quedar neutral: las conserva quien la tome.
-- **Bonos al estar en la ciudad** (`CITY_GUARD` en shared.js): contra jugadores +8 de defensa en el centro y +4 en el anillo de 3×3. Contra hordas que asaltan la ciudad: +10/+6 de defensa y +30%/+20% de ataque para quien la defiende.
-
-## Más clases y armas (v1.28)
-**6 armas nuevas** (se forjan, salen de botín y las usan los bots): 🤺 Estoque (dos ataques por turno; el segundo hace 60%), 🔨 Maza (35% de aturdir: −2 de movimiento un turno), 🪃 Bumerán (alcance 3, una mano), 🪢 Látigo (alcance 2 sin penalización a quemarropa, +1 movimiento, una mano), 🌾 Guadaña (+30% de daño a enemigos por debajo de la mitad de salud, dos manos) y 🔮 Orbe (mágica: alcance 3, ignora 20% de defensa, una mano). Las armas mágicas (báculo, varita, orbe) usan ahora la marca `magic` en `KINDS`.
-
-**6 clases nuevas** (nivel 6, 2 especializaciones cada una a nivel 12): 😡 Berserker (Frenesí, Titán), ⚜️ Paladín (Cruzado, Inquebrantable), 🥋 Monje (Puño de hierro, Maestro zen), 🎵 Bardo (Trovador, Juglar), ⚗️ Alquimista (Toxicólogo, Boticario) y 🌋 Elementalista (Piromante, Criomante; sus golpes queman o ralentizan: nuevos efectos de clase `fuego` y `hielo`). En total hay 15 clases.
-
-## Más criaturas y jefes (v1.29)
-- **Pacíficas** (no atacan; se defienden si las atacas): 🐇 conejo, 🐐 cabra montés, 🐂 toro (golpea fuerte), 🐢 tortuga gigante (mucha defensa).
-- **Agresivas**: 🦇 murciélago, 🐍 serpiente, 🕷️ araña gigante, 🦂 escorpión, 🥷 bandido, 🧟 zombi, 👻 fantasma (ataca a distancia 2, deja almas) y 🗿 gólem de piedra (lento y muy duro). Salen en las zonas de las tablas de fauna (normal, pacífica y agresiva); las zonas lejanas traen las más peligrosas.
-- **Jefes nuevos** (4, ahora hay 7): 🐃 Minotauro del Laberinto, 🐲 Hidra de las Ciénagas (a distancia 2), ⛰️ Coloso de Piedra (lentísimo y blindado) y 🧛 Conde Vampiro. Aparecen al azar junto a los anteriores; en el modo Historia siguen los tres de siempre.
-- Reto del Rey Demonio: su protagonista puede ser cualquiera de los 7 jefes y ahora también puede reclutar 🕷️ arañas, 🧟 zombis y 🗿 gólems.
-
-## Mazmorras (v1.30)
-
-- Entradas 🕳️ repartidas por el mapa, de 5 niveles (Cueva → … → el más profundo). Cuanto mayor el nivel, más duras las criaturas, más trampas y más botín.
-- Al entrar, la unidad pasa a otra "instancia" (una franja subterránea bajo el mapa, aislada por muros). La puerta 🚪 te devuelve al sitio por el que entraste.
-- Cada mazmorra tiene 6 salas: criaturas, tesoros 💎 y trampas ⚠️ ocultas (se descubren al pisarlas).
-- Al fondo hay un jefe con recompensa extra. Despejada, se reabastece a los 20 turnos.
-- Las unidades dentro solo las ve su dueño. (Desde v1.33 los bots sí entran, ver abajo.)
-
-### Fortaleza del Rey Demonio (v1.30.1)
-En el modo «Reto del Rey Demonio», la ciudad del rey se dibuja como fortaleza oscura: suelo carmesí, torres de pinchos, antorchas 🔥, volcán y 😈 sobre el torreón. Los edificios (muralla, herrería, cuartel, atalayas) se siguen viendo.
-
-## Ciudades rediseñadas (v1.31)
-- Las unidades dentro de una ciudad son fichas pequeñas en la esquina de su casilla; un solo contador ⚔ n por dueño aparece en el borde del solar.
-- Edificios con más detalle: herrería con chimenea humeando, cuartel con almenas y bandera, establo con valla y heno, casas con tejado.
-- La ciudad crece con las mejoras: aldea (1 casa) → pueblo → ciudad (4 casas, más casitas, calles y plaza).
-- Muralla con almenas, puerta con portón y torreones en el nivel 2.
-
-## Mazmorras con otra cara (v1.32)
-- Muros de ladrillo con grosor, suelo de losas con grietas, sombra bajo los muros y vacío negro fuera de las salas.
-- Antorchas en las paredes con brillo cálido, y un halo de luz alrededor de tus unidades dentro de la mazmorra.
-- Cinco temas por nivel: cueva, catacumba, cripta, fuego y abismo. La sala del jefe se tiñe de rojo.
-- Tesoros 💎 con brillo dorado y trampas ⚠️ con aro rojo; lo no explorado queda mucho más oscuro.
-
-## Bots con más vida (v1.33)
-- **Mazmorras:** los bots que las prefieren (Cazador y Cazajefes sobre todo; Equilibrado, Saqueador y Forjador a ratos) forman un grupo de hasta 5, eligen la mazmorra más difícil que les convenga, entran, matan solo lo que pueden vencer, recogen tesoros y salen si se debilitan.
-- **Torneos:** según su personalidad mandan a sus 2 mejores unidades a la arena.
-- **Mercaderes:** los que comercian (Granjero, Diplomático, Forjador) van a comprar, pagando con el excedente de sus almacenes.
-- **Ánimo:** el bot que va muy por detrás se vuelve *cauto* (más paz, menos ataques); el que domina se vuelve *ambicioso* (ataca antes, valora más las ciudades). Lo comenta en el chat.
-- **Memoria:** cada bot recuerda quién lo atacó (rencor) y quién le hizo tratos o pactos (gratitud). Con rencor ataca aunque sea pacífico y rechaza la paz; con gratitud acepta pactos más fácil y no ataca. Ambos se desvanecen con el tiempo.
-- **Frases:** unas 14 situaciones nuevas por personalidad (mazmorras, torneos, mercaderes, ánimo, rencor, lealtad, jefes abatidos) y variantes para partidas largas.
-
-## Versión visible, efectos y sonido (v1.34)
-- La versión aparece en la pantalla de inicio y en la sala de espera (se lee de `/api/version`), para saber qué hay desplegado en Render.
-- Efectos en el mapa: números flotantes de daño (rojo) y curación (verde), «⬆ Nv.N» dorado al subir de nivel y ✖ cuando algo cae a la vista.
-- Sonido sintetizado (sin archivos): golpe, herida, muerte, subida de nivel, nuevo turno y entrada a mazmorra. Botón 🔊/🔇 para silenciarlo (se recuerda).
-- Equilibrio: los jefes de las mazmorras de nivel 1 y 2 bajan un nivel (troll 6→5 y 9→8) porque quedaban muy por encima del nivel recomendado.
-
-## Combate y progresión (v1.35)
-
-- **Balance de clases y armas** ajustado con simulaciones de duelos (`node tools/balance.js agg|cagg`): Mago +18 % (antes +30 %), Orbe base 8, y recortes a las clases que dominaban 1c1. Los duelos no miden veneno/quemadura/invocaciones/auras, así que apoyos e invocadores se ven peor en la tabla de lo que son en partida.
-- **Jefes con fases**: al bajar de vida cambian de fase (+25 % de daño por fase, `c.ph`) y los jefes de mazmorra (`bd`) escalan con el nivel del grupo.
-- **Tumbas y resurrección**: al caer ante una criatura, la unidad deja una 🪦 tumba (30 turnos) con su equipo y mochila; cualquiera puede recogerla (o saquearla). Queda una lápida en «🪦 Caídos» de la ciudad: se resucita pagando almas + huesos (`reviveCost`), vuelve tras 2 turnos. Los bots también resucitan.
-
-## Iglesia y ángel guardián (v1.36)
-
-- Nuevo edificio **⛪ Iglesia**, de nivel 1 a 5 (los demás siguen en 2). Por nivel: **+2 de defensa** a quien esté en la ciudad o pegado a ella (+1 por nivel a 2 casillas; se combina con la muralla tomando el mejor de los dos) y **−8 % de coste en huesos y almas** al reclutar, resucitar caídos, invocar y reclutar bestias del Rey Demonio (−40 % al nivel 5).
-- **Nivel 5: 👼 Ángel guardián.** Vive en la ciudad (no es una unidad: no cuenta para el límite, no se controla y nadie puede atacarlo ni herirlo). Cada turno, antes de que actúen las criaturas, vuela hasta la criatura más cercana en 7 casillas (prefiere las que asaltan la ciudad y los jefes) y la golpea 2 veces (38 de daño, 30 % perforación). **Solo daña criaturas**, nunca a jugadores. El botín que consigue va al almacén de la ciudad. Si la ciudad cambia de dueño, el ángel sirve al nuevo; si queda sin dueño, desaparece.
-- Ajustes en `S.CHURCH` y `S.ANGEL` (shared.js). Los bots también construyen iglesias.
-
-## Carreta-estación y invocaciones (v1.37)
-
-- **🛒 La carreta es ahora una estación de suministros andante** (mini ciudad): cualquier unidad tuya pegada a ella puede **dejar y tomar materiales y objetos** (hasta su capacidad de 150) y **cambiar de equipo** (equipar/quitar) igual que junto a una ciudad. Bono pequeño: **+2 de defensa** y **+12 % de salud por turno** para las unidades pegadas (no se acumula con el +25 % de curación de una ciudad; en una ciudad manda la ciudad). La propia carreta sigue cargándose en las ciudades.
-- **Invocaciones en mazmorras (v1.37.1):** se quitó la restricción: las invocaciones **sí entran en mazmorras**. Las que estén a 3 casillas o menos del invocador entran con él, y salen con él al salir (también pueden entrar/salir por su cuenta). La carreta sigue sin entrar.
-- **Ángel guardián con nombre:** al aparecer se llama **Elizabeth** o **Nathaly** (al azar) y conserva el nombre; se muestra bajo el ángel en el mapa y en los avisos.
-
-## Economía, modos y comodidad (v1.38)
-
-**Economía**
-- **Producción de las ciudades:** cada ciudad con dueño produce materiales por turno según el terreno a 3 casillas (bosque/pradera → cuero, colinas/montaña → hierro, desierto → hueso), la capital (+) y sus edificios (herrería → hierro, cuartel/iglesia → hueso, atalaya → cuero). Se acumula en fracciones y se entrega al llegar a 1; se ve en la hoja de la ciudad («🏭 Produce por turno»). Ajuste del mundo «Producción de las ciudades»: Normal / Baja (la mitad) / Apagada (solo botín). Un mundo ya guardado empieza a producir al actualizar.
-- **Referencia de precios en el comercio:** valor de cada material (`S.MAT_VAL`) y de los objetos (`S.itemVal`); la hoja de comercio muestra lo que das y lo que pides con un aviso. Los bots usan los mismos valores.
-- **Rey Demonio:** su producción de huesos se duplica.
-
-**Modos**
-- **Historia: 8 capítulos.** Nuevos «El refugio sagrado» (iglesia nivel 3) y «Bajo la tierra» (despejar una mazmorra), antes del Rey Lobo. Una campaña ya empezada se desplaza de capítulo al actualizar.
-
-**Comodidad**
-- **📚 Manual** dentro del juego (referencia por secciones plegables) y pestaña **🔔 Avisos**: elige qué notificaciones recibir (inicio de turno, ataques, chat, pactos/hordas, recordatorio). Se guardan en el servidor.
-- **Registro con filtros** (Combate, Ciudad, Pactos y comercio, Mundo), agrupado por turno y con 150 eventos.
-
-## Taller del constructor, carreteras y estaciones de suministros (v1.39)
-
-- Nuevo edificio **🏗️ Taller del constructor** (niveles 1–2). Con él puedes **contratar un 👷 constructor** (máximo uno por ciudad; no cuenta como unidad, no ataca ni sube de nivel; se va si pierde su ciudad). Los materiales de sus obras salen del almacén de su ciudad.
-- **Nivel 1 — carreteras:** el constructor traza una carretera en la casilla donde está (1 cuero + 1 hierro, una obra por turno; solo sobre pradera, bosque, colinas o desierto y fuera de las ciudades). Cruzar una casilla de carretera cuesta solo **0,5 de movimiento** (para todas las unidades, también en el alcance que se marca en pantalla).
-- **Nivel 2 — 📦 estaciones de suministros:** un tipo de carretera (8 hierro, 3 acero, 6 cuero) que se levanta sobre una carretera a 2 casillas o menos de una ciudad tuya. **Las ciudades de un mismo dueño que tengan una estación cerca comparten un único inventario** (al unirse se suman sus almacenes). Si una ciudad se pierde, se conquista o queda abandonada, deja de compartir y no se lleva nada; la otra conserva el inventario común. Al guardar y cargar se conserva.
-- Los bots construyen el taller (si tienen 2+ ciudades), contratan constructor y unen sus ciudades con carretera y estaciones.
-- Cliente: carreteras y estaciones dibujadas en el mapa, taller visible en la ciudad, hoja del constructor con botones «Trazar» y «Levantar», botón «Contratar» en la ciudad, sección nueva en el manual.
-
-## Pixel art — fase 1: unidades y criaturas (v1.40)
-
-- Las unidades dejan los emojis y se dibujan como **sprites de 16×16 píxeles**: soldado con su **arma en la mano** (17 armas distintas), **color del equipo** en la ropa y la base, y **casco y pechera que cambian de color según la calidad** (cuero, hierro, acero, alma, dracónico). También se ven así las unidades de otros jugadores.
-- Las **27 criaturas**, las invocaciones y bestias (reusan el sprite de su criatura), la **carreta**, el **👷 constructor** y el **ángel** tienen sprite propio.
-- Escalado en múltiplos enteros y sin suavizado, para que los píxeles queden nítidos en el móvil. Si falta un sprite, se usa el emoji de antes.
-- Pendiente: terreno (fase 2) y ciudades, edificios y efectos (fase 3). Las hojas y paneles siguen con emojis.
-
-## Pixel art — fase 2: terreno (v1.41)
-
-- Pradera, bosque, colinas, montaña, desierto y agua se dibujan como **losetas pixel art de 16×16**, con 3 variantes por tipo repartidas según la casilla para que el mapa no se vea repetido (flores en la pradera, pinos y árboles, montículos, picos nevados, cactus).
-- El **agua se anima** (las olas se mueven cada ~0,7 s).
-- Las mazmorras y el minimapa no cambian. Pendiente: ciudades, edificios y efectos (fase 3).
-
-## Pixel art — fase 3: ciudades, edificios, sitios y efectos (v1.42)
-
-- **Ciudades:** casas (4 colores de tejado y pared; grises si la ciudad está en ruinas), 🔨 herrería con chimenea y fuego, cuartel con bandera del color del jugador, establo, atalayas, iglesia (tejado dorado desde el nivel 4, vidrieras azules y aureola en el 5), taller del constructor (con grúa en el nivel 2) y torre del homenaje/castillo con la bandera de tu color. Las ciudades neutrales muestran un castillo en ruinas. La muralla se mantiene dibujada con almenas.
-- **Mapa:** cofres, ruinas, tumbas, tesoros de mazmorra, trampas, entradas y puertas de mazmorra, estaciones de suministros (caja), mercaderes (puesto) y arena del torneo tienen su sprite.
-- **Efectos:** el anillo de impacto ahora es una ráfaga de píxeles.
-- Se mantienen en estilo anterior: la fortaleza del Rey Demonio, las hojas y paneles (emojis) y el minimapa.
-
-## Asedios, botín de aldeas y crías (v1.43)
-
-- **Asedios** (ajuste del mundo «Asedios», activado por defecto en partidas nuevas; las partidas ya empezadas siguen sin asedios):
-  - Edificio nuevo **🛠️ Taller de asedio** (nv. 1: 🐏 arietes; nv. 2: ☄️ catapultas; máx. 2 máquinas por ciudad; no cuentan como unidad). El ariete rompe la muralla pegado a ella; la catapulta, desde 3–4 casillas del centro.
-  - La **muralla tiene vida** (300 en nivel 1, 800 en nivel 2). Con la muralla en pie **no se puede entrar** a la ciudad; al llegar a 0 se abre una **brecha** (y se pierde su bono de defensa) hasta que el dueño la **repara** (devuelve la mitad, una vez por turno, con materiales). Si no hay cerco, la muralla herida se regenera un 10% por turno.
-  - **Cerco**: con 2 o más enemigos a 3 casillas o menos, la ciudad no produce ni recluta y cuenta turnos de cerco; tras 6 turnos, las unidades dentro pasan hambre (−8% de salud por turno). Una carreta propia a 2 casillas frena el cerco.
-  - Las **atalayas** disparan a las máquinas de asedio cercanas (y a cualquier enemigo si la ciudad está en cerco).
-  - Los bots reparan sus murallas y los agresivos construyen máquinas y rompen murallas de ciudades enemigas cercanas.
-- **Aldeas neutrales**: al capturar una por primera vez ganas una **construcción de nivel 1 al azar** y un **soldado de nivel 3** (una sola vez por aldea; no en el reto de una unidad).
-- **Crías**: nacen con el **nivel promedio de sus padres** (con los puntos de habilidad correspondientes), además del bono de nacimiento.
-
-## Mundo abierto — fase 2 (v1.44)
-
-Todo esto solo en el modo Mundo abierto. Se abre desde el botón **🌍** del mapa (Gremio · Ranking · Jefe mundial).
-
-- **Regiones por peligro**: según la distancia al centro del mapa hay 🌿 Tierras seguras (monstruos hasta ~30% de su nivel máximo), 🌲 Tierras medias (~65%, botín ×1,25) y 🔥 Tierras salvajes (hasta el 100%, botín ×1,6). Los jugadores nuevos nacen en las seguras (o en las medias si no hay sitio). La hoja de cada unidad muestra en qué región está.
-- **Protección de novato**: 24 turnos tras llegar (o tras empezar de nuevo). Nadie puede atacarte ni pisar tus ciudades, y tú tampoco puedes atacar a jugadores. Se puede terminar antes desde el menú 🌍.
-- **Jefes mundiales**: cada 48 turnos (el primero a los 24) aparece un jefe con 2,5× de vida y +25% de daño en las tierras salvajes, avisado a todos con su posición; se retira a los 72 turnos. Todos los que le hagan daño reciben materiales, una gema y experiencia en su ciudad (más cuanto mayor sea su parte del daño); el que más daño haga se lleva además un objeto raro.
-- **Ranking global**: tu puesto, los 15 primeros y los mejores gremios.
-- **Gremios**: hasta 8 jugadores. El líder invita; los miembros son **aliados permanentes** (no se atacan y comparten visión). Si dos ciudades del gremio están a 12 casillas o menos, las unidades cerca de cada una ganan **+2 de defensa** (territorio del gremio). La etiqueta `[TAG]` sale en las listas de jugadores. Se puede salir o expulsar; si se va el líder, pasa al siguiente miembro.
-
-## Historial por turnos (v1.45)
-
-- Botón **📈** (también en la hoja de Jugadores): gráfica de **puntos, unidades o ciudades** por turno de los 8 mejores jugadores (y la tuya), con una línea amarilla en el turno elegido.
-- **Turno a turno** (◀◀ ◀ ▶ ▶▶): la clasificación de ese turno y **qué pasó** en él (tu registro más la crónica pública del mundo, sin repetir).
-- El servidor guarda el estado de cada turno (hasta 500; al pasar, se aclara la parte antigua) y una **crónica pública** de los últimos 400 sucesos grandes (ciudades, jefes, historia, estaciones, duelos y avisos del mundo), que dura mucho más que el registro. Las partidas antiguas cargan sin problema y empiezan a anotar desde ahora.
-
-
-## v1.46 — Mochilas, prioridad de botín y mercader equilibrado
-- **Mochila base de 45 espacios** (antes 30).
-- **🎒 Objeto equipable «Mochila»**: nuevo hueco de equipo que amplía el inventario de la unidad que la lleva. Espacios extra según el material: cuero +6, hierro +10, acero +15, alma +21, dracónica +30. Se forja en la ciudad (3 de material), cae como botín raro y se puede encantar/engastar como el resto. No da defensa y no cuenta para los sets de armadura. No puedes quitártela (ni cambiarla por una peor) si la carga no cabría sin ella.
-- **Prioridad del botín**: los objetos raros van primero, luego los materiales por valor (gemas, escamas, almas, acero…) y al final hierro, hueso y cuero. Si la mochila está llena, se **descarta cuero/hueso (lo más barato)** para hacer sitio a lo valioso en vez de perderlo; lo barato nunca desplaza a lo caro. El mensaje de botín avisa de lo descartado. Vale para criaturas, jefes, cofres/sitios y tumbas.
-- **Mercader**: los precios se calculan con el valor real (recargo ×1,3): los objetos cuestan según su material y efectos (mitad almas, mitad acero), el lote de hueso (que nadie quería) se cambia por lotes útiles, el mapa del tesoro cuesta 8 de hierro y **cada compra encarece un 10 % lo que queda** en el carro.
-
-
-## v1.46.1 — Pruebas estables
-- Las pruebas usan ahora una **semilla fija** (`test/seed.js`): cada ejecución da el mismo resultado. Para cazar fallos raros: `ADA_SEED=7 node test/features4.js`, o `ADA_RANDOM=1` para azar real.
-- Corregidas las causas de fallos intermitentes: tumbas buscadas por nombre (los nombres se repiten entre jugadores), reintento de la prueba de recuperación de criaturas que nunca reintentaba, el Rey Demonio puede contratar constructores (no cuentan como unidades normales) y esperas fijas de la prueba de servidor (ahora con margen y espera por condición).
-- Comprobado con 7 semillas distintas en todos los archivos de pruebas: sin fallos.
-
-
-## v1.47 — Equilibrio de clases y panel «Más»
-- **Equilibrio de clases** (duelos 1c1 con `tools/balance.js`, sin clima y con semilla): antes las clases de combate iban del 21 % al 88 % de victorias; ahora entre ~45 % y ~72 %. Se bajó a berserker, monje, duelista, paladín, guardián y asesino (daño, regeneración, defensa, espinas) y se subió a cazador, nigromante, elementalista, mago/arcano y envenenador. Las descripciones del juego se actualizan solas. Las clases de apoyo/invocación (bardo, sanador, invocador) no se miden en duelos 1c1 porque su valor está en el equipo y las invocaciones.
-- La herramienta de equilibrio ya no depende del clima aleatorio de la arena. La prueba exige que la mejor clase quede por debajo del 80 % y la peor por encima del 35 %.
-- **Panel «Más»** en la barra inferior: sonido, cómo se juega, manual, chat, jugadores, historia, mundo, historial y resumen. Los botones redondos flotantes ya no tapan los «+» de las estadísticas: solo quedan 🏠 y «siguiente unidad», y se ocultan mientras hay una hoja abierta. El aviso rojo de «Más» suma ofertas de jugadores, chat sin leer y avisos del mundo.
-
-
-## v1.48 — Teología de las Guardianas y nuevo ángel
-- **Historia con fe propia:** en este mundo todos adoran a dos ángeles, **Elizabeth** (el Alba que sana) y **Nathaly** (la Vigía que nunca duerme). Hace mil años encadenaron al Dragón de Ceniza y prometieron volver cuando el volcán despertara. El prólogo, los textos de cada capítulo y los finales (victoria y derrota) cuentan esa creencia: altares de dos velas en cada aldea, la plegaria «Elizabeth, enciende el alba; Nathaly, guarda la noche», el Liche como hereje que quiere apagar las velas, el Dragón como el mismo que ellas encadenaron.
-- **Capítulo nuevo (ahora 9): «El milagro de las Guardianas»**, entre «Bajo la tierra» y el Rey Lobo: levantar una iglesia de nivel 5. Al lograrlo desciende el ángel de la ciudad (que ya se llamaba Elizabeth o Nathaly) y se cuenta la escena. Premio: almas, acero, una escama y un objeto raro. Las historias guardadas en curso a partir del capítulo 6 se corren un capítulo.
-- **Nuevo sprite del ángel:** una chica de **rizos negros** (con reflejos para que se vean los rizos) y **ojos marrones**, vestido blanco con cinto dorado, alas y halo.
-
-
-## v1.49 — Trueque de materiales
-- Nueva sección **♻️ Trueque** en la pestaña Almacén de cada ciudad tuya: cambia el sobrante barato por material superior, con pérdida para que no se rompa la economía. Botones ×1, ×10 y «Todo».
-  - 10 cuero → 1 hierro · 10 hueso → 1 hierro
-  - 8 hierro → 1 acero
-  - 6 acero → 1 alma
-  - 8 alma → 1 escama de dragón
-- Con 1000 de cuero y 1000 de hueso salen 200 de hierro, que se pueden cambiar por 25 de acero. Las tasas están en `CONVERT` (`shared.js`) y se pueden ajustar sin tocar el motor.
-- Solo en ciudades propias; la prueba comprueba que cada paso siempre pierde valor.
-
-
-## v1.50 — Invocaciones por unidad
-- El límite de invocaciones ya no es 2 por jugador sino **2 por cada invocador o nigromante**. Con tres invocadores puedes tener hasta 6 invocaciones. Siguen costando huesos, no ocupan puestos del tope de unidades y se desvanecen si su invocador cae.
-- Los bots también lo aplican por unidad.
-
-
-## v1.51 — La campaña pasa a 16 capítulos
-Siete capítulos nuevos para el modo Historia, que ahora usa todos los jefes del juego y sigue contando la fe en Elizabeth y Nathaly:
-- **Peregrinos del alba** (tras «Tierras propias»): despejar los caminos, 25 criaturas más.
-- **El laberinto sellado** (tras el milagro de las Guardianas): jefe **Minotauro del Laberinto**, el guardián que la ceniza enloqueció.
-- **La Hidra de las Ciénagas** (tras el Rey Lobo): jefe **Hidra**, que envenena las fuentes benditas de Nathaly.
-- **La vigilia de las velas**: una unidad de nivel 12 con equipo de calidad Alma o mejor.
-- **El Conde de la noche eterna**: jefe **Conde Vampiro**, que apaga las velas de los altares.
-- **El Coloso caído**: jefe **Coloso de Piedra**, las estatuas de las Guardianas corrompidas.
-- **La víspera del Dragón** (tras el Liche): ciudades del grupo (jugadores + 6) y una unidad de nivel 15.
-Orden completo: eco de la ceniza → tierras propias → peregrinos → acero y leyenda → refugio sagrado → bajo la tierra → milagro de las Guardianas → laberinto → Rey Lobo → Hidra → vigilia → Conde → Coloso → Liche → víspera → Dragón de Ceniza. Cada capítulo da premio (materiales y un objeto raro, mejor cuanto más avanzado). Las historias guardadas en curso conservan el número de capítulo, así que pueden quedar en un capítulo distinto del que tocaba; lo más seguro es empezar una campaña nueva. La prueba de la campaña ahora recorre todos los capítulos según el tipo de objetivo, así que añadir más ya no la rompe.
-
-
-## v1.52 — Mordedura de vampiro 🧛
-- **Contagio:** cuando el **Conde Vampiro** golpea a una unidad tuya y no la mata, hay un **25 %** de que la muerda y se convierta en vampiro. Sigue siendo tuya, conserva su clase, nivel y equipo, y avisa en el registro.
-- **Ventaja racial del vampiro:** +10 % de daño, roba el 20 % de la vida que hace y se regenera un 3 % por turno (se suma a lo que ya tenga por su clase). Se ve con 🧛 junto al nombre y sobre el sprite en el mapa.
-- **Quién se libra:** invocaciones, carretas, constructores, bestias del Rey Demonio, y cualquier unidad que esté a 2 casillas o menos de una ciudad tuya con **iglesia de nivel 2 o más**.
-- **Purificar:** si no quieres el vampirismo, junto a una ciudad tuya con iglesia (cualquier nivel) el botón ✨ Purificar en la ficha de la unidad cuesta 3 almas (la iglesia lo abarata).
-- Los números (probabilidad, ventajas, protección, coste) están en `VAMP` de `shared.js`; la lista `by` permite que otras criaturas contagien en el futuro.
-
-## v1.53 — Cuentas 👤
-
-Opcional: con una cuenta (correo + contraseña) ves las mismas partidas desde cualquier dispositivo. Seguir como invitado funciona igual que antes.
-
-- **Registro** con nombre, correo y contraseña (mín. 8). Se confirma el correo con un **código de 6 dígitos** (caduca en 15 min, 5 intentos).
-- **Entrar** desde otro dispositivo trae tus partidas; las que ya tenías como invitado se añaden a la cuenta al registrarte/entrar.
-- **Olvidé mi contraseña**: código por correo; al cambiarla se cierran las demás sesiones.
-- Contraseñas con scrypt, sesiones de 90 días por dispositivo (solo se guarda su hash), límites de intentos por correo e IP.
-- Código en `accounts.js`; las cuentas se guardan en el mismo almacén que las partidas.
-
-### Lo que necesitas configurar en Render
-1. **Upstash (imprescindible para que las cuentas no se pierdan).** El disco de Render gratis se borra al reiniciar, y con él las cuentas. Crea una base gratis en upstash.com (Redis) y añade en Render → Environment: `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN` (de la pestaña REST API). Tus partidas también se guardarán ahí.
-2. **Correo (para verificación y recuperación)** con Brevo (gratis, ~300 correos/día): crea cuenta en brevo.com → verifica un remitente (tu Gmail sirve para pruebas) → SMTP & API → crea una API key. En Render: `BREVO_API_KEY`, `MAIL_FROM` (el remitente verificado) y opcional `MAIL_FROM_NAME`.
-   - Sin Brevo: las cuentas funcionan **sin verificar el correo y sin recuperar contraseña** (si la olvidas, se pierde el acceso).
-   - Los correos de Gmail pueden caer en spam al principio; para publicar el juego conviene un dominio propio verificado en Brevo.
-
-Pruebas: `test/features11.js` (con un servidor de correo simulado).
-
-## v1.54 — Modo Oleadas 🌊
-
-Modo cooperativo nuevo (modo rápido «Oleadas» en la sala, o *Modo de juego → Oleadas* en los ajustes). Todos los jugadores (y bots) están aliados.
-
-- La primera oleada llega en el turno 3 y luego una cada 3 turnos, hasta **20 oleadas**.
-- Cada oleada marcha sobre algunas ciudades (la mitad de los jugadores, mínimo una). Crece en cantidad, nivel y tipo de criatura (goblins y lobos al principio, trolls y golems al final).
-- Cada **5 oleadas** llega además un jefe (Rey Lobo, Minotauro, Liche, y el Dragón de Ceniza en la 20).
-- Al superar una oleada, cada capital recibe materiales (huesos, cuero, hierro, acero y almas según avanza); al vencer un jefe, además un objeto de botín.
-- Las criaturas que se dispersan sin llegar a la ciudad ya no cuentan. Se gana al derrotar la última oleada y su jefe; se pierde si caen todos los jugadores.
-- En este modo no hay hordas ni jefes al azar, y la diplomacia está fijada.
-- El avance se ve en el botón 🌊 (el mismo que usa la Historia).
-
-Pruebas: `test/features12.js`.
-
-## v1.55 — Modo Laberinto 🕯️
-
-Modo cooperativo nuevo (modo rápido «Laberinto», o *Modo de juego → Laberinto* en los ajustes; el número de pisos se elige en «Pisos del laberinto»: 10, 12, 15, 18 o 20). Todos los jugadores (y bots) están aliados.
-
-- **Sin mundo exterior ni ciudades.** Cada jugador empieza con **2 unidades** en el piso 1.
-- Cada piso es un **laberinto de pasillos** con salas, tesoros 💎 en los callejones sin salida, trampas ocultas ⚠️ y criaturas. Más pisos = criaturas de más nivel y de tiers más duros.
-- **Escaleras:** la de subida está en la sala de inicio y la de bajada al fondo, junto a la sala grande. Una unidad junto a la escalera ve el botón «⬇️ Bajar» / «⬆️ Subir» en su ficha (las invocaciones cercanas la siguen). Desde el piso 1 no hay salida.
-- **Un jefe cada 2 pisos** (y siempre en el último, que es el Dragón de Ceniza). En los pisos con jefe la escalera de bajada está sellada 🔒 hasta vencerlo.
-- **Velas 🕯️ en vez de ciudades:** cada jugador tiene **una vela por piso**, que se enciende junto a la escalera de subida la primera vez que baja a ese piso. Sirven para **forjar, mejorar, guardar botín y revivir** (usa la pestaña «Revivir»), pero **no dan ningún bono**: no curan, no producen, no tienen edificios ni reclutan. Todas las velas de un jugador comparten el mismo almacén.
-- **Victoria:** vencer al jefe del último piso (gana todo el grupo). **Derrota:** si caen todas las unidades y nadie puede revivir.
-- No hay clima, hordas, mercaderes, torneos ni protagonista en este modo. El minimapa muestra el piso que estás viendo y el botón 🏠 te lleva a la vela de tu piso.
-- Los bots avanzan por los pisos, pelean, vuelven a su vela cuando la mochila se llena y bajan por la escalera.
-
-Pruebas: `test/features13.js`.
-
-## v1.55.1 — Arreglo del menú de la ciudad
-
-- Corregido: con los asedios activados, la ciudad que tenía **muralla** no dibujaba su menú (la pestaña «Construir» fallaba por una variable mal declarada y la hoja quedaba en blanco, sin dejar mejorar ni actualizar nada).
-- Revisado con 184 estados de partida reales (varios modos, hasta 150 turnos) abriendo todas las hojas y pestañas de ciudades y unidades: sin más errores.
-
-## v1.55.2 — Velas aliadas
-
-- En el Laberinto, una unidad junto a la vela de **otro jugador** (aliado) ahora puede equipar, guardar y retirar objetos como si estuviera junto a la suya, usando **su propio almacén** (el de sus velas). Nadie gasta ni toca lo de otro.
-- Tocar en el mapa la vela de un aliado abre el menú de **tu** vela de ese piso (forjar, mejorar, encantar, revivir con tu almacén).
-
-## v1.55.3 — Sin islas aisladas
-
-- Al generar el mapa, cualquier trozo de tierra que no se pueda alcanzar a pie desde las capitales (por ejemplo una isla en el borde) pasa a ser agua. Así ninguna mazmorra (como el Abismo), cofre, ruina o aldea queda inalcanzable.
-
-## v1.56 — Modo sin conexión 📴
-
-- En la pantalla de inicio, tarjeta **«Sin conexión»** → *Crear partida sin conexión*. El motor del juego corre dentro del propio celular (`public/local.js` carga `engine.js` en el navegador) y las partidas se guardan en el celular (IndexedDB). Se juega con bots, sin internet.
-- **Importante:** abre el juego **una vez con señal** antes del viaje (el service worker `sw.js` guarda una copia de la app). Después se abre y se juega sin red. Con red siempre carga lo más nuevo; si la señal es mala (>4 s) usa la copia guardada.
-- Hay un solo jugador humano; los turnos avanzan al pulsar «Fin de turno» (sin reloj). Cualquier modo menos Mundo abierto. Sin chat entre personas, avisos ni cuentas.
-- Las partidas sin conexión (📴) no se comparten con el servidor ni con la cuenta; se borran con ✕ y no se recuperan. Si borras los datos del navegador, se pierden.
-- Pruebas: `test/features15.js`.
-
-## v1.57 — Botón Automatizar y 3 armas nuevas
-
-**🤖 Automatizar** (panel «Más» → Automatizar, o la fila «Automático» en la ficha de cada unidad). Cada unidad tiene 4 modos: ✋ manual · ⚔️ moverse y atacar · 🎒 equiparse · 🤖 todo. También hay botones para poner **todas** a la vez y «▶ Ejecutar ahora».
-- Las unidades automáticas actúan solas **al terminar el turno** (también si el turno acaba por el reloj).
-- ⚔️ Cazan las criaturas que pueden vencer (comparando su fuerza, con los aliados cercanos, contra la de la criatura; los jefes exigen más ventaja), curan a aliados heridos si llevan el báculo del sanador, vuelven a casa con menos del 50% de salud o la mochila llena (y guardan el botín). **Nunca atacan a otros jugadores.**
-- 🎒 Se equipan lo mejor de su mochila y del almacén de la ciudad junto a la que estén (no cambian de tipo de arma: un arquero sigue con arma a distancia).
-- «Terminar turno» ya no avisa por unidades automáticas que aún tienen ataques.
-
-**Armas nuevas** (se forjan, caen de botín y las usan los bots según su clase):
-- 💀 **Calavera** — mágica, alcance 3, ignora 20% de defensa, una mano. **Nigromante:** +30% de daño, +1 alcance y sus esqueletos tienen +20% de salud mientras la lleve.
-- ✚ **Báculo del sanador** — dos manos, alcance 3, hace poco daño a enemigos, pero **cura a tus aliados** (y a los aliados por pacto) a distancia gastando un ataque: toca a un aliado herido con la unidad seleccionada. Cura = 10 × material + 3 por punto de Médico; **Sanador** +30% (Médico de campaña +20%, Custodio +10%).
-- 📯 **Silbato** — una mano, alcance 4, poco daño, **4 ataques por turno** (los golpes siguientes hacen 60%). **Invocador:** +35% de daño con él y sus invocaciones hacen +20% de daño mientras lo lleve.
-- Comando nuevo `heal` (`{a:'heal', u, to}`), `auto` y `autorun`. Pruebas: `test/features16.js`.
-
-## v1.58 — Modo Ciudadela 🏰 (fase 1)
-
-Modo cooperativo largo: una gran ciudad amurallada **compartida por todos los jugadores** (todos son dueños: almacén, edificios y mejoras comunes).
-
-- **Oleadas**: 20 oleadas (una cada **100 turnos**, tiempo para explorar mazmorras y el mundo), con jefe cada 5. Los enemigos salen fuera de las murallas y entran por las 3 puertas (norte, sur, este); si llegan a la plaza bajan la *integridad* de la ciudad (se repara sola entre oleadas). Si llega a 0, se pierde; si se superan las 20, se gana.
-- **Dificultad por jugadores**: más jugadores, más enemigos y más recompensa. Sin límite práctico de unidades (tope técnico de 100 por jugador).
-- **Entre oleadas**: descanso de varios turnos para reclutar, mejorar edificios y recoger recursos. Dentro de las murallas cuentas como estar en la ciudad.
-- **Escuadras con órdenes** (botón *Ciudadela* en «Más»): ✋ Libre, 🛡️ Defender (puerta N/S/E, plaza o un punto del mapa), ⚔️ Cazar, 🏠 A la ciudad. Se cumplen al acabar el turno o con «Ejecutar órdenes ahora». Cada unidad se asigna desde su ficha.
-- Dibujo: murallas con almenas, puertas de madera, torres, calles, plaza del mercado, casas y lotes para los edificios.
-- Los bots defienden las puertas y reclutan.
-- Pendiente (siguientes fases): 2) invadir la mazmorra con 5 unidades y ver la próxima oleada; 3) ciudad en pixel art más detallada.
-
-## v1.59 — Ciudadela, fase 2: invadir la mazmorra 🕳️
-
-- 3 entradas de mazmorra fuera de las murallas (niveles 1, 2 y 3 al inicio; suben de nivel cada 6 oleadas y se renuevan en cada oleada).
-- Dentro de la mazmorra solo puedes tener **5 unidades por jugador** a la vez (las invocaciones acompañan sin contar).
-- **Explorar**: al entrar en una mazmorra todos ven la próxima oleada (cantidad, nivel, tipos de enemigo y jefe). La vista previa desaparece al llegar esa oleada.
-- Vencer al jefe de una mazmorra hace la siguiente oleada un 10% más pequeña (acumulable hasta −30%).
-- Nueva orden de escuadra 🕳️ **Invadir mazmorra**: hasta 5 entran, luchan, recogen tesoros y salen si se hieren o la limpian.
-- La ciudad y su entorno (con las entradas) siempre son visibles.
-- Pendiente: fase 3, ciudad en pixel art más detallada.
-
-## v1.60 — Ciudadela, fase 3: ciudad en pixel art detallado 🎨
-
-- Murallas con camino de ronda, almenas exteriores, contrafuertes y aspilleras; se tiñen de azul (muralla nivel 2) y llevan filete dorado (nivel 3+).
-- Puertas con arco de piedra, hojas de madera, rastrillo y antorchas; estandartes ondeando en las torres.
-- Barrio con casas en hileras que **aumentan según las mejoras de la ciudad**, humo de chimeneas, árboles, calles secundarias, caminos de tierra fuera de las puertas, farolas con luz parpadeante.
-- Plaza con fuente de agua animada, puestos de mercado y aldeanos que van y vienen (más gente cuanto más se mejora).
-- Cajas y barriles junto a la herrería y los establos. Los edificios se dibujan sobre sus lotes.
-
-## v1.61 — Ciudadela: mundo exterior, taberna, mercado y arena 🍺🏟️
-
-- **Mundo más grande** (96×76) alrededor de la muralla, con más criaturas y sitios por explorar. La ciudad, sus alrededores y la arena siempre se ven; el resto hay que explorarlo.
-- **Viajeros por el mundo** (hasta 9 a la vez, se renuevan cada pocos turnos): *Viajeros* reclutables al azar (nivel según la oleada, atributos y a veces clase; se pagan con el almacén de la ciudad), *Curandero* (cura por completo a las unidades cercanas, hasta 3 veces) y *Maestro de armas* (+2 puntos de habilidad). Toca el viajero con una unidad a su lado.
-- **Taberna** (edificio nuevo, siempre presente): 3 clientes con rareza Común → Legendario y atributos al azar; **se renuevan cada 30 turnos**. Los Épicos traen clase e ítem; los **Legendarios son vampiros** con clase, especialización y un objeto raro. Cualquier jugador puede reclutar (paga el almacén común).
-- **Calle del mercado**: 5 puestos con toldo al sur de la plaza; los mercaderes ambulantes se instalan ahí cada pocos turnos (7 turnos) y se les compra con el almacén de la ciudad desde cualquier unidad dentro de las murallas.
-- **Torneo de la arena** (coliseo fuera de la puerta este): se abre cada 12 turnos durante 3. Una unidad lucha contra 5 gladiadores seguidos cada vez más fuertes; **si cae solo sale de la arena y no pierde nada** (ni vida). Cada ronda da experiencia y materiales; ganar las 5 da gemas y un objeto raro. Cada unidad compite una vez por torneo.
-- La hoja de la Ciudadela tiene ahora pestañas: Defensa, Taberna, Arena y Mercado.
-
-## v1.61.1 — Ciudadela: oleadas cada 100 turnos
-
-La primera oleada llega en el turno 100 y cada oleada siguiente 100 turnos después de superar la anterior (antes: 6 y 5). Así hay tiempo de sobra para explorar mazmorras, viajeros, taberna y arena entre oleadas.
-
-## v1.61.2 — Ajuste de lobby: turnos entre oleadas (Ciudadela)
-
-Nuevo ajuste del mundo «Ciudadela: turnos entre oleadas (y hasta la primera)»: 10, 25, 50, **100 (por defecto)** o 200 turnos.
-
-## v1.61.3 — Escuadras de la Ciudadela, más claras y fiables
-
-- Al dar una orden a una escuadra, **se ejecuta en el momento** (no solo al final del turno).
-- **Defender** mantiene el puesto: ataca a los enemigos a 4 casillas del puesto y vuelve, ya no sale a perseguir lejos.
-- El mapa muestra el **puesto** de cada escuadra (escudo de color) y un **distintivo de color con su número** en cada unidad; al tocar una unidad se ve la línea hacia su puesto.
-- Cada escuadra muestra su estado: unidades en su puesto, salud media, heridos, enemigos cerca del puesto.
-- Nuevo botón «🔁 Unidades nuevas se unen solas» (una escuadra a la vez): los reclutas, viajeros y clientes de la taberna entran en ella automáticamente.
-
-## v1.64.4 — Dejar ir
-
-- En la lista de **Caídos** de la ciudad (donde se resucita) hay un botón **🕊️ Dejar ir**: pide confirmación y borra al caído de la lista para siempre, sin gastar materiales. Útil cuando no quieres revivir a esa unidad y quieres despejar la lista.
-
-## v1.64.3 — General llega más lejos
-
-- La habilidad **General** ya no solo afecta a los aliados pegados: a **1 casilla** da el efecto completo (+2 % de salud y defensa por punto) y a **2 casillas** la mitad (+1 % por punto). Con 10 puntos: +20 % pegado, +10 % a 2 casillas.
-- El aura de clase (guardián, etc.) sigue siendo solo para aliados adyacentes.
-- Así cubre mejor a una escuadra en formación (frente/centro/retaguardia).
-
-## v1.64.2 — La escuadra explora la mazmorra en grupo
-
-Antes cada unidad iba por su cuenta hacia el enemigo más cercano: se separaban, entraban de una en una y morían rodeadas. Ahora:
-- **Entran juntas:** esperan en la entrada a que todo el grupo esté listo (máx. 8 turnos) y todas eligen la misma mazmorra. Después de una retirada esperan en la plaza a estar curadas (máx. 15 turnos) antes de volver.
-- **Avanzan juntas:** el grupo solo avanza cuando está reunido (radio de 3 casillas); quien se adelanta o se queda atrás vuelve con el grupo, y nadie persigue enemigos lejos del grupo.
-- **Salen juntas:** si hay enemigos cerca y alguien está por debajo de su umbral de retirada, se retira todo el grupo a la vez (nadie sale solo por pasillos con enemigos); también si la salud media es baja o hay 2 débiles. Si no hay enemigos cerca, el débil sale solo. Aviso «🚪 sale de la mazmorra».
-- **Umbral por defecto en mazmorra: 65 %** (defender sigue en 50 %). En una prueba de 16 partidas por ajuste con 5 unidades de nivel 6: con retirada al 35 % murieron 21 de 80, al 50 % 9 y al 65 % solo 2.
-- Antes de este cambio, con 5 unidades de nivel 4 u 8 morían unas 20 de 40 dentro de la mazmorra y llegaban a separarse hasta 16 casillas.
-
-## v1.64.0 — Escuadras: reglas, comparativa, formación y avisos
-
-- **Retirada y regreso automáticos:** cada escuadra tiene su regla «se retiran por debajo de» (nunca / 25 / 35 / 50 / 65 %, por defecto 50) y «vuelven a su puesto con» (50 / 80 / 100 %, por defecto 80). La unidad herida va a curarse a la plaza y, al recuperarse, retoma sola la orden de su escuadra. Marca «🩹 retirándose» en el panel y en su perfil.
-- **Comparativa:** una lista con todas las escuadras: unidades, fuerza (daño por turno + vida + defensa), salud media, heridas, retirándose, en mazmorra, en su puesto, enemigos cerca, y botones de orden directos.
-- **Formación:** al defender, cada unidad se coloca al **frente** (en el puesto), al **centro** (1 casilla atrás) o en **retaguardia** (2 atrás, hacia la plaza). Automático: arma a distancia y sanadores atrás, el resto al frente; se cambia en el perfil de cada unidad (Auto / Frente / Centro / Atrás).
-- **Avisos:** te dice cuando unidades de una escuadra se retiran a curarse, cuando su salud media baja de la mitad y cuando una escuadra termina una mazmorra.
-- Los bots de la Ciudadela siguen retirándose al 35 % y vuelven al 50 % de salud para no quedarse fuera demasiado tiempo.
-- **Por qué 50 %:** en una prueba de 250 turnos (6 partidas por ajuste, 12 unidades, oleada cada 50 turnos) con retirada al 35 % sobrevivían de media 5,5 unidades; sin retirada 2,2; al 50 % unas 9,7 con las mismas bajas enemigas. Al 65 % con regreso al 100 % sobrevivían 10,7 pero con más riesgo de dejar el puesto vacío: pruébalo si quieres jugar seguro.
-
-## v1.63.0 — Diseña a tu protagonista
-
-- En el perfil de tu protagonista (y de tu única unidad en el **reto de una unidad**) hay un botón **🎨 Diseñar**. Abre un creador con vista previa fija del retrato y botones para: nombre, género, piel (6), peinado (8), color de pelo (8), ojos (5), barba, cicatriz, complexión, postura, túnica, pantalón, capa y hasta 4 **accesorios** (parche, gafas, pendientes, bufanda, pintura de guerra, orejas élficas, flor, cuernos). Incluye «🎲 Al azar». Empieza con el aspecto actual del personaje.
-- **Gratis en el turno 1** (y la primera vez que lo diseñas, aunque sea más tarde). **Rediseñarlo después cuesta 5 almas** del almacén de una ciudad tuya con iglesia, estando junto a ella.
-- Si cambias de protagonista en el turno 1, el diseño pasa al nuevo. El diseño y el género se conservan cuando el protagonista cae y reaparece; los caídos resucitados también conservan su género.
-- Funciona en Historia, partidas normales y reto de una unidad; también sin conexión. Los modos sin protagonista (Ciudadela, Rey Demonio) no lo tienen.
-
-## v1.62.2 — Contador de eliminados
-
-- Cada personaje cuenta los **enemigos que ha eliminado** (criaturas, jefes, secuaces, unidades enemigas y rondas ganadas en la arena). Se ve en el perfil («☠️ N enemigos eliminados») y junto al nombre en la cabecera.
-- El contador se conserva cuando el protagonista reaparece o cuando resucitas a un caído en la iglesia. Las unidades que ya existían empiezan en 0.
-- Cuenta quien da el golpe final; las unidades que invoca un mago o nigromante llevan su propio contador.
-
-## v1.62.1 — Géneros
-
-- Cada unidad es **♂ o ♀** (símbolo junto al nombre en perfil, taberna y viajeros). Las 4 unidades iniciales son 2 y 2; las crías nacen con género al azar; los reclutas conservan el suyo.
-- **Para tener cría hace falta pareja ♂ + ♀.** El perfil indica qué género buscar. Ajuste del lobby «Crías: hace falta una pareja ♂ + ♀» (activado por defecto; en «No» vale cualquier pareja).
-- La taberna siempre ofrece clientes de los dos géneros, para que nunca quedes bloqueado.
-- El **retrato** cambia según el género (peinados, barba solo en ♂, pestañas y labios en ♀, complexión).
-- Partidas guardadas antiguas: cada unidad deduce su género de su id, sin romper nada. Las bestias del Rey Demonio no crían, como antes.
-
-## v1.62.0 — Retratos únicos
-
-- Cada personaje tiene su **retrato en pixel art** generado con código a partir de una semilla fija: tono de piel (6), peinado (8) y color de pelo (8), ojos, ceja, barba, cicatriz, complexión (3) y postura (4). Siempre se ve igual, y casi nunca coinciden dos.
-- **Se ve el equipo**: casco (con penacho en calidades altas), pechera, hombreras, guantes, botas, escudo y arma (espada, hacha, lanza, báculo, varita, arco, daga, maza) con el color de su calidad. La clase tiñe la túnica. El protagonista lleva corona y capa; los vampiros son pálidos, de ojos rojos y colmillos; si la salud baja del 35 % aparecen vendas.
-- Aparece en el **perfil de la unidad**, en las **tarjetas de la taberna** (fondo del color de su rareza) y en el **viajero** que vas a reclutar. Al reclutar, conserva la cara que tenía.
-- Sin imágenes ni peso extra: se dibuja en el móvil y funciona sin conexión.
-
-## v1.61.4 — Menos lag
-
-- **Caché del terreno**: el suelo del mapa (hierba, agua, muralla, calles…) y la niebla se dibujan una vez en un lienzo y luego solo se copian en cada fotograma, en vez de repintar miles de casillas cada vez. Se reconstruye solo cuando cambia el terreno, la niebla o la muralla. Las puertas animadas y las mazmorras se siguen dibujando en vivo.
-- **Colores de unidades**: se calculaban creando un lienzo nuevo por unidad y fotograma; ahora se guardan en memoria.
-- Medido simulando un móvil 6 veces más lento: de ~57 ms a ~12 ms por fotograma con todo el mapa a la vista, y de ~38 a ~10 ms con zoom medio.
+- Hay un solo administrador. Quien tenga `ADMIN_CODE` puede marcar pagos y sortear; cuídalo.
+- No hay recuperación de códigos: si alguien pierde el suyo, se genera uno nuevo.
+- Con disco, Render detiene el servicio unos segundos en cada deploy y no se puede escalar a varias instancias. Para 8 personas no importa.
+- El respaldo es un registro en JSON; no hay función de restaurarlo desde la web.
+
+## Archivos
+
+- `app.py`: toda la lógica.
+- `templates/`, `static/`: páginas, estilos y el JavaScript de la ruleta y la verificación.
+- `animals.py`: el nombre del animal de cada número (1 a 100). Lo genera `tools/make_sprites.py`.
+- `static/bg.jpg`: la imagen del bosque que se ve de fondo. Para cambiarla, reemplaza ese archivo por otra imagen con el mismo nombre.
+- `static/sprites.png` y `static/sprites.css`: los 100 animales reales en pixel art (32×32 píxeles cada uno).
+- `tools/`: el código que dibuja los animales. Solo hace falta si quieres cambiar o agregar uno: `cd tools && python make_sprites.py` (requiere `pip install pillow`, solo en tu computadora; Render no lo necesita).
+- `static/chess.js`, `static/chess-ui.js`, `static/chess-online.js`, `static/chess.png`: el ajedrez (motor, tablero y piezas en pixel art).
+- `static/domino.js`, `static/domino-ui.js`, `static/domino-view.js`, `static/domino-online.js`, `domino_engine.py`: el dominó (motor del navegador, mesa, dibujo de fichas, cliente en línea y motor del servidor).
+- `rules.txt`: las reglas que ve el grupo (edítalo).
+- `render.yaml`, `requirements.txt`: despliegue.
+- `test_app.py`: pruebas del flujo completo.

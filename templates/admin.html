@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% from "_macros.html" import spr %}
+{% block title %}Administración{% endblock %}
+{% block content %}
+<section class="card">
+  <h1>Administración</h1>
+  <div class="stats">
+    <div><span class="k">Saldo del banco</span><span class="v">{{ totals.balance|money }}</span></div>
+    <div><span class="k">Precio por número</span><span class="v">{{ price|money }}</span></div>
+  </div>
+  <form method="post" action="{{ url_for('admin_price') }}" class="row gap">
+    {{ csrf_field() }}
+    <label for="price">Nuevo precio por número (USD)</label>
+    <input id="price" name="price" inputmode="decimal" value="{{ '%.2f' % (price / 100) }}" required>
+    <button class="btn" type="submit">Guardar precio</button>
+  </form>
+  <form method="post" action="{{ url_for('admin_auto_draw') }}" class="row gap">
+    {{ csrf_field() }}
+    <label><input type="checkbox" name="enabled" value="1" {% if auto_enabled %}checked{% endif %}> Sortear solo todos los días a las</label>
+    <input type="time" name="time" value="{{ auto_time }}" required>
+    <button class="btn" type="submit">Guardar</button>
+  </form>
+  <p class="small muted">Hora de Ecuador. Solo entran los números marcados como pagados <strong>antes</strong> de esa hora; marca los pagos a tiempo. Si a la hora no hay ninguno pagado, ese día no se sortea solo.{% if auto_last %} Último: {{ auto_last }}.{% endif %}</p>
+  <p class="small muted"><a href="{{ url_for('admin_backup') }}">Descargar respaldo (JSON)</a> · hazlo cada semana y guárdalo fuera de la web.</p>
+</section>
+
+<section class="card" id="rondas">
+  <h2>Rondas abiertas</h2>
+  {% for rv in rounds_view %}
+    {% set r = rv.round %}
+    <h3>{{ r.day|fecha }}{% if r.day == today %} (hoy){% endif %} · {{ rv.paid }} pagados · pozo {{ (rv.paid * r.price_cents)|money }}</h3>
+    {% if rv.tickets %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Número</th><th>Persona</th><th>Estado</th><th></th></tr></thead>
+        <tbody>
+        {% for t in rv.tickets %}
+          <tr>
+            <td>{{ spr(t.number, 'sm') }} {{ t.number }} · {{ animal(t.number).name }}</td>
+            <td>{{ t.name }}</td>
+            <td>{% if t.paid %}pagado{% else %}sin pagar{% endif %}</td>
+            <td class="actions">
+              <form method="post" action="{{ url_for('admin_set_paid', tid=t.id) }}" class="inline">
+                {{ csrf_field() }}
+                <input type="hidden" name="valor" value="{{ 0 if t.paid else 1 }}">
+                <button class="link" type="submit">{{ 'quitar pago' if t.paid else 'marcar pagado' }}</button>
+              </form>
+              <form method="post" action="{{ url_for('admin_release', tid=t.id) }}" class="inline">
+                {{ csrf_field() }}
+                <button class="link danger" type="submit">liberar</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <p class="muted">Nadie ha reservado números todavía.</p>
+    {% endif %}
+    <form method="post" action="{{ url_for('admin_draw', rid=r.id) }}"
+          data-confirm="¿Cerrar las ventas y sortear? Las reservas sin pagar se anulan y no se puede deshacer.">
+      {{ csrf_field() }}
+      <button class="btn" type="submit" {% if rv.paid == 0 %}disabled{% endif %}>Cerrar ventas y sortear</button>
+    </form>
+    <p class="small muted">Huella publicada: <code class="hash">{{ r.commitment }}</code></p>
+  {% else %}
+    <p class="muted">No hay rondas abiertas.</p>
+  {% endfor %}
+</section>
+
+<section class="card" id="premios">
+  <h2>Premios por entregar</h2>
+  {% if pending %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Día</th><th>Ganador</th><th>Premio</th><th></th></tr></thead>
+      <tbody>
+      {% for p in pending %}
+        <tr>
+          <td>{{ p.day|fecha }}</td>
+          <td>{{ spr(p.winning_number, 'sm') }} #{{ p.winning_number }} {{ animal(p.winning_number).name }} · {{ p.winner_name }}</td>
+          <td>{{ p.prize_cents|money }}</td>
+          <td>
+            <form method="post" action="{{ url_for('admin_prize_paid', rid=p.id) }}" class="inline">
+              {{ csrf_field() }}<button class="link" type="submit">marcar entregado</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <p class="muted">No hay premios pendientes.</p>
+  {% endif %}
+</section>
+
+<section class="card" id="miembros">
+  <h2>Miembros</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Nombre</th><th>Fijo</th><th>Reglas</th><th>Rondas</th><th>Estado</th><th></th></tr></thead>
+      <tbody>
+      {% for m in members %}
+        <tr{% if not m.active %} class="off"{% endif %}>
+          <td>{{ m.name }}</td>
+          <td>{{ 'sí' if m.is_fixed else 'no' }}</td>
+          <td>{{ 'aceptadas' if m.accepted_rules_at else 'pendiente' }}</td>
+          <td>{{ m.jugados }}</td>
+          <td>{{ 'activo' if m.active else 'desactivado' }}</td>
+          <td class="actions">
+            <form method="post" action="{{ url_for('admin_toggle_fixed', mid=m.id) }}" class="inline">
+              {{ csrf_field() }}<button class="link" type="submit">{{ 'quitar fijo' if m.is_fixed else 'hacer fijo' }}</button>
+            </form>
+            <form method="post" action="{{ url_for('admin_toggle_active', mid=m.id) }}" class="inline">
+              {{ csrf_field() }}<button class="link" type="submit">{{ 'desactivar' if m.active else 'activar' }}</button>
+            </form>
+            <form method="post" action="{{ url_for('admin_regen_code', mid=m.id) }}" class="inline"
+                  data-confirm="Se generará un código nuevo y el anterior dejará de funcionar. ¿Continuar?">
+              {{ csrf_field() }}<button class="link" type="submit">código nuevo</button>
+            </form>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" class="muted">Aún no hay miembros.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <form method="post" action="{{ url_for('admin_add_member') }}" class="row gap">
+    {{ csrf_field() }}
+    <label for="name">Nuevo miembro</label>
+    <input id="name" name="name" maxlength="60" placeholder="Nombre" required>
+    <label class="check"><input type="checkbox" name="fixed" value="1"> miembro fijo</label>
+    <button class="btn" type="submit">Crear y generar código</button>
+  </form>
+</section>
+
+<section class="card" id="banco">
+  <h2>Registrar movimiento del banco</h2>
+  <p class="muted small">Los aportes de cada ronda se registran solos al sortear. Aquí solo van inversiones, retornos, repartos y correcciones. Nada se edita ni se borra después.</p>
+  <form method="post" action="{{ url_for('admin_ledger') }}" class="stack">
+    {{ csrf_field() }}
+    <label for="kind">Tipo</label>
+    <select id="kind" name="kind" required>
+      {% for k in ledger_kinds %}<option value="{{ k }}">{{ kind_label[k] }}</option>{% endfor %}
+    </select>
+    <label for="amount">Monto en USD (en “Ajuste” usa negativo para restar)</label>
+    <input id="amount" name="amount" inputmode="decimal" required>
+    <label for="description">Detalle (qué se compró, a quién, por qué)</label>
+    <input id="description" name="description" maxlength="200" required>
+    <button class="btn" type="submit">Registrar</button>
+  </form>
+</section>
+{% endblock %}

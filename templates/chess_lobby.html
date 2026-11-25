@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Ajedrez en línea{% endblock %}
+{% block content %}
+<h1>Ajedrez en línea</h1>
+<p class="muted">Juega contra otro miembro desde otro dispositivo. <a href="{{ url_for('chess') }}">Volver al ajedrez local</a></p>
+
+<section class="card">
+  <h2>Crear una partida</h2>
+  <form method="post" action="{{ url_for('chess_create') }}" class="chess-btns">
+    {{ csrf_field() }}
+    <label>Quiero jugar con
+      <select name="color">
+        <option value="r">Al azar</option>
+        <option value="w">Blancas</option>
+        <option value="b">Negras</option>
+      </select>
+    </label>
+    <button type="submit">Crear partida</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Partidas esperando rival</h2>
+  {% if open_games %}
+  <ul class="glist">
+    {% for g in open_games %}
+    <li>
+      <span>{{ g.white_name or g.black_name }} juega con {{ 'blancas' if g.white_name else 'negras' }}</span>
+      <form method="post" action="{{ url_for('chess_join', game_id=g.id) }}" class="inline">
+        {{ csrf_field() }}<button type="submit">Unirme</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}<p class="muted">No hay partidas abiertas ahora.</p>{% endif %}
+</section>
+
+<section class="card">
+  <h2>Mis partidas</h2>
+  {% if mine %}
+  <ul class="glist">
+    {% for g in mine %}
+    <li>
+      <a href="{{ url_for('chess_game', game_id=g.id) }}">
+        {{ g.white_name or '…' }} (blancas) contra {{ g.black_name or '…' }} (negras)
+      </a>
+      <span class="muted">
+        {% if g.status == 'open' %}esperando rival
+        {% elif g.status == 'playing' %}en juego
+        {% else %}terminada{% endif %}
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}<p class="muted">Todavía no tienes partidas.</p>{% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Banco grupal{% endblock %}
+{% block content %}
+<section class="card">
+  <h1>Banco grupal</h1>
+  <div class="stats">
+    <div><span class="k">Saldo disponible</span><span class="v">{{ totals.balance|money }}</span></div>
+    <div><span class="k">Aportado por rondas</span><span class="v">{{ totals.aportes|money }}</span></div>
+    <div><span class="k">Invertido</span><span class="v">{{ totals.invertido|money }}</span></div>
+    <div><span class="k">Retornos</span><span class="v">{{ totals.retornos|money }}</span></div>
+    <div><span class="k">Repartido</span><span class="v">{{ totals.repartido|money }}</span></div>
+    <div><span class="k">Ajustes</span><span class="v">{{ totals.ajustes|money }}</span></div>
+  </div>
+  <p class="muted small">Cada movimiento queda registrado y no se edita ni se borra. Un error se corrige con un movimiento de ajuste, a la vista de todos.</p>
+</section>
+
+<section class="card">
+  <h2>Movimientos</h2>
+  {% if rows %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Fecha</th><th>Tipo</th><th>Detalle</th><th class="num">Monto</th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td>{{ r.created_at|hora }}</td>
+          <td>{{ kind_label.get(r.kind, r.kind) }}</td>
+          <td>{{ r.description }}</td>
+          <td class="num {{ 'neg' if r.amount_cents < 0 else 'pos' }}">{{ r.amount_cents|money }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">Aún no hay movimientos.</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Mesa de dominó{% endblock %}
+{% block content %}
+<h1>Mesa de dominó</h1>
+<p class="muted"><a href="{{ url_for('domino_lobby') }}">← Todas las mesas</a></p>
+<section class="card dom" id="dom-online" data-token="{{ csrf_token() }}"
+         data-state-url="{{ url_for('domino_state', game_id=game_id) }}"
+         data-move-url="{{ url_for('domino_move', game_id=game_id) }}"
+         data-next-url="{{ url_for('domino_next', game_id=game_id) }}">
+  <div class="dom-score" aria-live="polite">
+    <span>Nosotros (tú y tu compañero): <strong id="d-us">0</strong></span>
+    <span>Ellos: <strong id="d-them">0</strong></span>
+    <span class="muted">A 100 puntos · Mano <span id="d-round">1</span></span>
+  </div>
+  <div class="dom-seat" id="seat2"></div>
+  <div class="dom-mid">
+    <div class="dom-seat side" id="seat3"></div>
+    <div class="dom-table" id="table" aria-label="Mesa"></div>
+    <div class="dom-seat side" id="seat1"></div>
+  </div>
+  <p class="status" id="d-msg" aria-live="polite">Cargando…</p>
+  <div id="d-ends" class="muted"></div>
+  <div class="dom-hand" id="hand" aria-label="Tus fichas"></div>
+  <div class="dom-choice" id="choice" hidden></div>
+  <div class="chess-btns">
+    <button type="button" id="d-start" hidden>Empezar (la computadora ocupa los lugares vacíos)</button>
+    <button type="button" id="d-next" hidden>Siguiente mano</button>
+    <form method="post" action="{{ url_for('domino_leave', game_id=game_id) }}" class="inline" id="d-leave">
+      {{ csrf_field() }}<button type="submit" id="d-leavebtn">Salir de la mesa</button>
+    </form>
+  </div>
+  <ul class="dom-log muted" id="d-log"></ul>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='domino-view.js') }}" defer></script>
+<script src="{{ url_for('static', filename='domino-online.js') }}" defer></script>
+{% endblock %}
