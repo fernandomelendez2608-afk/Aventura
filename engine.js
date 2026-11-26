@@ -15,18 +15,24 @@ const CITY_NAMES = ['Aldea Bruma', 'Puerto Ceniza', 'Valle Hueco', 'Torre Lunar'
 const BOT_NAMES = ['Morgana', 'Ragnar', 'Isolda', 'Thorin', 'Selene', 'Kaelen', 'Brynn', 'Dorian', 'Nerea', 'Vlad'];
 const ROLES = ['frontal', 'arquero', 'tanque', 'medico'];
 const ROLE_W = {
-  frontal: { dano: 4, salud: 2, defensa: 2, movilidad: 1, doble: 3, medico: 0.2, general: 0.3 },
-  arquero: { dano: 4, movilidad: 3, salud: 1.5, defensa: 1, doble: 3, medico: 0.2, general: 0.2 },
-  tanque:  { salud: 3, defensa: 4, general: 2.5, dano: 1, movilidad: 0.5, medico: 0.3, doble: 0.3 },
-  medico:  { medico: 4, general: 2, salud: 2, defensa: 2, dano: 1, movilidad: 1.5, doble: 0.3 },
+  frontal: { dano: 4, salud: 2, defensa: 2, movilidad: 1, doble: 3, medico: 0.2, general: 0.3, embestida: 1.5, esquiva: 1, contra: 1, regen: 1, alcance: 0, provocar: 0.2 },
+  arquero: { dano: 4, movilidad: 3, salud: 1.5, defensa: 1, doble: 3, medico: 0.2, general: 0.2, alcance: 2, esquiva: 1.5, regen: 0.6, embestida: 0, contra: 0, provocar: 0 },
+  tanque:  { salud: 3, defensa: 4, general: 2.5, dano: 1, movilidad: 0.5, medico: 0.3, doble: 0.3, provocar: 2, contra: 1.5, regen: 1.5, esquiva: 0.5, embestida: 0.3, alcance: 0 },
+  medico:  { medico: 4, general: 2, salud: 2, defensa: 2, dano: 1, movilidad: 1.5, doble: 0.3, esquiva: 1, regen: 1, alcance: 0.5, provocar: 0, contra: 0, embestida: 0 },
 };
 const MAX_UNITS = 14;
 const BREED_MAX = 20, BREED_WAIT = 15, BREED_BONUS = { hp: 10, dmg: 2 };
-const MAX_LEVEL = 53; // = suma de los topes de habilidades (10+10+2+10+1+10+10), con 1 punto por nivel (nivel 1 ya trae 1)
+const MAX_LEVEL = 99; // = suma de los topes de habilidades (15+15+15+2+15+1+15 +2+2+3+5+2+7 = 99), con 1 punto por nivel (nivel 1 ya trae 1)
 const INV_CAP = 45;
-const isAux = u => !!(u.sm || u.cart || u.bld || u.sg); // invocaciones y carretas no cuentan como unidades
+const isAux = u => !!(u.sm || u.cart || u.bld || u.sg || u.gr); // invocaciones y carretas no cuentan como unidades
+const nightOn = g => !!g && g.cfg && g.cfg.dn !== 'no' && g.cfg.mode !== 'laberinto' && S.isNight(g.turn);
+const torchOf = u => u && u.eq && u.eq.antorcha || null;
+function torchCover(g, t) { // ¿hay una antorcha aliada que ilumine a esta unidad?
+  for (const u of g.units) { const it = torchOf(u); if (!it || u.dg !== t.dg) continue; if (u.o !== t.o && (u.o === null || pactOf(g, t.o, u.o) !== 'alianza')) continue; if (cheb(u, t) <= S.torchR(it)) return true; }
+  return false;
+}
 const packBonus = u => { const k = u.eq && u.eq.mochila; return k ? (S.PACK[k.t] || 0) : 0; };
-const capOf = u => u.cart ? S.CART.cap : INV_CAP + packBonus(u);
+const capOf = u => u.gr ? 0 : u.cart ? S.CART.cap : INV_CAP + packBonus(u);
 const CRAFTS_PER_TURN = 4;
 const cityCrafts = c => CRAFTS_PER_TURN + 2 * ((c.b && c.b.herreria) || 0);
 
@@ -349,6 +355,10 @@ function ev(g, text, to, kind, nt) {
   if (g.events.length > 300) g.events.splice(0, g.events.length - 300);
   if (!to && CHRON_K.includes(kind)) { const ch = g.chron || (g.chron = []); ch.push({ id: g.eid - 1, turn: g.turn, text, k: kind }); if (ch.length > 400) ch.splice(0, ch.length - 400); } // crónica pública: dura mucho más que el registro
 }
+function vfx(g, x, y, k, tx, ty) { // efectos visuales de habilidades (esquiva, embestida, contraataque, provocar, regeneración): el cliente los dibuja en el mapa
+  const a = g.vx || (g.vx = []); a.push({ id: (g.vxid = (g.vxid || 0) + 1), x, y, k, tx: tx === undefined ? x : tx, ty: ty === undefined ? y : ty });
+  if (a.length > 40) a.splice(0, a.length - 40);
+}
 const CHRON_K = ['city', 'boss', 'story', 'season', 'pvp', 'sys'];
 function recordHist(g) { // historial: puntos, unidades y ciudades de cada jugador al empezar cada turno
   const h = g.hist || (g.hist = []);
@@ -412,7 +422,7 @@ function newUnit(g, owner, x, y) {
   let name = UNIT_NAMES.find(n => !used.has(n));
   if (!name) name = pick(g, UNIT_NAMES) + g.nid;
   const u = { id: g.nid++, o: owner, sx: used.size % 2 ? 'F' : 'M', name, x, y, lv: 1, xp: 0, hp: 50, pts: 1,
-    sk: { dano: 0, salud: 0, movilidad: 0, medico: 0, doble: 0, defensa: 0, general: 0 },
+    sk: { dano: 0, salud: 0, movilidad: 0, medico: 0, doble: 0, defensa: 0, general: 0, alcance: 0, provocar: 0, embestida: 0, esquiva: 0, contra: 0, regen: 0 },
     eq: {}, inv: { m: {}, it: [] }, mp: 3, at: 1, hits: 0, moved: false, acted: false };
   g.units.push(u); touch(g);
   return u;
@@ -458,6 +468,10 @@ function holyCost(c, cost) { // la iglesia abarata huesos y almas
 const evMode = g => g.cfg.events || 'todo';
 const wxNow = g => (evMode(g) !== 'calma' && g.wx && S.WEATHER[g.wx.k]) || null;
 function eff(g, u) {
+  if (u.gr) { // guarnición: 4 soldados; el daño depende de cuántos quedan y mejora junto a otras guarniciones
+    const G = S.GAR, T = G.types[u.gt || 'esp'], m = garMembers(u), nb = garNear(g, u), mx = garMix(g, u), k = 1 + G.bonus * nb + G.mix * mx;
+    return { maxHp: T.hp * G.n, def: Math.round(T.def * k * 10) / 10 + nb, dmg: Math.round(T.dmg * m * k), range: T.range, min: T.min, reach: T.reach, pierce: T.pierce, kind: T.kind, tier: 0, mov: T.mov, attacks: 1, aura: 0, ha: 0, fx: {}, mods: {} };
+  }
   if (u.sg) { const D = S.SIEGE[u.sg.k]; return { maxHp: D.hp, def: D.def, dmg: D.dmg, range: D.range, min: D.min, reach: false, pierce: 0, kind: null, tier: 0, mov: D.mov, attacks: 1, aura: 0, ha: 0, fx: {}, mods: {} }; }
   if (u.bld) return { maxHp: S.BUILDER.hp, def: S.BUILDER.def, dmg: 0, range: 1, min: 1, reach: false, pierce: 0, kind: null, tier: 0, mov: S.BUILDER.mov, attacks: 0, aura: 0, ha: 0, fx: {}, mods: {} };
   if (u.cart) return { maxHp: S.CART.hp, def: S.CART.def, dmg: 0, range: 1, min: 1, reach: false, pierce: 0, kind: null, tier: 0, mov: S.CART.mov, attacks: 0, aura: 0, ha: 0, fx: {}, mods: {} };
@@ -510,9 +524,9 @@ function eff(g, u) {
   const wm = (wxd && range > 1) ? (magic ? 1 + wxd.mag : 1 - wxd.rng) : 1; // el clima afecta a las armas a distancia
   return {
     maxHp: Math.round((50 + 6 * u.sk.salud) * (1 + au) * (1 + (cm.hpPct || 0) + (sb.hpPct || 0) + (fx.vigor || 0))) + (u.bn ? u.bn.hp : 0),
-    def: Math.round(def * (1 + au) * (1 + ha) * 10) / 10,
-    dmg: Math.round(Math.round((dmgBase + 2 * u.sk.dano + aDmg) * (1 + (cm.dmgPct || 0) + (magic ? (cm.magic || 0) : 0) + (necro ? (cm.calav || 0) : 0) + (whistle ? (cm.silb || 0) : 0)) * (1 + ha)) * wm) + (u.bn ? u.bn.dmg : 0),
-    range: range > 1 ? Math.max(min, range + (cm.range || 0) + (necro && cm.calav ? 1 : 0) - (wxd ? wxd.rngR : 0)) : range, min, reach, pierce: Math.min(0.9, pierce + aPierce + (cm.certero || 0)), kind, tier,
+    def: Math.round(def * (1 + au) * (1 + ha) * (u.dw > 0 ? 0.75 : 1) * 10) / 10,
+    dmg: Math.round(Math.round((dmgBase + 2 * u.sk.dano + aDmg) * (1 + (cm.dmgPct || 0) + (magic ? (cm.magic || 0) : 0) + (necro ? (cm.calav || 0) : 0) + (whistle ? (cm.silb || 0) : 0)) * (1 + ha)) * wm * (u.pn > 0 ? 0.8 : 1)) + (u.bn ? u.bn.dmg : 0),
+    range: range > 1 ? Math.max(min, range + (cm.range || 0) + (u.sk.alcance || 0) + (necro && cm.calav ? 1 : 0) - (wxd ? wxd.rngR : 0)) : range, min, reach, pierce: Math.min(0.9, pierce + aPierce + (cm.certero || 0)), kind, tier,
     mov: Math.max(1, 3 + u.sk.movilidad + movB + aMov + (cm.mov || 0) - (u.sl > 0 ? 2 : 0) - (wxd ? wxd.mov : 0)),
     attacks: multi || (1 + ((u.sk.doble && !single) ? 1 : 0) + (quick ? 1 : 0)),
     heal: healK ? Math.round(Math.round(healK * S.WM[tier]) + 3 * (u.sk.medico + (cm.medico || 0))) * (1 + (cm.heal || 0)) * (1 + ha) | 0 : 0,
@@ -521,23 +535,25 @@ function eff(g, u) {
 }
 function cstats(c, g) {
   const d = S.CREATURES[c.t], L = c.lv;
-  const el = c.el ? 1 : 0, win = (g && g.turn > 0 && S.seasonIdx(g.turn) === 3) ? 1 : 0;
+  const el = c.el ? 1 : 0, win = (g && g.turn > 0 && S.seasonIdx(g.turn) === 3) ? 1 : 0, nt = d.agg > 0 && !c.dg && nightOn(g) ? 1 : 0;
   const solo = d.boss && g && g.cfg && g.cfg.mode === 'uno'; // reto de una unidad: jefes más débiles (60% de vida, 80% de daño)
   return { mhp: Math.round(d.hp * (1 + 0.18 * (L - 1)) * (el ? 1.5 : 1) * (solo ? 0.6 : 1) * (c.wb ? S.WORLD.wb.hpMul : 1)),
-    dmg: Math.round(d.dmg * (1 + 0.12 * (L - 1)) * (el ? 1.25 : 1) * (solo ? 0.8 : 1) * (win && d.agg > 0 ? 1.15 : 1) * (1 + 0.25 * (c.ph || 0)) * (c.wb ? S.WORLD.wb.dmgMul : 1)),
-    def: d.def + 1.2 * (L - 1) + (el ? 2 : 0), rng: d.rng || 1, min: 1, mov: Math.max(1, d.mov + (c.ph ? 1 : 0) - (c.sl > 0 ? 2 : 0)), agg: d.agg + ((win && d.agg > 0) ? 1 : 0) };
+    dmg: Math.round(d.dmg * (1 + 0.12 * (L - 1)) * (el ? 1.25 : 1) * (solo ? 0.8 : 1) * (win && d.agg > 0 ? 1.15 : 1) * (nt ? S.DN.dmg : 1) * (1 + 0.25 * (c.ph || 0)) * (c.wb ? S.WORLD.wb.dmgMul : 1) * (g && c.bt === g.turn ? c.bm : 1) * (1 + 0.1 * Math.min(5, c.ft || 0))),
+    def: d.def + 1.2 * (L - 1) + (el ? 2 : 0) + (nt ? S.DN.def : 0), rng: d.rng || 1, min: 1, mov: Math.max(1, d.mov + (c.ph ? 1 : 0) + (nt ? S.DN.mov : 0) - (c.sl > 0 ? 2 : 0)), agg: d.agg + ((win && d.agg > 0) ? 1 : 0) + (nt ? 1 : 0) };
 }
 function terrDef(g, x, y) {
   const c = idx(g).T.get(y * g.map.w + x);
   return (S.TERR[terrAt(g, x, y)].def || 0) + (c ? 6 : 0);
 }
+function skDodge(g, u) { const p = 0.05 * ((u.sk && u.sk.esquiva) || 0); return p > 0 && rng(g) < p; } // habilidad Esquiva
+function skCounterDmg(u) { return 0.5 + 0.2 * (((u.sk && u.sk.contra) || 1) - 1); } // Contraataque: 50% / 70%
 function calcDamage(raw, def, pierce) {
   const d = Math.max(0, def * (1 - (pierce || 0)));
   return Math.max(1, Math.round(raw * (1 - d / (d + 60))));
 }
 const xpNeed = lv => 10 + 8 * (lv - 1);
 function gainXp(g, u, n) {
-  if (u.sm || u.cart || u.bld || u.sg) return;
+  if (u.sm || u.cart || u.bld || u.sg || u.gr) return;
   if (u.hero) n = Math.round(n * S.HERO.xp);
   { const er = eff(g, u).fx.erudito; if (er) n = Math.round(n * (1 + er)); }
   u.xp += n;
@@ -1229,7 +1245,8 @@ function visFor(g, pid) {
     }
   };
   const mine = o => o === pid || (o !== null && pactOf(g, pid, o) === 'alianza');
-  for (const u of g.units) if (mine(u.o)) mark(u.x, u.y, 20, 4);
+  const night = nightOn(g);
+  for (const u of g.units) if (mine(u.o)) { const tr = torchOf(u); if (night && !u.dg) { if (tr) { const R = 3 + S.torchR(tr); mark(u.x, u.y, R * R + 1, R); } else mark(u.x, u.y, 10, 3); } else mark(u.x, u.y, 20, 4); }
   for (const c of g.cities) if (mine(c.owner)) { const L = (c.b && c.b.atalaya) || 0, rr = 5 + 2 * L; mark(c.x, c.y, L ? (rr + 0.5) * (rr + 0.5) : 30, rr); }
   if (isCit(g)) { const R = S.CIT.r; for (let y = Math.max(0, R.y0 - 4); y <= Math.min(h - 1, R.y1 + 4); y++) for (let x = Math.max(0, R.x0 - 4); x <= Math.min(w - 1, R.x1 + 4); x++) v[y * w + x] = 1; } // la ciudad y su entorno siempre se ven
   if (isCit(g)) { const A = S.CIT.arena; for (let y = Math.max(0, A.y - 5); y <= Math.min(h - 1, A.y + 5); y++) for (let x = Math.max(0, A.x - 5); x <= Math.min(w - 1, A.x + 5); x++) v[y * w + x] = 1; } // y la arena
@@ -1842,7 +1859,7 @@ function doMove(g, u, x, y) {
   const r = S.reach(envFor(g, u), u.x, u.y, u.mp);
   const e = r.get(y * g.map.w + x);
   if (!e || !e.end) return 'No puedes llegar ahí este turno';
-  u.mp -= e.c; u.x = x; u.y = y; u.moved = true; touch(g);
+  if (!u.mvd) { u.ox = u.x; u.oy = u.y; } u.mvd = (u.mvd || 0) + cheb(u, { x, y }); u.mp -= e.c; u.x = x; u.y = y; u.moved = true; touch(g);
   const c = idx(g).T.get(y * g.map.w + x);
   if (c && c.owner !== u.o) capture(g, u, c);
   const st = g.sites.find(q => q.x === x && q.y === y);
@@ -1867,10 +1884,11 @@ function removeCreature(g, c) {
 }
 function killCreature(g, c, u) {
   const d = S.CREATURES[c.t], p = g.players[u.o];
+  if (d.rv && !c.rvd) { c.rvd = true; c.hp = Math.max(1, Math.round(cstats(c, g).mhp * d.rv)); ev(g, `🔥 ¡${d.n} resurge de sus cenizas!`, [u.o], 'boss'); touch(g); return; } // fénix: revive una vez
   removeCreature(g, c);
   u.kl = (u.kl || 0) + 1; // contador de enemigos eliminados por esta unidad
   if (c.min) { p.stats.kills++; gainXp(g, u, 4 + 2 * c.lv); return; } // secuaces de jefe: solo experiencia
-  if (d.boss || c.bd) for (const m of g.creatures.filter(x => x.bo === c.id)) removeCreature(g, m);
+  if (d.boss || c.bd || d.ab === 'llamado') for (const m of g.creatures.filter(x => x.bo === c.id)) removeCreature(g, m);
   if (c.dg) dgOnKill(g, c, u);
   p.stats.kills++; if (d.boss) { p.stats.boss++; if (g.story) g.story.killed[c.t] = true; }
   const gemsDrop = {};
@@ -1900,6 +1918,7 @@ function killCreature(g, c, u) {
   if (c.wb) wbReward(g, c);
 }
 function killUnit(g, u, by) { // by: {unit} o {creature}
+  if (global.__bd) global.__bd(g, u, by); // diagnóstico (solo pruebas)
   g.units.splice(g.units.indexOf(u), 1); touch(g);
   if (!u.sm) { const mine = g.units.filter(x => x.sm && x.sm.by === u.id); if (mine.length) { g.units = g.units.filter(x => !(x.sm && x.sm.by === u.id)); ev(g, `🌫️ Las invocaciones de ${u.name} se desvanecen.`, [u.o], 'summon'); } }
   const p = g.players[u.o];
@@ -1922,7 +1941,7 @@ function killUnit(g, u, by) { // by: {unit} o {creature}
   } else {
     ev(g, `💀 ${u.name} ha caído ante ${S.CREATURES[by.creature.t].n}.`, [u.o], 'dead');
   }
-  if (!u.sm && !u.cart && !u.bld && !u.sg && !u.bs && !u.hero && g.cfg.mode !== 'uno') { // lápida: se puede resucitar en una ciudad; si cayó ante una criatura deja su equipo en una tumba
+  if (!u.sm && !u.cart && !u.bld && !u.sg && !u.gr && !u.bs && !u.hero && g.cfg.mode !== 'uno') { // lápida: se puede resucitar en una ciudad; si cayó ante una criatura deja su equipo en una tumba
     g.graves = g.graves || [];
     g.graves.push({ id: g.nid++, o: u.o, name: u.name, lv: u.lv, pts: u.pts, sk: Object.assign({}, u.sk), cls: u.cls || null, sub: u.sub || null, bn: u.bn || null, gen: u.gen || 0, kl: u.kl || 0, sx: u.sx, turn: g.turn });
     const mine = g.graves.filter(x => x.o === u.o); if (mine.length > 8) g.graves.splice(g.graves.indexOf(mine[0]), 1);
@@ -1965,6 +1984,8 @@ function doAttack(g, u, tt, tid) {
   else { te = eff(g, tgt); defv = te.def + terrDef(g, tgt.x, tgt.y) + guardPvp(g, tgt); }
   if (tt === 'c') raw *= 1 + guardHAtk(g, u, tgt); // defender la ciudad de una horda da ataque
   const mo = e.mods || {};
+  const charge = (u.sk.embestida || 0) > 0 && (u.mvd || 0) >= 3;
+  if (charge) raw *= 1 + 0.12 * u.sk.embestida;
   if (u.hits === 0 && mo.first) raw *= 1 + mo.first;
   if (tt === 'c' && mo.vsCre) raw *= 1 + mo.vsCre;
   if (mo.execute && tgt.hp < (tt === 'c' ? cstats(tgt, g).mhp : te.maxHp) * 0.5) raw *= 1 + mo.execute;
@@ -1973,14 +1994,30 @@ function doAttack(g, u, tt, tid) {
   let crit = false;
   const wxa = wxNow(g);
   if (e.fx.critico && !(wxa && !wxa.crit) && rng(g) < e.fx.critico) { raw *= 1.8; crit = true; }
+  if (tt === 'u' && skDodge(g, tgt)) { vfx(g, tgt.x, tgt.y, 'miss'); u.at--; u.hits++; u.mp = 0; u.acted = true; return { msg: `${tgt.name} esquiva el golpe.` }; }
   let dmg = calcDamage(raw, defv, e.pierce), blocked = false;
   if (te && te.fx.bloqueo && rng(g) < te.fx.bloqueo) { dmg = Math.max(1, Math.round(dmg / 2)); blocked = true; }
+  if (tt === 'c') { // habilidades defensivas del bestiario
+    const cab = S.CREATURES[tgt.t].ab;
+    if (cab === 'sombra' && rng(g) < 0.25) { u.at--; u.hits++; u.mp = 0; u.acted = true; return { msg: `${S.CREATURES[tgt.t].n} se funde con las sombras y esquiva el golpe.` }; }
+    if (cab === 'hierro' && dmg <= 10) dmg = Math.max(1, Math.round(dmg / 2));
+    if (S.CREATURES[tgt.t].dd && rng(g) < S.CREATURES[tgt.t].dd) { u.at--; u.hits++; u.mp = 0; u.acted = true; return { msg: `${S.CREATURES[tgt.t].n} esquiva el golpe.` }; }
+    { const cd = S.CREATURES[tgt.t]; if (cd.rd) dmg = Math.max(1, Math.round(dmg * cd.rd)); if (cd.rr && dist > 1) dmg = Math.max(1, Math.round(dmg * cd.rr)); }
+  }
   tgt.hp -= dmg; tgt.hit = true;
+  if (tt === 'c') {
+    const cd = S.CREATURES[tgt.t];
+    if (cd.sp) { const sd = Math.max(1, Math.round(cstats(tgt, g).dmg * cd.sp.pct)); areaStatus(g, tgt, cd.sp.r, v => { if (!v.pz || v.pz.d < sd) v.pz = { t: cd.sp.t, d: sd }; v.pn = Math.max(v.pn || 0, 1); }); }
+    if (cd.mt && tgt.hp > 0 && (tgt.sp || 0) < 2 && dmg >= 0.18 * cstats(tgt, g).mhp) splitCreature(g, tgt, cd);
+  }
   if (tt === 'c' && tgt.wb) { tgt.pt = tgt.pt || {}; tgt.pt[u.o] = (tgt.pt[u.o] || 0) + dmg; }
   u.at--; u.hits++; u.mp = 0; u.acted = true;
   gainXp(g, u, 1);
   let msg = `${u.name} golpea a ${tt === 'c' ? (tgt.el || S.CREATURES[tgt.t].n) : tgt.name} (−${dmg}).`;
   if (e.fx.vida) { const hh = Math.max(1, Math.round(dmg * e.fx.vida)); u.hp = Math.min(e.maxHp, u.hp + hh); msg += ` 🩸 +${hh}.`; }
+  if (tt === 'c' && tgt.hp > 0 && S.CREATURES[tgt.t].ab === 'reflejo' && dist === 1) { const rf = Math.max(1, Math.round(dmg * 0.2)); u.hp -= rf; msg += ` 🪲 El caparazón devuelve −${rf}.`; if (u.hp <= 0) { killUnit(g, u, { creature: tgt }); return { msg: msg + ' Tu unidad cae.' }; } }
+  if (tt === 'c' && tgt.hp > 0 && S.CREATURES[tgt.t].th && dist === 1) { const th = S.CREATURES[tgt.t].th, td = Math.max(1, Math.round(cstats(tgt, g).dmg * th.pct)); if (!u.pz || u.pz.d < td) u.pz = { t: th.t, d: td }; msg += th.tm ? ' ☠️ ' + th.tm : ' 🔥 Te quemas al golpearla.'; }
+  if (charge) { vfx(g, tgt.x, tgt.y, 'charge', u.ox === undefined ? u.x : u.ox, u.oy === undefined ? u.y : u.oy); msg += ' 🐎 ¡Embestida!'; if (u.sk.embestida >= 3 && tgt.hp > 0) { tgt.sl = 1; msg += ' 💫 Aturdido.'; } }
   if (crit) msg += ' 💥 ¡Crítico!';
   if (blocked) msg += ' 🛡️ Bloqueado.';
   if (e.fx.fuego && tgt.hp > 0 && !(wxa && !wxa.fire)) { const d = Math.max(1, Math.round(e.dmg * e.fx.fuego)); if (!tgt.pz || tgt.pz.d < d) tgt.pz = { t: 2, d }; msg += ' 🔥 Quemado.'; }
@@ -1991,7 +2028,8 @@ function doAttack(g, u, tt, tid) {
     if (tgt.hp <= 0) { killCreature(g, tgt, u); return { msg: msg + ' ¡Derrotado!' }; }
     tgt.prov = u.id;
     const cs = cstats(tgt, g);
-    if (dist >= cs.min && dist <= cs.rng) {
+    if (dist >= cs.min && dist <= cs.rng && skDodge(g, u)) { vfx(g, u.x, u.y, 'miss'); msg += ' 💨 Esquivas el contraataque.'; }
+    else if (dist >= cs.min && dist <= cs.rng) {
       const rd = calcDamage(cs.dmg * factor, e.def + terrDef(g, u.x, u.y) + guardHDef(g, u, tgt), 0); // el segundo golpe del turno recibe un contraataque al 60%
       u.hp -= rd; msg += ` Contraataque −${rd}.`;
       if (u.hp <= 0) { killUnit(g, u, { creature: tgt }); return { msg: msg + ' Tu unidad cae.' }; }
@@ -2007,11 +2045,18 @@ function doAttack(g, u, tt, tid) {
       u.hp -= th; msg += ` 🌵 Espinas −${th}.`;
       if (u.hp <= 0) { killUnit(g, u, { unit: tgt }); return { msg: msg + ' Tu unidad cae.' }; }
     }
-    if (dist >= te.min && dist <= te.range) {
+    if (dist >= te.min && dist <= te.range && skDodge(g, u)) { vfx(g, u.x, u.y, 'miss'); msg += ' 💨 Esquivas el contraataque.'; }
+    else if (dist >= te.min && dist <= te.range) {
       let rraw = te.dmg * factor;
       if (te.range > 1 && !te.reach && dist === 1) rraw *= 0.6;
       const rd = calcDamage(rraw, e.def + terrDef(g, u.x, u.y) + guardPvp(g, u), te.pierce);
       u.hp -= rd; msg += ` Contraataque −${rd}.`;
+      if (u.hp <= 0) { killUnit(g, u, { unit: tgt }); return { msg: msg + ' Tu unidad cae.' }; }
+    }
+    if (dist === 1 && tgt.sk && tgt.sk.contra && !tgt.ctt && tgt.hp > 0) { // habilidad Contraataque
+      tgt.ctt = 1;
+      const xd = calcDamage(te.dmg * skCounterDmg(tgt), e.def + terrDef(g, u.x, u.y) + guardPvp(g, u), te.pierce);
+      vfx(g, u.x, u.y, 'counter', tgt.x, tgt.y); u.hp -= xd; msg += ` ↩️ Contraataque extra −${xd}.`;
       if (u.hp <= 0) { killUnit(g, u, { unit: tgt }); return { msg: msg + ' Tu unidad cae.' }; }
     }
   }
@@ -2128,8 +2173,8 @@ function applySkill(u, s) {
   const d = S.SKILLS[s];
   if (!d) return 'Habilidad desconocida';
   if (u.pts <= 0) return 'No tienes puntos disponibles';
-  if (u.sk[s] >= d.cap) return `${d.n} ya está al máximo`;
-  u.sk[s]++; u.pts--;
+  if ((u.sk[s] || 0) >= d.cap) return `${d.n} ya está al máximo`;
+  u.sk[s] = (u.sk[s] || 0) + 1; u.pts--;
   return null;
 }
 function cmd(g, pid, m) {
@@ -2142,7 +2187,8 @@ function cmd(g, pid, m) {
   const BLD_NO = ['skill', 'cls', 'sub', 'equip', 'unequip', 'dep', 'depi', 'wd', 'wdi', 'summon', 'hero', 'attack'];
   const SG_NO = BLD_NO.filter(a => a !== 'attack');
   const BS_NO = ['cls', 'sub', 'equip', 'unequip', 'summon', 'hero'];
-  const unitOf = () => { const u = g.units.find(x => x.id === m.u && x.o === pid ); return (u && ((u.sm && SM_NO.includes(m.a)) || (u.cart && CART_NO.includes(m.a)) || (u.bld && BLD_NO.includes(m.a)) || (u.sg && SG_NO.includes(m.a)) || (u.bs && BS_NO.includes(m.a)))) ? null : u; };
+  const GR_NO = BLD_NO.filter(a => a !== 'attack');
+  const unitOf = () => { const u = g.units.find(x => x.id === m.u && (x.o === pid || (x.gr && isCit(g)))); return (u && ((u.gr && GR_NO.includes(m.a)) || (u.sm && SM_NO.includes(m.a)) || (u.cart && CART_NO.includes(m.a)) || (u.bld && BLD_NO.includes(m.a)) || (u.sg && SG_NO.includes(m.a)) || (u.bs && BS_NO.includes(m.a)))) ? null : u; };
   const cityOf = () => g.cities.find(c => c.id === m.c && (c.owner === pid || (c.cit && isCit(g))));
   let err = null, msg = '';
   if (isLab(g) && ['recruit', 'build', 'builder', 'cart', 'road', 'station', 'siegeunit', 'siegewall', 'repair', 'ord'].includes(m.a)) return { err: 'Eso no existe en el laberinto: las velas solo sirven para forjar, mejorar, guardar y revivir' };
@@ -2215,6 +2261,7 @@ function cmd(g, pid, m) {
       const r = doGuild(g, p, m); if (typeof r === 'string') err = r; else msg = r.msg || ''; break;
     }
     case 'endprot': { if (!protLeft(g, pid)) return { err: 'No tienes protección activa' }; p.prot = 0; touch(g); msg = 'Protección terminada: ya puedes atacar (y te pueden atacar)'; break; }
+    case 'garrison': { err = doGarrison(g, p, m.k); if (!err) msg = 'Guarnición reclutada (descansa este turno)'; break; }
     case 'siegeunit': {
       const c = cityOf(); if (!c) return { err: 'Ciudad no encontrada' };
       err = doSiegeUnit(g, p, c, m.k); if (!err) msg = 'Máquina de asedio construida (descansa este turno)'; break;
@@ -2359,6 +2406,11 @@ function cmd(g, pid, m) {
       if (typeof r === 'string') err = r; else msg = r.msg || '';
       break;
     }
+    case 'def': {
+      if (!isCit(g)) { err = 'Solo existe en la Ciudadela'; break; }
+      const r = doDef(g, p, m); if (typeof r === 'string') err = r; else msg = r.msg || '';
+      break;
+    }
     case 'bar': case 'npc': case 'arena': {
       if (!isCit(g)) { err = 'Solo existe en la Ciudadela'; break; }
       const r = m.a === 'bar' ? doBar(g, p, m) : m.a === 'npc' ? doNpc(g, p, m) : doArena(g, p, m);
@@ -2405,15 +2457,16 @@ function cmd(g, pid, m) {
 
 /* ---------- criaturas ---------- */
 function creatureEnv(g, c) {
-  const ix = idx(g), w = g.map.w, t = g.map.t;
+  const ix = idx(g), w = g.map.w, t = g.map.t, wall = c ? S.CREATURES[c.t].cross || null : null; // etéreo: atraviesa la muralla; trepa: la escala (cuesta 3)
+  const bars = new Set(); if (g.defs && !wall) for (const d of g.defs) if (d.k === 'barricada') bars.add(d.y * w + d.x);
   return {
     w, h: g.map.h,
-    terr: (x, y) => ix.T.has(y * w + x) ? 'm' : t.charAt(y * w + x),
+    terr: (x, y) => { if (ix.T.has(y * w + x)) return 'm'; if (bars.size && bars.has(y * w + x)) return 'W'; const ch = t.charAt(y * w + x); return wall && ch === 'W' ? wall : ch; },
     occ: (x, y) => (ix.U.has(y * w + x) || ix.C.has(y * w + x)) ? 2 : 0,
   };
 }
 function creatureStep(g, c, cs, tx, ty) {
-  const w = g.map.w, r = S.reach(creatureEnv(g, c), c.x, c.y, cs.mov), dm = distMap(g, tx, ty);
+  const w = g.map.w, r = S.reach(creatureEnv(g, c), c.x, c.y, cs.mov), dm = S.CREATURES[c.t].cross ? new Proxy({}, { get: (o, k) => cheb({ x: k % w, y: (k - (k % w)) / w }, { x: tx, y: ty }) }) : distMap(g, tx, ty, isCit(g) && !c.dg); // los que cruzan murallas van en línea recta
   const cur = dm[c.y * w + c.x];
   let best = null;
   for (const [k, v] of r) {
@@ -2509,13 +2562,115 @@ function vampBite(g, c, u) { // las criaturas vampiro pueden contagiar a quien m
   u.vamp = 1; touch(g);
   ev(g, `${S.VAMP.e} ¡${S.CREATURES[c.t].n} muerde a ${u.name}! Se convierte en vampiro: sigue siendo tuyo y gana +10% de daño, roba 20% de vida y se regenera. Una iglesia puede purificarlo.`, [u.o], 'boss');
 }
+/* ---------- bestiario de la Ciudadela (v1.65): habilidades de las criaturas ---------- */
+function packPass(g) { // manada y furia del alfa: bonos de daño de este turno
+  const wolves = g.creatures.filter(c => S.CREATURES[c.t].fam === 'lobo'); 
+  for (const c of wolves) {
+    const d = S.CREATURES[c.t]; let m = 1;
+    if (d.ab === 'manada') m += 0.1 * Math.min(3, wolves.filter(o => o !== c && cheb(o, c) <= 2).length);
+    if (wolves.some(o => o.t === 'alfa' && o !== c && cheb(o, c) <= 6)) m += 0.25;
+    c.bm = m; c.bt = g.turn;
+  }
+  for (const c of g.creatures) { const d = S.CREATURES[c.t]; if (!d.pk) continue; // leones, cuervos…: bono por cada igual cercano
+    const n = g.creatures.filter(o => o !== c && o.t === c.t && cheb(o, c) <= d.pk.r).length; c.bm = 1 + d.pk.pct * Math.min(d.pk.max, n); c.bt = g.turn; }
+}
+function areaStatus(g, c, r, f) { let n = 0; for (const u of g.units) if (cheb(u, c) <= r && !u.cart) { f(u); n++; } return n; }
+function pushUnit(g, c, u, n) { // empuja a u hasta n casillas alejándola de c (si el camino está libre)
+  const ix = idx(g), dx = Math.sign(u.x - c.x), dy = Math.sign(u.y - c.y); let moved = 0;
+  if (!dx && !dy) return 0;
+  for (let i = 0; i < n; i++) {
+    const x = u.x + dx, y = u.y + dy, k = y * g.map.w + x; if (!inB(g, x, y) || S.TERR[terrAt(g, x, y)].c >= 99 || ix.U.has(k) || ix.C.has(k) || ix.T.has(k) || (u.dg ? !dgFree(g, x, y) : false)) break;
+    ix.U.delete(u.y * g.map.w + u.x); u.x = x; u.y = y; ix.U.set(k, u); moved++;
+  }
+  if (moved) touch(g); return moved;
+}
+function creatureAbility(g, c, d, target, dmg, cs) { // tras un golpe que no mató al objetivo
+  const nm = d.n;
+  if (d.st) target.sl = Math.max(target.sl || 0, d.st); // derriba / aturde / congela
+  if (d.pn) target.pn = Math.max(target.pn || 0, d.pn); // ciega / intimida
+  if (d.dwh) target.dw = Math.max(target.dw || 0, d.dwh); // corroe la armadura
+  if (d.cf && rng(g) < d.cf) { target.cf = 1; ev(g, `💫 ${nm} confunde a ${target.name}: perderá su ataque el próximo turno.`, [target.o], 'hit'); }
+  if (d.ls) c.hp = Math.min(cs.mhp, c.hp + Math.max(1, Math.round(dmg * d.ls)));
+  if (d.pull) { const m = pullUnit(g, c, target, d.pull); if (m) ev(g, `⛓️ ${nm} arrastra a ${target.name} ${m} casilla${m === 1 ? '' : 's'}.`, [target.o], 'hit'); }
+  if (d.fr) areaStatus(g, c, d.fr.r, u => { u.pn = Math.max(u.pn || 0, d.fr.t); });
+  if (d.ps) { const pd = Math.max(1, Math.round(cs.dmg * d.ps.pct)); if (!target.pz || target.pz.d < pd) target.pz = { t: d.ps.t, d: pd }; }
+  if (d.bn) { const bd = Math.max(1, Math.round(cs.dmg * d.bn.pct)); if (!target.pz || target.pz.d < bd) target.pz = { t: d.bn.t, d: bd }; }
+  if (d.ar) { const o = d.ar.at === 't' ? target : c, n = areaStatus(g, o, d.ar.r, u => { u.sl = Math.max(u.sl || 0, d.ar.s); }); if (n > 1) ev(g, `${nm} sacude o hiela el terreno: ${n} unidades ralentizadas.`, [target.o], 'hit'); }
+  if (d.ch) { const others = g.units.filter(u => u !== target && !u.cart && u.hp > 0 && cheb(u, target) <= 3 && !!u.dg === !!target.dg).sort((a, b) => cheb(a, target) - cheb(b, target)).slice(0, d.ch[0]);
+    for (const u of others) { const e = eff(g, u), cd = calcDamage(cs.dmg * d.ch[1], e.def, 0); u.hp -= cd; ev(g, `⚡ El rayo de ${nm} salta a ${u.name} (−${cd}).`, [u.o], 'hit'); if (u.hp <= 0) killUnit(g, u, { creature: c }); } }
+  if (d.push) { const m = pushUnit(g, c, target, d.push); if (m) ev(g, `🌪️ ${nm} empuja a ${target.name} ${m} casilla${m === 1 ? '' : 's'}.`, [target.o], 'hit'); }
+  switch (d.ab) {
+    case 'escarcha': { const n = areaStatus(g, c, 2, u => { u.sl = Math.max(u.sl || 0, 1); }); ev(g, `❄️ ¡${nm} aúlla! Ralentiza a ${n} unidad${n === 1 ? '' : 'es'} cercana${n === 1 ? '' : 's'}.`, [target.o], 'hit'); break; }
+    case 'brasas': { const bd = Math.max(1, Math.round(cs.dmg * 0.25)); if (!target.pz || target.pz.d < bd) target.pz = { t: 2, d: bd }; ev(g, `🔥 Las garras de ${nm} dejan brasas en ${target.name}.`, [target.o], 'hit'); break; }
+    case 'aguijon': { if (target.pz) { target.sl = Math.max(target.sl || 0, 2); ev(g, `💫 ¡${nm} pica a ${target.name}, que ya estaba envenenado, y lo aturde!`, [target.o], 'hit'); } else { target.pz = { t: 3, d: Math.max(1, Math.round(cs.dmg * 0.2)) }; ev(g, `☠️ ${nm} envenena a ${target.name}.`, [target.o], 'hit'); } break; }
+    case 'polvo': { const n = areaStatus(g, c, 2, u => { u.sl = Math.max(u.sl || 0, 2); }); ev(g, `💤 ${nm} esparce polvo onírico: ${n} unidad${n === 1 ? '' : 'es'} adormecida${n === 1 ? '' : 's'}.`, [target.o], 'hit'); break; }
+    case 'gelido': { const h = Math.max(1, Math.round(dmg * 0.4)); c.hp = Math.min(cs.mhp, c.hp + h); target.sl = Math.max(target.sl || 0, 1); break; }
+    case 'devora': { const h = Math.max(1, Math.round(dmg * 0.25)); c.hp = Math.min(cs.mhp, c.hp + h); break; }
+    case 'profano': { target.nh = 2; target.nhp = target.hp; ev(g, `🗡️ ¡La hoja profanada de ${nm} impide curarse a ${target.name} durante 2 turnos!`, [target.o], 'hit'); break; }
+    case 'alarido': { const n = areaStatus(g, c, 4, u => { u.pn = 2; u.sl = Math.max(u.sl || 0, 1); }); ev(g, `😱 ¡${nm} lanza su alarido! ${n} unidad${n === 1 ? '' : 'es'} presa${n === 1 ? '' : 's'} del pánico (−20% de daño).`, [target.o], 'hit'); break; }
+  }
+}
+function blink(g, c, d) { // gato astral: salto dimensional junto a su presa
+  if (g.turn - (c.tb === undefined ? -9 : c.tb) < d.tp) return;
+  let best = null, bd = 99; for (const u of g.units) { if (u.cart || !!u.dg !== !!c.dg) continue; const k = cheb(u, c); if (k > 2 && k <= 9 && k < bd) { best = u; bd = k; } }
+  if (!best) return; const ix = idx(g);
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    const x = best.x + dx, y = best.y + dy, k = y * g.map.w + x; if ((!dx && !dy) || !inB(g, x, y) || ix.U.has(k) || ix.C.has(k) || ix.T.has(k)) continue;
+    if (c.dg ? !dgFree(g, x, y) : !'gfhd'.includes(terrAt(g, x, y))) continue;
+    ix.C.delete(c.y * g.map.w + c.x); c.x = x; c.y = y; ix.C.set(k, c); c.tb = g.turn; ev(g, `✨ ¡${S.CREATURES[c.t].n} salta junto a ${best.name}!`, [best.o], 'hit'); touch(g); return;
+  }
+}
+function queenCall(g, c, d) { // la reina de la colmena invoca crías mientras hay enemigos cerca
+  if (g.turn - (c.cl === undefined ? -9 : c.cl) < 3 || !g.units.some(u => cheb(u, c) <= 9 && !!u.dg === !!c.dg)) return;
+  const mine = g.creatures.filter(m => m.bo === c.id).length; if (mine >= 4) return;
+  c.cl = g.turn; let n = 0; const ix = idx(g), types = ['hormiga', 'hormiga', 'mantis', 'avispa'];
+  for (let dy = -2; dy <= 2 && n < 2 && mine + n < 4; dy++) for (let dx = -2; dx <= 2 && n < 2 && mine + n < 4; dx++) {
+    const x = c.x + dx, y = c.y + dy; if (!dx && !dy) continue;
+    const k = y * g.map.w + x; if (!inB(g, x, y) || ix.U.has(k) || ix.C.has(k) || ix.T.has(k)) continue;
+    if (c.dg ? !dgFree(g, x, y) : !'gfhd'.includes(terrAt(g, x, y))) continue;
+    const m = spawnCreature(g, pick(g, types), x, y, Math.max(1, c.lv - 3)); m.min = true; m.bo = c.id; if (c.dg) m.dg = c.dg;
+    if (c.tg) { m.tg = c.tg; m.ttl = c.ttl || 100; if (g.cw && g.cw.ids.includes(c.id)) g.cw.ids.push(m.id); } // las crías de una oleada cuentan para superarla
+    ix.C.set(k, m); n++;
+  }
+  if (n) { ev(g, `🐝 ¡${d.n} llama al enjambre! Aparecen ${n} crías.`, null, 'boss'); touch(g); }
+}
+const cs0 = (c, g) => cstats(c, g);
+function pullUnit(g, c, u, n) { // atrae a u hacia c hasta quedar a su lado
+  const ix = idx(g); let moved = 0;
+  for (let i = 0; i < n && cheb(u, c) > 1; i++) {
+    const x = u.x + Math.sign(c.x - u.x), y = u.y + Math.sign(c.y - u.y), k = y * g.map.w + x;
+    if (!inB(g, x, y) || S.TERR[terrAt(g, x, y)].c >= 99 || ix.U.has(k) || ix.C.has(k) || ix.T.has(k) || (u.dg ? !dgFree(g, x, y) : false)) break;
+    ix.U.delete(u.y * g.map.w + u.x); u.x = x; u.y = y; ix.U.set(k, u); moved++;
+  }
+  if (moved) touch(g); return moved;
+}
+function splitCreature(g, c, d) { // mitosis: la baba se divide en dos más pequeñas
+  const ix = idx(g);
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    const x = c.x + dx, y = c.y + dy, k = y * g.map.w + x; if ((!dx && !dy) || !inB(g, x, y) || ix.U.has(k) || ix.C.has(k) || ix.T.has(k)) continue;
+    if (c.dg ? !dgFree(g, x, y) : !'gfhd'.includes(terrAt(g, x, y))) continue;
+    const m = spawnCreature(g, c.t, x, y, c.lv); const half = Math.max(1, Math.ceil(c.hp / 2)); c.hp = half; m.hp = half; m.sp = (c.sp || 0) + 1; c.sp = m.sp; if (c.dg) m.dg = c.dg; if (c.tg) { m.tg = c.tg; m.ttl = c.ttl || 100; if (g.cw && g.cw.ids.includes(c.id)) g.cw.ids.push(m.id); }
+    ix.C.set(k, m); ev(g, `🟣 ¡${d.n} se divide en dos!`, null, 'hit'); touch(g); return true;
+  }
+  return false;
+}
 function creaturesTurn(g) {
+  packPass(g);
   const occ = isLab(g) ? new Set(g.units.map(u => u.dg)) : null; // en el laberinto solo se mueven las criaturas de los pisos donde hay alguien
   for (const c of g.creatures.slice()) {
     if (!g.creatures.includes(c)) continue;
     if (occ && !occ.has(c.dg)) continue;
     bossPhase(g, c);
-    const d = S.CREATURES[c.t], cs = cstats(c, g);
+    const d = S.CREATURES[c.t];
+    if (d.ab === 'llamado') queenCall(g, c, d);
+    if (d.tp) blink(g, c, d);
+    if (d.rg) { const mh = cstats(c, g).mhp; if (c.hp < mh) { c.hp = Math.min(mh, c.hp + Math.round(mh * d.rg)); touch(g); } }
+    if (d.au) { const bd = d.au.bn ? Math.max(1, Math.round(cs0(c, g).dmg * d.au.bn)) : 0; areaStatus(g, c, d.au.r, u => { if (d.au.s) u.sl = Math.max(u.sl || 0, d.au.s); if (d.au.pn) u.pn = Math.max(u.pn || 0, d.au.pn); if (d.au.dw) u.dw = Math.max(u.dw || 0, d.au.dw); if (bd && (!u.pz || u.pz.d < bd)) u.pz = { t: 2, d: bd }; }); }
+    if (d.amb && !c.aw) { // emboscada: inmóvil hasta que una presa se acerca; si nadie llega en 20 turnos, se marchita
+      if (g.units.some(u => !u.cart && cheb(u, c) <= 3 && !!u.dg === !!c.dg)) c.aw = true;
+      else { c.wl = (c.wl || 0) + 1; if (c.wl > 20) removeCreature(g, c); continue; }
+    }
+    const cs = cstats(c, g);
     let hcity = null;
     if (c.tg) {
       c.ttl = (c.ttl || 0) - 1;
@@ -2533,6 +2688,11 @@ function creaturesTurn(g) {
       for (const u of g.units) { const dd = cheb(u, c); if (dd <= agg && (dd < bd || (dd === bd && target && u.hp < target.hp))) { bd = dd; target = u; } }
       if (target && !c.tg && cheb(target, { x: c.hx, y: c.hy }) > (d.boss ? 9 : 7)) target = null; // correa
     }
+    { // habilidad Provocar: las criaturas cercanas atacan al provocador
+      let tb = null, tbd = 1e9;
+      for (const u of g.units) { const pv = u.sk && u.sk.provocar; if (!pv) continue; const dd = cheb(u, c); if (dd <= pv && (dd < tbd || (dd === tbd && tb && u.hp < tb.hp))) { tbd = dd; tb = u; } }
+      if (tb && target !== tb && (target || (agg > 0 && cheb(tb, c) <= agg))) { target = tb; vfx(g, tb.x, tb.y, 'taunt', c.x, c.y); }
+    }
     if (target) {
       let dist = cheb(c, target);
       if (dist > cs.rng) {
@@ -2547,15 +2707,21 @@ function creaturesTurn(g) {
           if (!best || inRange < best.ir || (inRange === best.ir && (dd < best.dd || (dd === best.dd && v.c < best.c)))) best = { x, y, dd, c: v.c, ir: inRange };
         }
         if (best && best.dd < dist) { c.x = best.x; c.y = best.y; touch(g); dist = best.dd; }
+        else if (c.tg || cheb(c, target) <= Math.max(cs.agg, 4)) { if (wallBreak(g, c, cs, target.x, target.y)) continue; }
       }
       if (dist <= cs.rng) {
         const e = eff(g, target);
-        let dmg = calcDamage(cs.dmg, e.def + terrDef(g, target.x, target.y) + guardHDef(g, target, c), 0);
+        let dmg = calcDamage(cs.dmg * (d.agg > 0 && !c.dg && nightOn(g) && torchCover(g, target) ? 1 / S.DN.dmg : 1) * (d.rnd ? d.rnd[0] + (d.rnd[1] - d.rnd[0]) * rng(g) : 1), e.def + terrDef(g, target.x, target.y) + guardHDef(g, target, c), d.pierce || 0);
+        if (d.cr) { if (c.lt === target.id) c.cn = Math.min(d.cr.max, (c.cn || 0) + 1); else c.cn = 0; c.lt = target.id; dmg = Math.round(dmg * (1 + d.cr.pct * c.cn)); }
+        if (d.crit && ((d.crit.sure && terrAt(g, target.x, target.y) === d.crit.sure) || (d.crit.dg && c.dg) || rng(g) < d.crit.p)) dmg = Math.round(dmg * 1.5);
+        if (d.op) { c.oh = c.oh || {}; if (!c.oh[target.id]) { c.oh[target.id] = 1; dmg = Math.round(dmg * d.op); } } // primer golpe a cada objetivo (emboscada / caída)
         if (e.fx.bloqueo && rng(g) < e.fx.bloqueo) dmg = Math.max(1, Math.round(dmg / 2));
+        if (skDodge(g, target)) { vfx(g, target.x, target.y, 'miss'); ev(g, `💨 ${target.name} esquiva el ataque de ${c.el ? c.el : S.CREATURES[c.t].n}.`, [target.o], 'hit'); continue; }
         target.hp -= dmg;
         ev(g, `🩸 ${c.el ? c.el : S.CREATURES[c.t].n} (niv. ${c.lv}) ataca a ${target.name} (−${dmg}).`, [target.o], 'hit', c.tg ? 'raid' : undefined);
-        if (target.hp <= 0) { killUnit(g, target, { creature: c }); c.prov = null; continue; }
+        if (target.hp <= 0) { killUnit(g, target, { creature: c }); c.prov = null; if (d.ab === 'devora') c.ft = (c.ft || 0) + 1; continue; }
         vampBite(g, c, target);
+        if (d.ab) creatureAbility(g, c, d, target, dmg, cs);
         if (dist === 1 && e.fx.espinas) {
           c.hp -= Math.max(1, Math.round(dmg * e.fx.espinas)); c.hit = true;
           if (c.hp <= 0) { killCreature(g, c, target); continue; }
@@ -2569,9 +2735,15 @@ function creaturesTurn(g) {
           if (ue.fx.vida) { target.hp = Math.min(ue.maxHp, target.hp + Math.max(1, Math.round(rd * ue.fx.vida))); }
           if (ue.fx.veneno) c.pz = { t: 3, d: Math.max(1, Math.round(ue.dmg * ue.fx.veneno)) };
         }
+        if (dist === 1 && target.sk && target.sk.contra && !target.ctt) { // habilidad Contraataque: golpe extra una vez por turno
+          target.ctt = 1;
+          const cd2 = calcDamage(ue.dmg * skCounterDmg(target), cs.def + terrDef(g, c.x, c.y), ue.pierce);
+          c.hp -= cd2; c.hit = true; vfx(g, c.x, c.y, 'counter', target.x, target.y); ev(g, `↩️ ${target.name} contraataca (−${cd2}).`, [target.o], 'hit');
+          if (c.hp <= 0) { killCreature(g, c, target); continue; }
+        }
       }
     } else if (hcity) {
-      if (cheb(c, hcity) > 1) creatureStep(g, c, cs, hcity.x, hcity.y);
+      if (cheb(c, hcity) > 1) { const bx = c.x, by = c.y; creatureStep(g, c, cs, hcity.x, hcity.y); if (c.x === bx && c.y === by) wallBreak(g, c, cs, hcity.x, hcity.y); }
     } else if (rng(g) < 0.4) {
       const dir = pick(g, S.DIRS);
       const x = c.x + dir[0], y = c.y + dir[1];
@@ -2655,6 +2827,8 @@ function refreshUnits(g) {
     if (u.sm) { const own = g.units.find(x => x.id === u.sm.by); if (!own) { g.units.splice(g.units.indexOf(u), 1); continue; } u.lv = own.lv; }
     const e = eff(g, u);
     if (u.sl > 0) u.sl--;
+    if (u.pn > 0) u.pn--;
+    if (u.dw > 0) u.dw--;
     if (u.pz) { u.hp = Math.max(1, u.hp - u.pz.d); u.pz.t--; if (u.pz.t <= 0) delete u.pz; }
     let heal = 0, mpct = 0;
     for (const v of g.units) {
@@ -2664,10 +2838,13 @@ function refreshUnits(g) {
     }
     heal += Math.min(mpct, 0.5) * e.maxHp;
     if (e.fx.regen) heal += e.fx.regen * e.maxHp;
+    if (u.sk.regen) { heal += 0.03 * u.sk.regen * e.maxHp; if (u.hp < e.maxHp) vfx(g, u.x, u.y, 'regen'); } // habilidad Regeneración
     if (cityNear(g, u) && !cityNear(g, u).vela) heal += 0.25 * e.maxHp; else if (cartNear(g, u)) heal += S.CART.heal * e.maxHp;
     if (!u.moved && !u.acted && u.hp < e.maxHp) heal += 0.1 * e.maxHp;
     u.hp = Math.min(e.maxHp, Math.round(u.hp + heal));
-    u.mp = e.mov; u.at = e.attacks; u.hits = 0; u.moved = false; u.acted = false;
+    if (u.nh > 0) { u.hp = Math.min(u.hp, u.nhp); u.nh--; if (u.nh <= 0) { delete u.nh; delete u.nhp; } } // hoja profanada: sin curación
+    u.mp = e.mov; u.at = e.attacks; u.hits = 0; u.moved = false; u.acted = false; u.mvd = 0; u.ctt = 0;
+    if (u.cf > 0) { u.cf--; u.at = 0; u.mp = Math.floor(u.mp / 2); } // encantada/confusa: pierde su ataque este turno
   }
   for (const c of g.cities) { c.crafts = 0; c.built = 0; }
 }
@@ -2996,6 +3173,13 @@ function checkEnd(g) {
 }
 
 /* ---------- eventos del mundo (v1.26): clima, torneos y mercaderes ambulantes ---------- */
+function dayNightTick(g) {
+  if (g.cfg.dn === 'no' || g.cfg.mode === 'laberinto') return;
+  const nt = S.isNight(g.turn);
+  if (g.nt === undefined) { g.nt = nt; if (nt) ev(g, '🌙 Cae la noche: las criaturas son más fuertes y agresivas, y ves menos. ¡Enciende una antorcha 🔦!', null, 'season'); return; }
+  if (nt === g.nt) return; g.nt = nt; touch(g);
+  ev(g, nt ? `🌙 Cae la noche (${S.DN.night} turnos): las criaturas agresivas pegan un 25% más, se mueven más y ven mejor que tú. ¡Quédate junto a una antorcha 🔦 o a tu ciudad!` : `☀️ Amanece: vuelve el día (${S.DN.len - S.DN.night} turnos tranquilos).`, null, 'season');
+}
 function weatherTick(g) {
   if (evMode(g) === 'calma') { g.wx = null; return; }
   if (!g.wx) { g.wx = { k: 'sol', left: 2 }; return; }
@@ -3251,6 +3435,7 @@ function advanceTurn(g) {
   botDiplomacy(g); tradeTick(g);
   for (const p of g.players) if (p.alive && (p.bot || p.auto)) { try { botTurn(g, p); } catch (e) { console.error('bot error', e); } }
   angelsTurn(g);
+  try { garAuto(g); } catch (e) { console.error('gar error', e); }
   creaturesTurn(g);
   worldTick(g);
   try { breedTick(g); reviveTick(g); } catch (e) { console.error('breed/revive error', e); }
@@ -3268,7 +3453,7 @@ function advanceTurn(g) {
   g.endsAt = Date.now() + g.cfg.turnHours * 3600000;
   ev(g, `— Turno ${g.turn} —`, null, 'turn');
   if (g.turn > 1 && (g.turn - 1) % S.SEASON_LEN === 0) { const se = S.SEASONS[S.seasonIdx(g.turn)]; ev(g, `${se.e} Llega ${se.lead}. ${se.d}`, null, 'season'); }
-  try { weatherTick(g); tournTick(g); merchTick(g); dgTick(g); } catch (e) { console.error('events error', e); }
+  try { dayNightTick(g); weatherTick(g); tournTick(g); merchTick(g); dgTick(g); } catch (e) { console.error('events error', e); }
   g.dirty = true;
 }
 
@@ -3289,7 +3474,7 @@ function botCfg(g, p) {
 function botPickSkill(u) {
   const w = ROLE_W[u.role] || ROLE_W.frontal;
   const tab = [];
-  for (const s of S.SKILL_ORDER) if (u.sk[s] < S.SKILLS[s].cap) tab.push([s, (w[s] || 0.2) * (1 + 0.3 * u.sk[s])]);
+  for (const s of S.SKILL_ORDER) if ((u.sk[s] || 0) < S.SKILLS[s].cap) tab.push([s, (w[s] || 0.2) * (1 + 0.3 * (u.sk[s] || 0))]);
   return tab.length ? tab : null;
 }
 function ehp(hp, def) { return hp / (1 - def / (def + 60)); }
@@ -3372,8 +3557,8 @@ function botBuilder(g, p, u) { // el constructor de un bot: une sus ciudades con
   for (const [key, e] of r) { if (!e.end || key === k) continue; const x = key % g.map.w, y = (key / g.map.w) | 0; if (cheb(u, { x, y }) !== 1) continue; const d = cheb(target, { x, y }) + (g.rd && g.rd[key] ? -0.4 : 0); if (!best || d < best.d) best = { x, y, d }; }
   if (best && best.d < cheb(target, u)) doMove(g, u, best.x, best.y);
 }
-function distMap(g, tx, ty) {
-  const key = tx + ',' + ty;
+function distMap(g, tx, ty, br) { // br: las murallas de la Ciudadela cuentan como transitables (rompibles) con coste 4
+  const key = tx + ',' + ty + (br ? 'b' : '');
   g._dm = g._dm || {};
   if (g._dm[key]) return g._dm[key];
   const w = g.map.w, h = g.map.h, t = g.map.t;
@@ -3388,7 +3573,7 @@ function distMap(g, tx, ty) {
     for (const [dx, dy] of S.DIRS) {
       const nx = x + dx, ny = y + dy;
       if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-      const tc = S.TERR[t.charAt(ny * w + nx)].c;
+      const ch = t.charAt(ny * w + nx), tc = (br && ch === 'W') ? 4 + Math.round(wlHp(g, ny * w + nx) / 120) : S.TERR[ch].c;
       if (tc >= 99) continue;
       const nc = c + tc;
       if (nc < dm[ny * w + nx]) { dm[ny * w + nx] = nc; push([nc, nx, ny]); }
@@ -3460,6 +3645,12 @@ function botTarget(g, p, squad) {
       if (sq.pw > 1.3 * need * dp.pw) consider({ x: c.x, y: c.y, ty: 'city' }, pb.cityVal, d);
     }
   }
+  for (const o of g.units) { // v1.69: defensa del hogar: un rival cerca de una ciudad propia se ataca con prioridad, aunque el grupo esté algo por debajo (la ciudad ayuda)
+    if (o.o === p.id || o.dg || isAux(o) || pactOf(g, p.id, o.o)) continue;
+    const hc = g.cities.find(c => c.owner === p.id && cheb(c, o) <= 6); if (!hc) continue;
+    const near = g.units.filter(v => v.o === o.o && cheb(v, o) <= 3), op = squadPower(g, near);
+    if (sq.pw > 0.8 * op.pw) { p._ok.add('u' + o.id); consider({ x: o.x, y: o.y, ty: 'u' }, 95 + o.lv * 2, cheb(hc, cen) * 0.5); }
+  }
   for (const o of g.units) {
     if (o.o === p.id || !allow(o.o)) continue;
     const d = cheb(o, cen); if (d > 12) continue;
@@ -3476,10 +3667,10 @@ function bestAttack(g, p, u, e) {
   const targets = [];
   for (const c of g.creatures) if (cheb(c, u) <= reachRange && p._ok.has(c.id)) {
     const cs = cstats(c, g);
-    targets.push({ tt: 'c', ref: c, x: c.x, y: c.y, hp: c.hp, def: cs.def + terrDef(g, c.x, c.y), boss: !!S.CREATURES[c.t].boss });
+    targets.push({ tt: 'c', ref: c, x: c.x, y: c.y, hp: c.hp, mhp: cs.mhp, def: cs.def + terrDef(g, c.x, c.y), boss: !!S.CREATURES[c.t].boss });
   }
   for (const o of g.units) if (o.o !== p.id && cheb(o, u) <= reachRange && p._ok.has('u' + o.id)) {
-    targets.push({ tt: 'u', ref: o, x: o.x, y: o.y, hp: o.hp, def: eff(g, o).def + terrDef(g, o.x, o.y), boss: false });
+    targets.push({ tt: 'u', ref: o, x: o.x, y: o.y, hp: o.hp, mhp: eff(g, o).maxHp, def: eff(g, o).def + terrDef(g, o.x, o.y), boss: false });
   }
   if (!targets.length) return null;
   const threats = [];
@@ -3497,7 +3688,8 @@ function bestAttack(g, p, u, e) {
       const raw = e.dmg * (u.hits === 0 ? 1 : 0.6) * ((e.range > 1 && !e.reach && d === 1) ? 0.6 : 1);
       const dmg = calcDamage(raw, t.def, e.pierce);
       const kill = dmg >= t.hp;
-      const s = (kill ? 60 : 0) + dmg - 0.4 * (danger / Math.max(1, u.hp)) * 10 + (e.range > 1 ? d * 2 : 0) - v.c * 0.3;
+      const ft = p._ft && p._ft.tt === t.tt && p._ft.id === t.ref.id && p._ft.t === g.turn; // focus: remata al herido y sigue el objetivo del grupo
+      const s = (kill ? 60 : 0) + dmg + (1 - t.hp / Math.max(1, t.mhp || t.hp)) * 18 + (ft ? 14 : 0) - 0.4 * (danger / Math.max(1, u.hp)) * (e.range > 1 ? 14 : 10) + (e.range > 1 ? d * 3 : 0) - v.c * 0.3;
       if (!best || s > best.s) best = { s, x, y, t, isStart };
     }
   }
@@ -3556,6 +3748,7 @@ function citStart(g) {
       if (armT) for (const slot of ['casco', 'guantes', 'hombreras', 'pechera', 'pantalones', 'botas']) nu.eq[slot] = { id: g.nid++, k: slot, t: armT };
     }
   }
+  ['esp', 'arq', 'lan', 'mag'].slice(0, S.GAR.free).forEach(t => garSpawn(g, g.players[0].id, t)); // dos guarniciones iniciales, de todos
   for (let i = 0; i < 64; i++) spawnNormal(g, true);
   for (let i = 0, tr = 0; i < 22 && tr < 500; tr++) if (spawnSite(g)) i++;
   g.cit = { hp: C.hp, max: C.hp }; g.npcs = []; g.arena = null; g.bar = null; g.merch = [];
@@ -3576,7 +3769,18 @@ function citPlan(g, n) { // qué trae la oleada n (según los jugadores vivos)
   const C = S.CIT, P = Math.max(1, g.players.filter(p => p.alive).length), k = 1 + C.perPlayer * (P - 1);
   const boss = n % C.boss === 0 ? C.bosses[Math.min(C.bosses.length - 1, n / C.boss - 1)] : null;
   const types = n < 5 ? ['goblin', 'lobo', 'esqueleto'] : n < 10 ? ['goblin', 'orco', 'zombi', 'arana', 'lobo'] : n < 15 ? ['orco', 'troll', 'esqueleto', 'zombi'] : ['troll', 'orco', 'golem', 'esqueleto'];
-  return { n, cnt: Math.min(C.maxEnemies, Math.round((C.base + C.grow * n) * k)), lv: 1 + Math.round(n * 1.15), types, boss };
+  let theme = null, ratio = 1;
+  if (n >= 2) { // v1.65: oleadas temáticas con el bestiario de la Ciudadela (lobos, enjambres, no-muertos) + una criatura clásica para mezclar
+    theme = C.themeOrder[(n - 2) % C.themeOrder.length];
+    const tier = n < 8 ? 0 : n < 14 ? 1 : 2;
+    const old = types.slice(), lv = 1 + Math.round(n * 1.15);
+    const tl = C.themes[theme].t, pool = [...new Set(tl.slice(0, tier + 1).flat())]; if (tier < 2 && n >= 5) for (const t of tl[1].concat(tl[2])) if (!pool.includes(t)) pool.push(t); types.splice(0, types.length, ...pool, old[(n * 7) % old.length]); // acumulativo: cada fase suma criaturas; desde la oleada 5 asoman también las de fases siguientes (los jefes menores van de 1 en 1) // en la fase media ya asoma el jefe menor del tema (con 20 oleadas no todos los temas llegan a la fase final)
+    const pw = t => { const cs = cstats({ t, lv: Math.min(lv, S.CREATURES[t].max) }); return cs.mhp * cs.dmg * (1 + cs.def / 40); }, avg = a => a.reduce((m, t) => m + pw(t), 0) / a.length;
+    const nw = types.filter(t => !(S.CREATURES[t].cit && S.CREATURES[t].xp >= 28)); // sin contar a los jefes menores (van de 1 en 1)
+    ratio = nw.length ? avg(nw) / avg(old) : 1; // si las criaturas del tema pegan más que las clásicas, la oleada trae menos para que la dificultad sea parecida
+  }
+  const f = ratio > 0.75 ? 0.75 / ratio : 1; // calibrado con simulaciones: las oleadas temáticas, con sus habilidades, no deben ser más duras que las clásicas
+  return { n, cnt: Math.max(3, Math.min(C.maxEnemies, Math.round((C.base + C.grow * n) * k * f))), lv: 1 + Math.round(n * 1.15), types, boss, theme };
 }
 function citLeft(g) { const w = g.cw, ids = new Set(w.ids), left = g.creatures.filter(c => ids.has(c.id)); w.ids = left.map(c => c.id); return left.length; }
 function citSpawn(g) {
@@ -3599,17 +3803,137 @@ function citSpawn(g) {
     }
     return false;
   };
-  for (let i = 0, n = citCnt(g, pl); i < n; i++) if (place(pick(g, pl.types), pl.lv)) made++;
+  const eliteMax = 1 + Math.floor(w.n / 8); let elites = 0;
+  for (let i = 0, n = citCnt(g, pl); i < n; i++) {
+    let ty = pick(g, pl.types), dd = S.CREATURES[ty];
+    if (dd.cit && dd.xp >= 28) { if (elites >= eliteMax) { for (let t = 0; t < 8 && S.CREATURES[ty].cit && S.CREATURES[ty].xp >= 28; t++) ty = pick(g, pl.types); if (S.CREATURES[ty].cit && S.CREATURES[ty].xp >= 28) continue; } else elites++; } // jefes menores (alfa, reina, liche, caballero): pocos por oleada
+    if (place(ty, pl.lv)) made++;
+  }
   let boss = '';
   if (pl.boss && place(pl.boss, pl.lv + 3)) { made++; boss = ` ¡Y viene un jefe: ${S.CREATURES[pl.boss].n}!`; }
   w.cleared = 0; w.cnt = made; w.next = 0; w.weak = 0; touch(g);
   for (const d of g.dungeons) if (!g.units.some(u => u.dg === d.id)) { d.tier = Math.min(5, (d.base || 1) + Math.floor(w.n / 6)); fillDungeon(g, d); } // las mazmorras se renuevan
-  ev(g, `🌊 ¡Oleada ${w.n} de ${w.total}! ${made} criaturas de nivel ${pl.lv} avanzan hacia la Ciudadela desde ${camps.length > 1 ? camps.length + ' direcciones' : 'el exterior'}.${boss}`, null, 'horde', 'horde');
+  const th = pl.theme ? S.CIT.themes[pl.theme] : null;
+  ev(g, `🌊 ¡Oleada ${w.n} de ${w.total}!${th ? ' ' + th.e + ' ' + th.n + '.' : ''} ${made} criaturas de nivel ${pl.lv} avanzan hacia la Ciudadela desde ${camps.length > 1 ? camps.length + ' direcciones' : 'el exterior'}.${boss}`, null, 'horde', 'horde');
   for (const p of g.players.filter(x => x.alive && x.bot)) botReact(g, 'horda', p, {}, 0.3);
+}
+
+/* ---------- eventos entre oleadas (v1.71): sorpresas mientras se espera la siguiente oleada ---------- */
+const CIT_EVENTS = [
+  ['caravana', 3, '🐪 Una caravana de suministros llega a la Ciudadela'],
+  ['bendicion', 2, '🕊️ Las Guardianas bendicen la Ciudadela'],
+  ['taberna', 2, '🍺 Llegan viajeros nuevos a la taberna'],
+  ['entreno', 2, '📖 Fiesta de entrenamiento'],
+  ['reliquia', 1, '🏺 Se halla una reliquia'],
+  ['incursion', 3, '🌑 Noche de sombras'],
+];
+function citEvent(g) {
+  const w = g.cw, C = S.CIT; if (!w || g.status !== 'playing') return;
+  if (!(!w.n || w.cleared) || !w.next || w.next - g.turn <= 8) { return; } // solo en la calma, y no justo antes de la oleada
+  if (!w.evt) w.evt = g.turn + ri(g, 8, 16);
+  if (g.turn < w.evt) return;
+  w.evt = g.turn + ri(g, 14, 26);
+  const city = citCity(g), k = wpick(g, CIT_EVENTS.map(e => [e[0], e[1]])), n = Math.max(1, w.cleared || w.n || 1), P = Math.max(1, g.players.filter(p => p.alive).length), kk = 1 + 0.6 * (P - 1);
+  const head = CIT_EVENTS.find(e => e[0] === k)[2];
+  if (k === 'caravana') {
+    const m = { hueso: 4 + n, cuero: 4 + n, hierro: 3 + Math.ceil(n / 2) }; if (n >= 4) m.acero = Math.ceil(n / 3); if (n >= 9) m.alma = 1 + Math.floor(n / 6);
+    for (const key in m) { m[key] = Math.round(m[key] * kk); city.st.m[key] = (city.st.m[key] || 0) + m[key]; }
+    ev(g, `${head}: ${fmtMats(m)} al almacén.`, null, 'season');
+  } else if (k === 'bendicion') {
+    let c = 0; for (const u of g.units) if (!isAux(u) && !u.dg && S.CIT && u.o !== undefined && g.players[u.o] && g.players[u.o].alive) { const mh = eff(g, u).maxHp; if (u.hp < mh || u.pz) { u.hp = mh; delete u.pz; c++; } }
+    ev(g, `${head}: ${c} unidad(es) recuperan toda su vida.`, null, 'season');
+  } else if (k === 'taberna') {
+    barRefresh(g); ev(g, `${head}: ¡mira la taberna, hay clientes nuevos!`, null, 'season');
+  } else if (k === 'entreno') {
+    let c = 0; for (const u of g.units) if (!isAux(u) && !u.dg && g.players[u.o] && g.players[u.o].alive) { u.pts = (u.pts | 0) + 1; c++; }
+    ev(g, `${head}: ${c} unidad(es) ganan +1 punto de habilidad.`, null, 'season');
+  } else if (k === 'reliquia') {
+    city.st.it.push(rareItem(g, { w: [0, 10, 30, 35, 25] }));
+    ev(g, `${head}: un objeto raro se guarda en el almacén de la Ciudadela.`, null, 'season');
+  } else { // incursión: una pequeña banda sin oleada, a cazar antes de que se acerque
+    const pl = citPlan(g, n), ix = idx(g), W = g.map.w, H = C.h; let cx = 0, cy = 0, ok = false;
+    for (let t = 0; t < 200 && !ok; t++) { cx = C.plaza.x + ri(g, -26, 26); cy = C.plaza.y + ri(g, -22, 22); ok = inB(g, cx, cy) && cx > 3 && cy > 3 && cx < W - 4 && cy < H - 4 && 'gfhd'.includes(terrAt(g, cx, cy)) && cheb({ x: cx, y: cy }, C.plaza) > C.spawnDist; }
+    if (!ok) return;
+    let made = 0;
+    for (let i = 0; i < 3 + Math.min(3, Math.floor(n / 6)) && made < 6; i++) for (let tr = 0; tr < 20; tr++) {
+      const x = cx + ri(g, -3, 3), y = cy + ri(g, -3, 3), kx = y * W + x;
+      if (!inB(g, x, y) || !'gfhd'.includes(terrAt(g, x, y)) || citInside(x, y) || ix.U.has(kx) || ix.C.has(kx) || ix.T.has(kx) || g.creatures.some(c => c.x === x && c.y === y)) continue;
+      const c = spawnCreature(g, pick(g, pl.types), x, y, Math.max(1, pl.lv)); c.ttl = 150; made++; break;
+    }
+    if (!made) return;
+    ev(g, `${head}: una banda de ${made} criaturas (nivel ${Math.max(1, pl.lv)}) merodea cerca de (${cx}, ${cy}). ¡Caza buena!`, null, 'horde');
+  }
+  touch(g);
+}
+
+/* ---------- guarniciones (v1.73) y muralla con vida ---------- */
+const garMembers = u => Math.max(1, Math.min(S.GAR.n, Math.ceil(u.hp / S.GAR.types[u.gt || 'esp'].hp)));
+function garMix(g, u) { const t = new Set(); for (const v of g.units) if (v !== u && v.gr && (v.gt || 'esp') !== (u.gt || 'esp') && cheb(u, v) <= S.GAR.near) t.add(v.gt || 'esp'); return Math.min(t.size, S.GAR.maxMix); } // tipos distintos cerca: ejército combinado
+function garNear(g, u) { let n = 0; for (const v of g.units) if (v !== u && v.gr && cheb(u, v) <= S.GAR.near) n++; return Math.min(n, S.GAR.maxNear); }
+const garList = g => g.units.filter(u => u.gr);
+const garCap = g => S.GAR.cap + S.GAR.perPlayer * Math.max(1, g.players.filter(p => p.alive).length);
+function garCost(g, t) { const n = garList(g).length, k = 1 + S.GAR.step * n, c = {}, B = S.GAR.types[t || 'esp'].cost; for (const m in B) c[m] = Math.ceil(B[m] * k); return c; }
+function garSpawn(g, owner, t) {
+  const C = S.CIT, sp = dgSpot(g, C.plaza.x, C.plaza.y + 3, 'g', 9); if (!sp) return null;
+  const u = newUnit(g, owner, sp.x, sp.y); g.garN = (g.garN | 0) + 1;
+  t = S.GAR.types[t] ? t : 'esp'; u.gt = t; u.name = S.GAR.types[t].n + ' ' + g.garN; u.gr = true; u.pts = 0; u.hp = S.GAR.types[t].hp * S.GAR.n; u.lv = 1; return u;
+}
+function doGarrison(g, p, t) {
+  t = S.GAR.types[t] ? t : 'esp';
+  if (!isCit(g)) return 'Las guarniciones solo existen en la Ciudadela';
+  const city = citCity(g); if (!city) return 'Ciudad no encontrada';
+  if (garList(g).length >= garCap(g)) return `Ya hay ${garList(g).length} guarniciones (máximo ${garCap(g)})`;
+  const cost = garCost(g, t); if (!canAfford(city.st.m, cost)) return 'Faltan materiales en el almacén: ' + fmtMats(cost);
+  const u = garSpawn(g, p.id, t); if (!u) return 'No hay espacio libre en la plaza';
+  spend(city.st.m, cost); u.mp = 0; u.at = 0; u.moved = true; u.acted = true; touch(g);
+  ev(g, `${S.GAR.e} ${p.name} recluta ${u.name} (4 ${S.GAR.types[t].n.toLowerCase()}). Cuesta ${fmtMats(cost)}.`, null, 'city');
+  return null;
+}
+function garAuto(g) { // las guarniciones sin órdenes defienden solas: golpean a la criatura adyacente
+  if (!isCit(g)) return;
+  for (const u of garList(g)) {
+    if (u.acted || u.at <= 0 || u.hp <= 0) continue;
+    const rg = eff(g, u).range, foe = g.creatures.filter(c => cheb(u, c) <= rg && cheb(u, c) >= (rg > 1 ? 1 : 1) && !c.dg).sort((a, b) => a.hp - b.hp)[0]; if (!foe) continue;
+    try { const r = doAttack(g, u, 'c', foe.id); if (typeof r !== 'string') u.at = 0; } catch (e) { /* sin objetivo válido */ }
+  }
+}
+const wlMax = g => { const c = citCity(g); return S.WALL.hp + S.WALL.perLevel * ((c && c.b && c.b.muralla) | 0); };
+const wlHp = (g, k) => (g.wl && g.wl[k] !== undefined) ? g.wl[k] : wlMax(g);
+function setTerrCh(g, k, ch) { const t = g.map.t; g.map.t = t.slice(0, k) + ch + t.slice(k + 1); g._dm = {}; touch(g); }
+function wallHit(g, x, y, dmg) {
+  const w = g.map.w, k = y * w + x, hp = wlHp(g, k) - dmg; g.wl = g.wl || {};
+  if (!g.cw.wm) { g.cw.wm = 1; ev(g, '🧱 ¡Las criaturas atacan la muralla! Si cae un tramo se abrirá una brecha.', null, 'horde'); }
+  if (hp <= 0) { g.wl[k] = 0; setTerrCh(g, k, 'd'); ev(g, `🧱 ¡Brecha! Las criaturas derriban un tramo de la muralla en (${x}, ${y}).`, null, 'horde'); return true; }
+  g.wl[k] = hp; touch(g); return false;
+}
+function wallBreak(g, c, cs, gx, gy) { // criatura terrestre atascada ante la muralla: la golpea
+  if (!isCit(g) || c.dg || S.CREATURES[c.t].cross) return false;
+  const w = g.map.w, dm = distMap(g, gx, gy, true), cur = dm[c.y * w + c.x]; let best = null;
+  for (const [dx, dy] of S.DIRS) {
+    const x = c.x + dx, y = c.y + dy; if (!inB(g, x, y) || g.map.t.charAt(y * w + x) !== 'W') continue;
+    const dd = dm[y * w + x]; if (dd < cur && (!best || dd < best.dd)) best = { x, y, dd };
+  }
+  if (!best) return false;
+  wallHit(g, best.x, best.y, Math.max(1, Math.round(cs.dmg * (S.CREATURES[c.t].boss ? 3 : 1)))); return true;
+}
+function wallTick(g) { // reparación entre oleadas: tramos dañados se curan solos y las brechas se reconstruyen con materiales
+  if (!g.wl) return; const city = citCity(g), mx = wlMax(g), w = g.map.w, ix = idx(g); let fixed = 0;
+  for (const key of Object.keys(g.wl)) {
+    const k = +key, x = k % w, y = (k - x) / w;
+    if (g.creatures.some(c => c.tg && cheb(c, { x, y }) <= 5)) continue; // con enemigos cerca no se repara
+    if (g.wl[k] === 0) {
+      if (fixed >= S.WALL.perTurn || ix.U.has(k) || ix.C.has(k) || !canAfford(city.st.m, S.WALL.repair)) continue;
+      spend(city.st.m, S.WALL.repair); setTerrCh(g, k, 'W'); g.wl[k] = Math.round(mx * 0.5); fixed++;
+    } else { g.wl[k] = Math.min(mx, g.wl[k] + Math.ceil(mx * S.WALL.regen)); if (g.wl[k] >= mx) delete g.wl[k]; touch(g); }
+  }
+  if (fixed) ev(g, `🧱 Se reconstruyen ${fixed} tramo(s) de muralla (${fmtMats(S.WALL.repair)} cada uno).`, null, 'city');
 }
 function citTick(g) {
   const C = S.CIT, w = g.cw, city = citCity(g); if (!w || !city || g.status !== 'playing') return;
   try { citWorldTick(g); } catch (e) { console.error('cit world error', e); }
+  try { citDefTick(g); } catch (e) { console.error('cit def error', e); }
+  try { citEvent(g); } catch (e) { console.error('cit event error', e); }
+  try { wallTick(g); } catch (e) { console.error('wall error', e); }
   // las criaturas que llegan a la plaza dañan la integridad de la ciudad
   let dmg = 0;
   for (const c of g.creatures) if (c.tg === city.id && cheb(c, city) <= 2) { const cs = cstats(c, g); dmg += Math.max(1, Math.ceil(cs.dmg / 10)) * (S.CREATURES[c.t].boss ? 3 : 1); }
@@ -3622,7 +3946,7 @@ function citTick(g) {
     const m = { hueso: 5 + 2 * n, cuero: 5 + 2 * n, hierro: 3 + n }; if (n >= 5) m.acero = Math.floor(n / 2); if (n >= 10) m.alma = Math.floor(n / 4);
     for (const key in m) city.st.m[key] = (city.st.m[key] || 0) + Math.round(m[key] * k);
     if (n % C.boss === 0) city.st.it.push(rareItem(g, {}));
-    w.next = g.turn + citGap(g); touch(g);
+    w.next = g.turn + citGap(g); defRepair(g); touch(g);
     ev(g, `✅ ¡Oleada ${n} superada! La Ciudadela recibe materiales${n % C.boss === 0 ? ' y un objeto de botín' : ''}. La siguiente llega en ${citGap(g)} turnos: ¡a mejorar y reclutar!`, null, 'story');
   }
   if (w.n >= w.total && w.cleared >= w.total) {
@@ -3633,15 +3957,98 @@ function citTick(g) {
   }
   if (w.n < w.total && (!w.n || w.cleared) && w.next && g.turn >= w.next) citSpawn(g);
 }
+/* ---------- Ciudadela (v1.68): defensas de la ciudad ---------- */
+const defCap = g => 8 + 2 * ((((citCity(g) || {}).b) || {}).muralla || 0);
+function defStat(g, d) {
+  const n = (g.cw && g.cw.n) || 0, lv = d.lv;
+  switch (d.k) {
+    case 'torre': return { range: lv >= 3 ? 6 : 5, shots: lv >= 3 ? 2 : 1, dmg: 14 + 10 * lv + 2 * n };
+    case 'escarcha': return { range: 3, hits: 1 + lv, dmg: 4 + 3 * lv + Math.floor(n / 2), slow: lv >= 3 ? 2 : 1 };
+    case 'trampa': return { dmg: 40 + 25 * lv + 4 * n, ch: 3, slow: 1 };
+    default: return { hp: 70 + 50 * lv }; // barricada
+  }
+}
+function defZoneOk(g, x, y) { // fuera de la muralla, a como mucho 7 casillas; nunca sobre puertas, arena ni terreno impracticable
+  const R = S.CIT.r; if (!inB(g, x, y) || y >= mapH0(g)) return 'Casilla fuera del mapa';
+  if (x < R.x0 - 7 || x > R.x1 + 7 || y < R.y0 - 7 || y > R.y1 + 7) return 'Demasiado lejos de la muralla (máx. 7 casillas)';
+  if (x >= R.x0 - 1 && x <= R.x1 + 1 && y >= R.y0 - 1 && y <= R.y1 + 1) return 'Las defensas se construyen fuera de la muralla';
+  if (S.CIT.gates.some(gt => gt.x === x && gt.y === y)) return 'No puedes bloquear la puerta';
+  const A = S.CIT.arena; if (cheb({ x, y }, A) <= 3) return 'Demasiado cerca de la arena';
+  if (!'gfhd'.includes(terrAt(g, x, y))) return 'Ahí no se puede construir';
+  return null;
+}
+function doDef(g, p, m) {
+  const city = citCity(g); if (!city) return 'Sin ciudad';
+  g.defs = g.defs || [];
+  const op = m.op;
+  if (op === 'build') {
+    const T = S.DEFS[m.k]; if (!T) return 'Defensa desconocida';
+    const x = m.x | 0, y = m.y | 0, bad = defZoneOk(g, x, y); if (bad) return bad;
+    const ix = idx(g), k = y * g.map.w + x;
+    if (ix.U.has(k) || ix.C.has(k) || ix.T.has(k) || g.defs.some(d => d.x === x && d.y === y) || (g.npcs || []).some(n => n.x === x && n.y === y)) return 'Casilla ocupada';
+    if (g.defs.length >= defCap(g)) return `Máximo ${defCap(g)} defensas (mejorar la muralla sube el límite)`;
+    if (!canAfford(city.st.m, T.cost)) return 'Faltan materiales en el almacén: ' + fmtMats(T.cost);
+    spend(city.st.m, T.cost);
+    const d = { id: (g.defid = (g.defid || 0) + 1), k: m.k, x, y, lv: 1 }; const st = defStat(g, d); d.max = st.hp || 0; d.hp = d.max; d.ch = st.ch || 0;
+    g.defs.push(d); touch(g);
+    ev(g, `🛡️ ${p.name} construye ${T.e} ${T.n}.`, null, 'site');
+    return { msg: `${T.n} construida` };
+  }
+  const d = g.defs.find(q => q.id === (m.id | 0)); if (!d) return 'Esa defensa ya no existe';
+  const T = S.DEFS[d.k];
+  if (op === 'up') {
+    if (d.lv >= 3) return 'Ya está al máximo';
+    const cost = T.up[d.lv - 1]; if (!canAfford(city.st.m, cost)) return 'Faltan materiales en el almacén: ' + fmtMats(cost);
+    spend(city.st.m, cost); d.lv++; const st = defStat(g, d); if (d.k === 'barricada') { d.max = st.hp; d.hp = d.max; } if (d.k === 'trampa') d.ch = st.ch; touch(g);
+    return { msg: `${T.n} mejorada al nivel ${d.lv}` };
+  }
+  if (op === 'sell') {
+    const back = {}; for (const mt in T.cost) { const n = Math.floor(T.cost[mt] / 2); if (n) back[mt] = n; }
+    for (const mt in back) city.st.m[mt] = (city.st.m[mt] || 0) + back[mt];
+    g.defs.splice(g.defs.indexOf(d), 1); touch(g);
+    return { msg: `${T.n} desmontada` + (Object.keys(back).length ? ' (recuperas ' + fmtMats(back) + ')' : '') };
+  }
+  return 'Orden desconocida';
+}
+function defKill(g, c, d) { // una criatura cae por una defensa: el botín va al almacén de la ciudad
+  const T = S.CREATURES[c.t], city = citCity(g);
+  if (T.rv && !c.rvd) { c.rvd = true; c.hp = Math.max(1, Math.round(cstats(c, g).mhp * T.rv)); ev(g, `🔥 ¡${T.n} resurge de sus cenizas!`, null, 'boss'); touch(g); return; }
+  removeCreature(g, c);
+  if (T.boss || c.bd || T.ab === 'llamado') for (const mm of g.creatures.filter(x => x.bo === c.id)) removeCreature(g, mm);
+  if (city && !c.min) { const dr = rollDrops(g, c); for (const mt in dr) city.st.m[mt] = (city.st.m[mt] || 0) + dr[mt]; }
+  g.cit.dk = (g.cit.dk || 0) + 1; touch(g);
+}
+function defHit(g, d, c, raw, kind) {
+  const cs = cstats(c, g), dmg = calcDamage(raw, cs.def, 0);
+  c.hp -= dmg; c.hit = true; vfx(g, c.x, c.y, kind, d.x, d.y);
+  if (c.hp <= 0) defKill(g, c, d);
+}
+function citDefTick(g) {
+  const ds = g.defs; if (!ds || !ds.length) return;
+  const foes = () => g.creatures.filter(c => c.tg && c.hp > 0);
+  const near = (d, r) => foes().filter(c => cheb(c, d) <= r).sort((a, b) => cheb(a, d) - cheb(b, d) || a.hp - b.hp);
+  for (const d of ds.slice()) {
+    const st = defStat(g, d);
+    if (d.k === 'torre') { for (let s = 0; s < st.shots; s++) { const t = near(d, st.range)[0]; if (!t) break; defHit(g, d, t, st.dmg, 'shot'); } }
+    else if (d.k === 'escarcha') { for (const t of near(d, st.range).slice(0, st.hits)) { t.sl = Math.max(t.sl || 0, st.slow); defHit(g, d, t, st.dmg, 'frost'); } }
+    else if (d.k === 'trampa' && d.ch > 0) { const t = near(d, 1)[0]; if (t) { d.ch--; t.sl = Math.max(t.sl || 0, st.slow); defHit(g, d, t, st.dmg, 'trap'); touch(g); } }
+    else if (d.k === 'barricada') { // las criaturas pegadas a la barricada la golpean
+      let hit = 0; for (const c of g.creatures) if (c.tg && cheb(c, d) <= 1) hit += Math.max(1, Math.ceil(cstats(c, g).dmg * 0.6));
+      if (hit) { d.hp -= hit; touch(g); if (d.hp <= 0) { g.defs.splice(g.defs.indexOf(d), 1); ev(g, `💥 ¡Las criaturas destrozan una ${S.DEFS.barricada.n.toLowerCase()}!`, null, 'horde'); } }
+    }
+  }
+}
+function defRepair(g) { for (const d of g.defs || []) { const st = defStat(g, d); if (d.k === 'barricada') { d.max = st.hp; d.hp = d.max; } if (d.k === 'trampa') d.ch = st.ch; } }
 function citInfo(g, pid, vis) {
   const w = g.cw, p = g.players[pid]; if (!w) return null;
   const left = w.ids.length ? citLeft(g) : 0;
   const wv = vis || visFor(g, pid), W0 = g.map.w;
-  return { hp: g.cit.hp, max: g.cit.max, arena: S.CIT.arena, lots: S.CIT.lots, market: S.CIT.market,
+  const w0 = g.map.w;
+  return { gar: { n: garList(g).length, cap: garCap(g), costs: Object.fromEntries(Object.keys(S.GAR.types).map(t => [t, garCost(g, t)])), nb: S.GAR.maxNear }, wm: wlMax(g), wl: Object.keys(g.wl || {}).map(k => { const x = k % w0; return [x, (k - x) / w0, g.wl[k]]; }), hp: g.cit.hp, max: g.cit.max, df: (g.defs || []).map(d => ({ id: d.id, k: d.k, x: d.x, y: d.y, lv: d.lv, hp: d.hp, mx: d.max, ch: d.ch })), dcap: defCap(g), dk: g.cit.dk || 0, arena: S.CIT.arena, lots: S.CIT.lots, market: S.CIT.market,
     npcs: (g.npcs || []).filter(n => wv[n.y * W0 + n.x]).map(n => ({ id: n.id, k: n.k, x: n.x, y: n.y, name: n.name, left: Math.max(0, n.until - g.turn), lv: n.lv, sk: n.sk, cost: n.cost, cls: n.cls, uses: n.uses | 0 })),
     bar: g.bar ? { left: Math.max(0, g.bar.next - g.turn), c: g.bar.c.map(c => ({ id: c.id, rar: c.rar, name: c.name, lv: c.lv, sk: c.sk, cls: c.cls, sub: c.sub, vamp: c.vamp ? 1 : 0, sx: c.sx || 'M', cost: c.cost, taken: c.taken !== undefined })) } : null,
     ar: g.arena ? { open: 1, left: Math.max(0, g.arena.end - g.turn), ent: Object.keys(g.arena.ent).map(Number), rounds: S.ARENA.rounds, last: g.arena.last || null } : { open: 0, next: Math.max(0, arenaNext(g) - g.turn), rounds: S.ARENA.rounds, ent: [] }, r: S.CIT.r, gates: S.CIT.gates, plaza: S.CIT.plaza, units: S.CIT.units,
-    pv: (w.scout === w.n + 1 && w.n < w.total) ? (q => ({ n: q.n, cnt: citCnt(g, q), lv: q.lv, types: q.types, boss: q.boss }))(citPlan(g, w.n + 1)) : null, weak: citWeak(g), raid: S.CIT.raid, inDg: g.units.filter(u => u.o === pid && u.dg && !u.sm).length,
+    pv: (w.scout === w.n + 1 && w.n < w.total) ? (q => ({ n: q.n, cnt: citCnt(g, q), lv: q.lv, types: q.types, boss: q.boss, theme: q.theme }))(citPlan(g, w.n + 1)) : null, weak: citWeak(g), raid: S.CIT.raid, inDg: g.units.filter(u => u.o === pid && u.dg && !u.sm).length,
     w: { n: w.n, total: w.total, next: w.next ? Math.max(0, w.next - g.turn) : 0, left, cnt: w.cnt || 0, cleared: w.cleared || 0, fin: !!w.fin, lost: !!w.lost, boss: S.CIT.boss },
     sq: ((p && p.sq) || []).map(s => ({ id: s.id, n: s.n, k: s.k, x: s.x, y: s.y, g: s.g || null, auto: s.auto ? 1 : 0, ...(sqStat(g, pid, s)) })) };
 }
@@ -3650,8 +4057,8 @@ const NPC_NAMES = ['Alden', 'Brisa', 'Cato', 'Dunia', 'Eloy', 'Faro', 'Gaia', 'H
 const citProg = g => (g.cw ? g.cw.n : 0);
 function citRandSk(g, pts) { // reparte los puntos de habilidad al azar (movilidad máx. 2, doble ataque una vez)
   const sk = { dano: 0, salud: 0, movilidad: 0, medico: 0, doble: 0, defensa: 0, general: 0 };
-  const W = [['dano', 4], ['salud', 3], ['defensa', 3], ['general', 1], ['medico', 1], ['movilidad', 1], ['doble', 1]];
-  for (let i = 0; i < pts; i++) { const k = wpick(g, W); if ((k === 'movilidad' && sk[k] >= 2) || (k === 'doble' && sk[k] >= 1)) sk.dano++; else sk[k]++; }
+  const W = [['dano', 4], ['salud', 3], ['defensa', 3], ['general', 1], ['medico', 1], ['movilidad', 1], ['doble', 1], ['esquiva', 1], ['regen', 1], ['contra', 0.5], ['embestida', 0.5], ['provocar', 0.3], ['alcance', 0.3]];
+  for (let i = 0; i < pts; i++) { const k = wpick(g, W); if ((sk[k] || 0) >= S.SKILLS[k].cap) sk.dano = Math.min(S.SKILLS.dano.cap, sk.dano + 1); else sk[k] = (sk[k] || 0) + 1; }
   return sk;
 }
 function citMkUnit(g, p, spot, c) { // crea una unidad a partir de un candidato (viajero o taberna)
@@ -3953,12 +4360,56 @@ function squadRun(g, p, only) {
   }
   return n;
 }
+/* v1.69: los bots de la Ciudadela aprovechan el tiempo entre oleadas: cazan, suben de nivel, se equipan y construyen defensas */
+function citBotHunt(g, p, mine) {
+  const plaza = S.CIT.plaza, sqp = squadPower(g, mine);
+  let tg = null, bs = -1;
+  for (const c of g.creatures) {
+    if (c.tg || c.dg || cheb(c, plaza) > 36) continue;
+    const cs = cstats(c, g); if (sqp.pw < 2.4 * cs.dmg * ehp(cs.mhp, cs.def)) continue; // solo lo que el grupo vence con holgura
+    const s = (10 + 4 * c.lv + S.CREATURES[c.t].xp * 0.5 + (c.el ? 25 : 0) + (S.CREATURES[c.t].boss ? 30 : 0)) / (cheb(c, plaza) + 8);
+    if (s > bs) { bs = s; tg = c; }
+  }
+  const hs = p._hq || (p._hq = { k: 'hunt', id: -1, n: 'bot', rt: 50, rb: 80 });
+  let cx = 0, cy = 0; for (const u of mine) { cx += u.x; cy += u.y; } const cen = { x: cx / mine.length, y: cy / mine.length };
+  for (const u of mine) {
+    if (!g.units.includes(u)) continue;
+    const fr = u.hp / eff(g, u).maxHp;
+    if (!tg || fr < 0.6 || u.rtr) { squadUnit(g, p, u, hs); continue; } // heridos: a la ciudad a curarse
+    const d = cheb(u, tg);
+    if (d <= 9) { squadUnit(g, p, u, hs); continue; } // cerca: ataca (autoUnit)
+    if (d < cheb(cen, tg) - 3) continue; // no se adelanta al grupo
+    headTo(g, u, tg.x, tg.y);
+  }
+}
+function citBotDefs(g, p) {
+  const city = citCity(g); if (!city || g.turn % 2) return;
+  const m = city.st.m, ds = g.defs || [], cap = defCap(g);
+  const x2 = c => { const o = {}; for (const k in c) o[k] = c[k] * 2; return o; }; // solo con excedente: debe sobrar el doble
+  const tryBuild = (k, x, y) => { if (ds.length >= cap || !canAfford(m, x2(S.DEFS[k].cost))) return false; if (defZoneOk(g, x, y)) return false; return typeof doDef(g, p, { op: 'build', k, x, y }) !== 'string'; };
+  const dir = { E: [1, 0], S: [0, 1], N: [0, -1], W: [-1, 0] };
+  // 1) mejorar lo que ya hay (torres primero)
+  for (const d of ds.slice().sort((a, b) => (a.k === 'torre' ? 0 : 1) - (b.k === 'torre' ? 0 : 1) || a.lv - b.lv)) {
+    if (d.lv >= 3 || d.k === 'barricada') continue; const up = S.DEFS[d.k].up[d.lv - 1];
+    if (canAfford(m, x2(up)) && typeof doDef(g, p, { op: 'up', id: d.id }) !== 'string') return;
+  }
+  // 2) construir en cada puerta: 2 torres a los lados del camino, 1 trampa sobre el camino, 1 torre de escarcha y 1 barricada más adelante
+  for (const gt of S.CIT.gates) {
+    const [dx, dy] = dir[gt.k] || [1, 0], px = -dy, py = dx;
+    const plan = [['torre', gt.x + dx * 4 + px * 2, gt.y + dy * 4 + py * 2], ['torre', gt.x + dx * 4 - px * 2, gt.y + dy * 4 - py * 2], ['trampa', gt.x + dx * 5, gt.y + dy * 5], ['escarcha', gt.x + dx * 4 + px * 3, gt.y + dy * 5 + py * 3], ['barricada', gt.x + dx * 7, gt.y + dy * 7]];
+    for (const [k, x, y] of plan) { if (ds.some(d => d.x === x && d.y === y)) continue; if (tryBuild(k, x, y)) return; }
+  }
+}
 function citBot(g, p) { // los bots de la Ciudadela defienden la puerta más cercana a los enemigos
   const plaza = S.CIT.plaza, foes = g.creatures.filter(c => c.tg).sort((a, b) => cheb(a, plaza) - cheb(b, plaza));
   let pt = { x: plaza.x, y: plaza.y };
   if (foes.length) { const gt = S.CIT.gates.slice().sort((a, b) => cheb(a, foes[0]) - cheb(b, foes[0]))[0]; pt = gateIn(gt); }
   const sq = { k: 'guard', x: pt.x, y: pt.y, rt: 35, rb: 50 };
-  for (const u of g.units.filter(x => x.o === p.id && !isAux(x))) if (g.units.includes(u)) squadUnit(g, p, u, sq);
+  const mine = g.units.filter(x => x.o === p.id && !isAux(x) && !x.dg);
+  const free = !foes.length && g.cw && g.cw.next - g.turn > 12; // tiempo de sobra hasta la próxima oleada
+  if (free && mine.length) citBotHunt(g, p, mine);
+  else for (const u of mine) if (g.units.includes(u)) squadUnit(g, p, u, sq);
+  if (!foes.length && g.players.find(q => q.bot && q.alive !== false) === p) citBotDefs(g, p); // un solo bot por turno construye
   const city = citCity(g); // los bots también reclutan (sin vaciar el almacén)
   if (city && g.units.filter(x => x.o === p.id && !isAux(x)).length < 10) { const cost = recruitCost(g, p.id, city); if (canAfford(city.st.m, cost) && (city.st.m.cuero || 0) >= 3 * (cost.cuero || 0)) doRecruit(g, p, city); }
 }
@@ -4007,7 +4458,7 @@ function autoHeal(g, u) { // cura a los aliados heridos que pueda alcanzar; devu
 function autoGear(g, u, c) { // se equipa lo mejor que tenga en la mochila o en el almacén de la ciudad junto a la que está
   const sc = it => it.t * 10 + (it.r || 0) * 4 + (it.fx ? it.fx.length : 0) * 2 + ((it.gm || []).filter(Boolean).length);
   let changed = false;
-  for (const slot of ['arma', 'escudo', 'casco', 'guantes', 'hombreras', 'pechera', 'pantalones', 'botas', 'mochila']) {
+  for (const slot of ['arma', 'escudo', 'casco', 'guantes', 'hombreras', 'pechera', 'pantalones', 'botas', 'mochila', 'antorcha']) {
     const cur = u.eq[slot];
     const ok = it => K[it.k] && K[it.k].slot === slot && sc(it) > (cur ? sc(cur) : -1)
       && (slot !== 'arma' || !cur || it.k === cur.k || (K[it.k].magic === K[cur.k].magic && (K[it.k].range > 1) === (K[cur.k].range > 1) && ![it.k, cur.k].some(x => K[x].heal || K[x].multi || K[x].necro)))
@@ -4067,6 +4518,63 @@ function autoUnit(g, p, u) {
   }
   return did;
 }
+/* v1.69.1: los bots reconocen el beneficio de criar (nivel promedio de los padres + bonus de nacimiento que se acumula por generación) y buscan activamente a una pareja */
+function botBreed(g, p, outside, done) {
+  const need = BREED_NEED[g.cfg.breed]; if (!need || isCit(g) || g.cfg.mode === 'uno' || global.__nobreed) { p.brd = null; return; }
+  const mine = g.units.filter(u => u.o === p.id && !isAux(u) && !u.bs);
+  const cities = g.cities.filter(c => c.owner === p.id);
+  if (!cities.length || mine.length >= BREED_MAX - 1) { p.brd = null; return; }
+  const sexOk = (a, b) => g.cfg.gender === 'no' || S.sexOf(a) !== S.sexOf(b);
+  const fit = u => !u.dg && u.hp >= eff(g, u).maxHp * 0.6 && (u.bc || 0) <= g.turn && outside.includes(u) && g.units.includes(u);
+  let a = null, b = null, city = null;
+  if (p.brd) { a = g.units.find(u => u.id === p.brd.a); b = g.units.find(u => u.id === p.brd.b); city = cities.find(c => c.id === p.brd.c); if (!a || !b || !city || g.turn > p.brd.until || !fit(a) || !fit(b)) { p.brd = null; a = b = city = null; } }
+  if (!p.brd) { // elegir la mejor pareja: la de más nivel y más cercana a una ciudad
+    let best = null; const list = outside.filter(fit);
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+      const x = list[i], y = list[j]; if (!sexOk(x, y)) continue;
+      for (const c of cities) { const d = Math.max(cheb(x, c), cheb(y, c)); if (d > 14) continue; const s = (x.lv + y.lv) * 1.5 - d * 0.4 + ((x.gen || 0) + (y.gen || 0)) * 0.5; if (!best || s > best.s) best = { s, x, y, c }; }
+    }
+    if (!best) return;
+    a = best.x; b = best.y; city = best.c; p.brd = { a: a.id, b: b.id, c: city.id, until: g.turn + need + 10 };
+  }
+  // peligro: con amenazas cerca de la ciudad o de la pareja, que defiendan (se cancela hasta que pase)
+  for (const c of g.creatures) { if ((c.dg || 0) !== 0) continue; const cs = cstats(c, g); if ((cs.agg > 0 || c.prov) && (cheb(c, city) <= 7 || cheb(c, a) <= 6 || cheb(c, b) <= 6)) { p.brd = null; return; } }
+  for (const o of g.units) if (o.o !== p.id && !o.dg && !isAux(o) && !pactOf(g, p.id, o.o) && (cheb(o, city) <= 9 || cheb(o, a) <= 7)) { p.brd = null; return; }
+  const near = u => cheb(u, city) <= 2;
+  if (!near(a)) headTo(g, a, city.x, city.y);
+  if (near(a) && cheb(a, b) !== 1 || !near(b)) { // la pareja se coloca junto a la ciudad, una al lado de la otra
+    const w = g.map.w, r = S.reach(envFor(g, b), b.x, b.y, b.mp); let best = null;
+    for (const [k, v] of r) { if (!v.end) continue; const x = k % w, y = (k - x) / w; if (cheb({ x, y }, a) !== 1 || cheb({ x, y }, city) > 2) continue; if (!best || v.c < best.c) best = { x, y, c: v.c }; }
+    if (best) doMove(g, b, best.x, best.y); else if (cheb(a, b) > 1) headTo(g, b, a.x, a.y);
+  }
+  done.add(a.id); done.add(b.id);
+}
+function botFlee(g, p, u, e) { // v1.69: si una criatura que el grupo no puede vencer le alcanza este turno, se aparta (o se pega a sus aliados) en vez de esperar la muerte
+  const dg = u.dg || 0, thr = [];
+  for (const c of g.creatures) {
+    if ((c.dg || 0) !== dg || (p._ok && p._ok.has(c.id))) continue;
+    const cs = cstats(c, g); if (!(cs.agg > 0 || c.prov)) continue;
+    const reach = cs.mov + cs.rng + 1; if (cheb(c, u) > reach + 2) continue;
+    thr.push({ x: c.x, y: c.y, reach, pw: cs.dmg * ehp(cs.mhp, cs.def) });
+  }
+  for (const o of g.units) { // y de grupos rivales que no puede vencer (no aliados)
+    if (o.o === p.id || (o.dg || 0) !== dg || isAux(o) || pactOf(g, p.id, o.o) || (p._ok && p._ok.has('u' + o.id))) continue;
+    const oe = eff(g, o), reach = oe.mov + oe.range + 1; if (cheb(o, u) > reach + 2) continue;
+    thr.push({ x: o.x, y: o.y, reach, pw: oe.dmg * oe.attacks * ehp(o.hp, oe.def) });
+  }
+  if (!thr.length) return false;
+  const near = g.units.filter(v => v.o === p.id && !isAux(v) && cheb(v, u) <= 3 && (v.dg || 0) === dg);
+  if (squadPower(g, near).pw >= 1.2 * thr.reduce((a, t) => a + t.pw, 0)) return false; // el grupo cercano puede con ellas: se queda
+  const w = g.map.w, r = S.reach(envFor(g, u), u.x, u.y, u.mp);
+  const margin = (x, y) => thr.reduce((a, t) => Math.min(a, cheb({ x, y }, t) - t.reach), 99);
+  const homes = g.cities.filter(c => c.owner === p.id);
+  const score = (x, y, c) => margin(x, y) * 3 + near.filter(v => v !== u && cheb(v, { x, y }) <= 2).length * 1.5 - c * 0.15 - (homes.length ? Math.min(...homes.map(h => cheb(h, { x, y }))) * 0.25 : 0);
+  let best = null; const cur = score(u.x, u.y, 0), curM = margin(u.x, u.y);
+  for (const [k, v] of r) { if (!v.end) continue; const x = k % w, y = (k - x) / w, s = score(x, y, v.c); if (!best || s > best.s) best = { s, x, y }; }
+  if (!best || best.s <= cur + 1 || margin(best.x, best.y) <= curM) return false; // sin salida mejor: pelea
+  if (doMove(g, u, best.x, best.y)) return false;
+  return true;
+}
 function botUnit(g, p, u, target, solo) {
   if (!g.units.includes(u)) return;
   const w = g.map.w;
@@ -4076,12 +4584,14 @@ function botUnit(g, p, u, target, solo) {
   for (const c of g.cities) if (c.owner === p.id) { const d = cheb(c, u); if (d < hd) { hd = d; home = c; } }
   if (home && u.hp / e.maxHp < 0.5) { if (hd > 1) headTo(g, u, home.x, home.y); return; }
   if (home && invW(u) >= 14) { if (hd > 1) headTo(g, u, home.x, home.y); return; }
+  if (botFlee(g, p, u, e)) return;
   for (let i = 0, n = Math.max(2, e.attacks); i < n; i++) {
     if (!g.units.includes(u) || u.at <= 0) break;
     e = eff(g, u);
     const b = bestAttack(g, p, u, e);
     if (!b) break;
     if (!b.isStart) { if (doMove(g, u, b.x, b.y)) break; }
+    p._ft = { tt: b.t.tt, id: b.t.ref.id, t: g.turn };
     const r = doAttack(g, u, b.t.tt, b.t.ref.id);
     if (typeof r === 'string') break;
   }
@@ -4230,7 +4740,7 @@ function botTurn(g, p) {
   if (isCit(g)) return citBot(g, p);
   let units = g.units.filter(u => u.o === p.id);
   units.forEach((u, i) => {
-    if (u.sm || u.cart || u.bld || u.sg) { u.role = 'frontal'; return; }
+    if (u.sm || u.cart || u.bld || u.sg || u.gr) { u.role = 'frontal'; return; }
     if (u.bs) { u.role = (S.CREATURES[u.bs].rng || 1) > 1 ? 'arquero' : u.bs === 'troll' || u.bs === 'orco' || u.bs === 'golem' ? 'tanque' : 'frontal'; while (u.pts > 0) { const tab = botPickSkill(u); if (!tab) break; applySkill(u, wpick(g, tab)); } return; }
     if (!u.role) {
       u.role = ROLES[i % ROLES.length];
@@ -4264,7 +4774,8 @@ function botTurn(g, p) {
   else if (p.bot) { const bc = botCfg(g, p); botTournGo(g, p, outside, bc.pb, done); botMerchGo(g, p, outside, bc.pb, done); }
   if (p.bot) for (const u of outside) if (u.bld && g.units.includes(u)) botBuilder(g, p, u);
   if (p.bot && siegeOn(g)) botSiege(g, p);
-  for (const u of outside) if (!u.cart && !u.bld && !u.sg && !done.has(u.id) && g.units.includes(u)) botUnit(g, p, u, target);
+  if (p.bot) botBreed(g, p, outside, done);
+  for (const u of outside) if (!u.cart && !u.bld && !u.sg && !u.gr && !done.has(u.id) && g.units.includes(u)) botUnit(g, p, u, target);
   if (inside.length) botDgInside(g, p, inside.filter(u => g.units.includes(u)));
 }
 
@@ -4299,7 +4810,7 @@ function summary(g) { // resumen de fin de partida: clasificación y premios
 }
 function snapshot(g, pid, now) {
   const base = {
-    code: g.code, status: g.status, turn: g.turn, endsAt: g.endsAt, now: now || Date.now(), hostId: g.hostId, you: pid, cfg: g.cfg, story: storyInfo(g), wv: waveInfo(g), ct: citInfo(g, pid), lab: labInfo(g), king: g.king === undefined ? null : g.king, winner: g.winner, winners: g.winners || null,
+    code: g.code, status: g.status, turn: g.turn, endsAt: g.endsAt, now: now || Date.now(), hostId: g.hostId, you: pid, cfg: g.cfg, dn: (g.cfg.dn !== 'no' && g.cfg.mode !== 'laberinto' && g.status === 'playing') ? (nightOn(g) ? { n: 1, left: S.nightLeft(g.turn) } : { n: 0, left: S.dayLeft(g.turn) }) : null, story: storyInfo(g), wv: waveInfo(g), ct: citInfo(g, pid), lab: labInfo(g), king: g.king === undefined ? null : g.king, winner: g.winner, winners: g.winners || null,
     players: g.players.map(p => ({ id: p.id, name: p.name, color: p.color, team: p.team === undefined ? null : p.team, bot: p.bot, pers: p.bot ? (p.pers || 'equilibrado') : undefined, auto: !!p.auto, alive: p.alive, ready: p.ready,
       score: g.status === 'lobby' ? 0 : score(g, p), units: g.units.filter(u => u.o === p.id && !isAux(u)).length, cities: g.cities.filter(c => c.owner === p.id).length,
       kills: p.stats.kills, boss: p.stats.boss, pk: p.stats.pk, hero: heroInfo(g, p), gt: (guildOf(g, p.id) || {}).tag, pr: protLeft(g, p.id) || undefined })),
@@ -4326,13 +4837,13 @@ function snapshot(g, pid, now) {
   terr = tarr.join(''); vs = varr.join('');
   const mine = [], others = [], cre = [];
   for (const u of g.units) {
-    if (u.o === pid) {
+    if (u.o === pid || (u.gr && isCit(g))) {
       const e = eff(g, u);
       mine.push({ id: u.id, o: u.o, name: u.name, x: u.x, y: u.y, dg: u.dg || 0, lv: u.lv, xp: u.xp, xpn: xpNeed(u.lv), hp: u.hp, pts: u.pts, sk: u.sk, eq: u.eq, inv: u.inv, mp: u.mp, at: u.at,
-        e: { maxHp: e.maxHp, def: e.def, dmg: e.dmg, range: e.range, min: e.min, mov: e.mov, attacks: e.attacks, pierce: e.pierce, aura: e.aura, ha: e.ha, fx: e.fx, heal: e.heal || 0 }, au: u.au || 0, sq: u.sq || 0, pz: u.pz ? 1 : 0, bn: u.bn || null, gen: u.gen || 0, cz: cityZone(g, u), bc: u.bc || 0, pr: pairInfo(g, u), sm: u.sm ? u.sm.k : null, bs: u.bs || null, hr: u.hero || null, cart: u.cart ? 1 : 0, sg: u.sg ? { k: u.sg.k, c: u.sg.c } : null, bld: u.bld ? { c: u.bld.c, bt: u.bt === g.turn ? 1 : 0 } : null, cap: capOf(u), sc: summonInfo(g, u), vp: u.vamp ? 1 : 0, pt: u.pt || 0, kl: u.kl || 0, hd: u.hd || null, fm: u.fm || null, rtr: u.rtr ? 1 : 0, sx: S.sexOf(u), cls: u.cls || null, sub: u.sub || null, ord: u.ord || null, nearCity: !!cityNear(g, u), nearCart: !!cartNear(g, u) });
+        e: { maxHp: e.maxHp, def: e.def, dmg: e.dmg, range: e.range, min: e.min, mov: e.mov, attacks: e.attacks, pierce: e.pierce, aura: e.aura, ha: e.ha, fx: e.fx, heal: e.heal || 0 }, au: u.au || 0, sq: u.sq || 0, pz: u.pz ? 1 : 0, bn: u.bn || null, gen: u.gen || 0, cz: cityZone(g, u), bc: u.bc || 0, pr: pairInfo(g, u), sm: u.sm ? u.sm.k : null, bs: u.bs || null, hr: u.hero || null, gr: u.gr ? garMembers(u) : 0, gn: u.gr ? garNear(g, u) : 0, gx: u.gr ? garMix(g, u) : 0, gt: u.gr ? (u.gt || 'esp') : null, cart: u.cart ? 1 : 0, sg: u.sg ? { k: u.sg.k, c: u.sg.c } : null, bld: u.bld ? { c: u.bld.c, bt: u.bt === g.turn ? 1 : 0 } : null, cap: capOf(u), sc: summonInfo(g, u), vp: u.vamp ? 1 : 0, pt: u.pt || 0, kl: u.kl || 0, hd: u.hd || null, fm: u.fm || null, rtr: u.rtr ? 1 : 0, sx: S.sexOf(u), cls: u.cls || null, sub: u.sub || null, ord: u.ord || null, nearCity: !!cityNear(g, u), nearCart: !!cartNear(g, u) });
     } else if (vis[u.y * w + u.x]) {
       const e = eff(g, u);
-      others.push({ id: u.id, o: u.o, name: u.name, x: u.x, y: u.y, lv: u.lv, hp: u.hp, mhp: e.maxHp, w: e.kind, def: e.def, dmg: e.dmg, pz: u.pz ? 1 : 0, sm: u.sm ? u.sm.k : null, bs: u.bs || null, hr: u.hero || null, vp: u.vamp ? 1 : 0, ct: u.cart ? 1 : 0, bl: u.bld ? 1 : 0, sg: u.sg ? u.sg.k : null, ah: u.eq && u.eq.casco ? u.eq.casco.t : 0, ac: u.eq && u.eq.pechera ? u.eq.pechera.t : 0 });
+      others.push({ id: u.id, o: u.o, name: u.name, x: u.x, y: u.y, lv: u.lv, hp: u.hp, mhp: e.maxHp, w: e.kind, def: e.def, dmg: e.dmg, pz: u.pz ? 1 : 0, sm: u.sm ? u.sm.k : null, bs: u.bs || null, hr: u.hero || null, vp: u.vamp ? 1 : 0, ct: u.cart ? 1 : 0, bl: u.bld ? 1 : 0, sg: u.sg ? u.sg.k : null, ah: u.eq && u.eq.casco ? u.eq.casco.t : 0, ac: u.eq && u.eq.pechera ? u.eq.pechera.t : 0, pt: u.pt || 0, sx: u.sx || null, cls: u.cls || null, hd: u.hd || null, wk: u.eq && u.eq.arma ? u.eq.arma.k : null, wt: u.eq && u.eq.arma ? u.eq.arma.t : 0, hm: u.eq && u.eq.hombreras ? u.eq.hombreras.t : 0, bt: u.eq && u.eq.botas ? u.eq.botas.t : 0, sh: u.eq && u.eq.escudo ? u.eq.escudo.t : 0, gl: u.eq && u.eq.guantes ? u.eq.guantes.t : 0 });
     }
   }
   for (const c of g.creatures) if (vis[c.y * w + c.x]) {
@@ -4362,6 +4873,7 @@ function snapshot(g, pid, now) {
     const e = g.events[i];
     if (!e.to || e.to.includes(pid)) log.push({ id: e.id, turn: e.turn, text: e.text, k: e.k });
   }
+  base.vx = (g.vx || []).filter(q => vis[q.y * w + q.x] || vis[q.ty * w + q.tx]).slice(-20);
   const roads = []; if (g.rd) for (const k in g.rd) if (ex[k]) roads.push([+k, g.rd[k]]);
   base.hist = histInfo(g, pid);
   base.chron = (g.chron || []).slice(-150);
@@ -4395,9 +4907,9 @@ function deserialize(s) {
   return g;
 }
 
-module.exports = {
-  citPlan, aura,
+module.exports = { citEvent, dayNightTick,
+  citPlan, aura, creaturesTurn, citSpawn, citLeft,
   rndLvTest: (g, t, x, y) => rndLv(g, t, x, y), createGame, addPlayer, addBot, joinWorld, removePlayer, startGame, cmd, advanceTurn, snapshot, serialize, deserialize,
-  refreshUnits, newUnit, doMove, doAttack, score, COLORS, COLOR_NAMES, eff, cstats, idx, touch,
-  chat, chatFor, botMem, botNote, reviveCost, holyCost, cityIncome, relinkStores, stationNear, builderOf, envFor, botMood, spawnCreature, spawnBoss, cstats, fillDungeon, dgName, gainXp, killUnit, killCreature, rareItem, addMats, capOf, invW, merchOffers, vampBite, markSeen, replaceableSlots, replaceBot, releasePlayer, pactOf,
+  refreshUnits, newUnit, doMove, doAttack, score, COLORS, COLOR_NAMES, eff, cstats, visFor, idx, touch,
+  citDefTick, garSpawn, doGarrison, garAuto, garNear, garMembers, wlMax, wallTick, wallHit, citCity, defStat, botBreed, botFlee, citBotDefs, citBotHunt, gainXp, chat, chatFor, botMem, botNote, reviveCost, holyCost, cityIncome, relinkStores, stationNear, builderOf, envFor, botMood, spawnCreature, spawnBoss, cstats, fillDungeon, dgName, gainXp, killUnit, killCreature, rareItem, addMats, capOf, invW, merchOffers, vampBite, markSeen, replaceableSlots, replaceBot, releasePlayer, pactOf,
 };

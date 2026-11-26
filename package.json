@@ -1,12 +1,12 @@
 {
   "name": "aventura-de-almas",
-  "version": "1.64.4",
+  "version": "1.74.0",
   "description": "Aventura de almas: estrategia por turnos para celular, hasta 10 jugadores",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "sim": "node test/sim.js 10 150",
-    "test": "node test/human.js && node test/push-vector.js && node test/persist.js && node test/features.js && node test/features2.js && node test/features3.js && node test/menu.js && node test/features4.js && node test/features5.js && node test/features6.js && node test/features7.js && node test/features8.js && node test/features9.js && node test/features10.js && node test/features11.js && node test/features12.js && node test/features13.js && node test/features14.js && node test/features15.js && node test/features16.js && node test/features17.js && node test/features18.js && node test/features19.js && node test/features20.js && node test/features21.js && node test/features22.js && node test/features23.js && node test/features24.js && node test/features25.js && node test/features26.js && node test/features27.js"
+    "test": "node test/human.js && node test/push-vector.js && node test/persist.js && node test/features.js && node test/features2.js && node test/features3.js && node test/menu.js && node test/features4.js && node test/features5.js && node test/features6.js && node test/features7.js && node test/features8.js && node test/features9.js && node test/features10.js && node test/features11.js && node test/features12.js && node test/features13.js && node test/features14.js && node test/features15.js && node test/features16.js && node test/features17.js && node test/features18.js && node test/features19.js && node test/features20.js && node test/features21.js && node test/features22.js && node test/features23.js && node test/features24.js && node test/features25.js && node test/features26.js && node test/features27.js && node test/features28.js && node test/features29.js && node test/features30.js && node test/features31.js && node test/features32.js && node test/features33.js && node test/features34.js && node test/features35.js && node test/features36.js && node test/features37.js && node test/features38.js && node test/features39.js && node test/features40.js && node test/features41.js && node test/features42.js"
   },
   "engines": { "node": ">=18" },
   "dependencies": {}

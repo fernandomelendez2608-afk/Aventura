@@ -81,6 +81,23 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:0}
 .lack{color:var(--red)}
 .ok{color:var(--green)}
 .pips{letter-spacing:1px;color:var(--gold)}
+.sktree{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:10px 0;padding:10px 4px 6px;background:radial-gradient(ellipse at 50% 0,#2a2f4a 0,var(--panel) 70%);border:1px solid var(--line);border-radius:14px}
+.skcol{display:flex;flex-direction:column;align-items:center}
+.skhead{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;text-align:center}
+.sklink{width:3px;height:14px;background:var(--line);border-radius:2px}
+.sklink.on{background:var(--gold);box-shadow:0 0 6px var(--gold)}
+.sknode{position:relative;width:58px;height:58px;border-radius:50%;border:0;padding:0;cursor:pointer;background:conic-gradient(var(--gold) calc(var(--p)*1%),#2c3350 0);display:flex;align-items:center;justify-content:center;color:var(--txt);font:inherit}
+.sknode::before{content:"";position:absolute;inset:5px;border-radius:50%;background:var(--panel2)}
+.sknode.on::before{background:#2e2a1c}
+.sknode.max{box-shadow:0 0 12px var(--gold)}
+.sknode.sel{outline:2px solid var(--txt);outline-offset:2px}
+.sknode.can{animation:skpulse 1.6s ease-in-out infinite}
+@keyframes skpulse{50%{box-shadow:0 0 12px var(--green)}}
+.sknode i{position:relative;font-style:normal;font-size:22px;line-height:1}
+.sknode b{position:absolute;bottom:-4px;right:-4px;z-index:1;font-size:11px;background:var(--bg);border:1px solid var(--gold);color:var(--gold);border-radius:9px;padding:0 5px}
+.sknm{font-size:11px;margin-top:6px;color:var(--dim);text-align:center;min-height:14px}
+.skinfo{background:var(--panel2);border:1px solid var(--gold);border-radius:12px;padding:10px 12px;margin:4px 0}
+
 .hint{color:var(--dim);font-size:13px;margin:6px 0}
 #pushBar{position:absolute;left:8px;right:8px;bottom:8px;z-index:6;background:#181c27f2;border:1px solid var(--gold);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;font-size:14px}
 #pushBar .row{gap:8px}
@@ -92,6 +109,12 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:0}
 #tut h3{text-align:center;margin:6px 0 10px}
 #tut .dots{text-align:center;margin:10px 0}#tut .dots i{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--line);margin:0 3px}#tut .dots i.on{background:var(--gold)}
 #tut .row{display:flex;gap:8px;margin-top:8px}#tut .row .btn{flex:1}
+#quest{position:fixed;left:8px;right:8px;top:calc(env(safe-area-inset-top,0px) + 54px);z-index:25;background:linear-gradient(135deg,#2c2a14,#1d2236);border:1px solid var(--gold);border-radius:14px;padding:8px 10px;display:flex;align-items:center;gap:10px;box-shadow:0 4px 18px #000a;max-width:460px;margin:0 auto}
+#quest .qe{font-size:26px}#quest .qt{flex:1;min-width:0;font-size:14px}#quest .qt b{display:block}#quest .qt span{color:var(--dim);font-size:12px}
+#quest .qn{font-size:11px;color:var(--gold);letter-spacing:.5px}#quest .btn{padding:4px 9px;font-size:12px}
+#quest.ok{border-color:#5fe08a;background:#16301f}
+.qglow{animation:qg 1s ease-in-out infinite;outline:2px solid var(--gold);outline-offset:2px}
+@keyframes qg{50%{box-shadow:0 0 16px 4px var(--gold)}}
 #nav{position:absolute;right:8px;top:120px;z-index:4;display:flex;flex-direction:column;gap:6px}
 #nav button{width:46px;height:46px;border-radius:50%;border:1px solid var(--line);background:#181c27ee;font-size:20px;position:relative}
 #sheet .chm{padding:5px 8px;margin:4px 0;border-radius:10px;background:#ffffff0d}#sheet .chm.me{background:#e6b45a22}#sheet .chm div{word-break:break-word}
@@ -198,6 +221,7 @@ body.sheetopen #nav{display:none} /* con una hoja abierta no tapan los botones +
   <div id="top"><span><button class="menub" id="gMenu" title="Menú principal">☰</button><span class="conn" id="gConn"></span><b id="gTurn">Turno 1</b></span><span class="mid" id="gTimer">--:--:--</span><span id="gReady" class="dim">0/0</span></div>
   <div id="cvwrap"><canvas id="cv"></canvas><canvas id="mm" width="104" height="104"></canvas><div id="nav"><button id="nHome" title="Ir a mi ciudad">🏠</button><button id="nStory" class="hidden" title="Historia">📖</button><button id="nWorld" class="hidden" title="Mundo: gremio, ranking y jefe mundial">🌍<small id="wCnt" class="hidden">0</small></button><button id="nHist" class="hidden" title="Historial por turnos">📈</button><button id="nSum" class="hidden" title="Resumen de la partida">📊</button><button id="nSnd" title="Sonido">🔊</button><button id="nHelp" title="Cómo se juega">❓</button><button id="nMan" title="Manual y avisos">📚</button><button id="nChat" title="Chat">💬<small id="chCnt" class="hidden">0</small></button><button id="nNext" title="Siguiente unidad con acciones">🛡️<small id="nCnt">0</small></button></div><div id="toast"></div><div id="pushBar" class="hidden"></div></div>
   <div id="tut" class="hidden"></div>
+  <div id="quest" class="hidden"></div>
   <div id="sheet" class="hidden"></div>
   <div id="bar">
     <button data-ui="units"><span>🛡️</span>Unidades<i class="badge hidden" id="bUnits"></i></button>
@@ -476,6 +500,17 @@ function fxDiff() {
   const cur = new Map(), add = (arr, k) => { for (const m of arr || []) cur.set(k + m.id, { x: m.x, y: m.y, hp: m.hp, lv: m.lv, k, dg: m.dg || 0 }); };
   add(S.mine, 'u'); add(S.others, 'o'); add(S.cre, 'c');
   const prev = fxPrev; fxPrev = cur;
+  { // efectos de habilidades enviados por el motor (esquiva, embestida, contraataque, provocar, regeneración)
+    const vx = S.vx || [], seen = window._vxSeen, mx = vx.reduce((a, q) => Math.max(a, q.id), 0);
+    if (seen !== undefined && !document.hidden && prev && window._fxCode === S.code) {
+      const nw = performance.now(); let k = 0;
+      for (const q of vx) { if (q.id <= seen || k++ >= 8) continue;
+        const T = { miss: ['¡Miss!', '#9fd8ff', true], charge: ['🐎 ¡Carga!', '#ffb454', true], counter: ['↩️ Contra', '#ff8f5a', true], taunt: ['📢', '#ffd34d', false], regen: ['💚', '#5fe08a', false], shot: ['', '#ffe066', false], frost: ['❄️', '#9fd8ff', false], trap: ['🪤', '#ff6b6b', true] }[q.k]; if (!T) continue;
+        fx.push({ x: q.x, y: q.y, t: T[0], col: T[1], big: T[2], t0: nw, ln: q.k === 'charge' || q.k === 'counter' || q.k === 'taunt' || q.k === 'shot' || q.k === 'frost' || q.k === 'trap' ? { x: q.tx, y: q.ty } : null, kind: q.k }); }
+      if (fx.length) dirty = true;
+    }
+    if (mx > (seen || 0) || seen === undefined) window._vxSeen = Math.max(mx, seen || 0);
+  }
   const turnUp = window._fxTurn !== undefined && S.turn > window._fxTurn; window._fxTurn = S.turn;
   if (!prev || window._fxCode !== S.code) { window._fxCode = S.code; return; }
   if (document.hidden) return;
@@ -496,6 +531,11 @@ function drawFx(ox, oy, z) {
   if (!fx.length) return; const now = performance.now(); fx = fx.filter(f => now - f.t0 < 1200);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const f of fx) {
+    if (f.ln) { // estela desde el origen hasta el objetivo (embestida, contraataque, provocar)
+      const la = Math.min(1, (now - f.t0) / 350), x0 = ox + (f.ln.x + .5) * z, y0 = oy + (f.ln.y + .5) * z, x1 = ox + (f.x + .5) * z, y1 = oy + (f.y + .5) * z, hx = x0 + (x1 - x0) * la, hy = y0 + (y1 - y0) * la;
+      ctx.globalAlpha = Math.max(0, 1 - (now - f.t0) / 700); ctx.strokeStyle = f.col; ctx.lineWidth = Math.max(3, z * .12); ctx.lineCap = 'round'; ctx.setLineDash(f.kind === 'taunt' ? [z * .12, z * .1] : []); ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(hx, hy); ctx.stroke(); ctx.setLineDash([]); ctx.lineCap = 'butt';
+      if (f.kind === 'charge' && la < 1) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(hx, hy, z * .14, 0, 7); ctx.fill(); }
+    }
     const a = (now - f.t0) / 1200, x = ox + (f.x + .5) * z, y = oy + (f.y + .35) * z - a * z * (f.big ? 1.1 : .8);
     ctx.globalAlpha = Math.max(0, 1 - a * a); ctx.font = 'bold ' + Math.round(z * (f.big ? .42 : .38)) + 'px sans-serif'; ctx.lineWidth = 3; ctx.strokeStyle = '#000'; ctx.strokeText(f.t, x, y); ctx.fillStyle = f.col; ctx.fillText(f.t, x, y);
     if (a < .3) { ctx.globalAlpha = .5 * (1 - a / .3); ctx.fillStyle = f.col; const q = Math.max(2, Math.round(z * .09)), r = z * (.2 + a * 1.1); for (let i = 0; i < 8; i++) { const an = i * Math.PI / 4 + .4; ctx.fillRect(Math.round(ox + (f.x + .5) * z + Math.cos(an) * r - q / 2), Math.round(oy + (f.y + .5) * z + Math.sin(an) * r - q / 2), q, q); } }
@@ -586,7 +626,7 @@ function fmtTime(ms) {
 }
 function renderTop() {
   if (!S || S.status === 'lobby') return;
-  $('gTurn').textContent = S.status === 'over' ? 'Partida terminada' : 'Turno ' + S.turn + (S.cfg.maxTurns ? ' / ' + S.cfg.maxTurns : '') + (S.season ? ' ' + SH.SEASONS[S.season.i].e : '') + (S.wx && SH.WEATHER[S.wx.k] ? SH.WEATHER[S.wx.k].e : '');
+  $('gTurn').textContent = S.status === 'over' ? 'Partida terminada' : 'Turno ' + S.turn + (S.cfg.maxTurns ? ' / ' + S.cfg.maxTurns : '') + (S.dn ? ' ' + (S.dn.n ? '🌙' : '☀️') : '') + (S.season ? ' ' + SH.SEASONS[S.season.i].e : '') + (S.wx && SH.WEATHER[S.wx.k] ? SH.WEATHER[S.wx.k].e : '');
   $('gTimer').textContent = S.status === 'over' ? '🏁' : S.cfg.local ? '📴 sin conexión' : fmtTime(S.endsAt - (Date.now() + skew));
   const humans = S.players.filter(p => p.alive && !p.bot && !p.auto);
   const world = S.cfg.mode === 'mundo';
@@ -612,13 +652,13 @@ function openSheet(mode, extra) { ackRecap(); gotoMode = null; sheet = Object.as
 function closeSheet() { ackRecap(); gotoMode = null; sheet = null; selId = null; computeReach(); renderSheet(); resize(); dirty = true; }
 $('bar').addEventListener('click', e => { const b = e.target.closest('[data-ui]'); if (!b) return; const m = b.dataset.ui; selId = null; computeReach(); if (sheet && sheet.mode === m) { sheet = null; renderSheet(); resize(); dirty = true; } else openSheet(m); dirty = true; });
 const matsHtml = m => { const ks = SH.MAT_ORDER.filter(k => m[k] > 0); return ks.length ? ks.map(k => `<span class="chip">${SH.MATS[k].e} ${m[k]} <span class="dim">${SH.MATS[k].n}</span></span>`).join('') : '<span class="dim">vacío</span>'; };
-const itemHtml = it => { const K = SH.KINDS[it.k]; return `${K.e} <b class="r${it.r || 0}">${SH.itemName(it)}</b> <span class="dim">(${K.pack ? '+' + SH.PACK[it.t] + ' espacios' : (K.w ? 'daño' : 'def') + ' ' + SH.itemValue(it)})</span>` + (it.fx && it.fx.length ? it.fx.map(f => `<span class="fxl">${SH.affixText(f, it.r)}</span>`).join('') : '') + (it.so ? Array.from({ length: it.so }, (_, i) => it.gm && it.gm[i] ? `<span class="fxl">${SH.gemText(it.gm[i], !!K.w)}</span>` : `<span class="fxl dim">◇ Engarce vacío</span>`).join('') : ''); };
+const itemHtml = it => { const K = SH.KINDS[it.k]; return `${K.e} <b class="r${it.r || 0}">${SH.itemName(it)}</b> <span class="dim">(${K.torch ? 'luz ' + SH.torchR(it) + ' casillas' : K.pack ? '+' + SH.PACK[it.t] + ' espacios' : (K.w ? 'daño' : 'def') + ' ' + SH.itemValue(it)})</span>` + (it.fx && it.fx.length ? it.fx.map(f => `<span class="fxl">${SH.affixText(f, it.r)}</span>`).join('') : '') + (it.so ? Array.from({ length: it.so }, (_, i) => it.gm && it.gm[i] ? `<span class="fxl">${SH.gemText(it.gm[i], !!K.w)}</span>` : `<span class="fxl dim">◇ Engarce vacío</span>`).join('') : ''); };
 const pct = (a, b) => Math.max(0, Math.min(100, Math.round(a / b * 100)));
 const bar = (cls, a, b) => `<div class="bar ${cls}"><i style="width:${pct(a, b)}%"></i></div>`;
 
 function moreItems() { // entradas del panel «Más»: se leen de los botones ocultos para no duplicar su lógica
   const out = [{ id: 'players', e: '🏆', t: 'Jugadores', b: window._offers || 0, ui: 'players' }];
-  if (S && S.status === 'playing' && S.mine.some(u => !u.sm && !u.cart && !u.bld && !u.sg && !u.bs)) { const n = S.mine.filter(u => u.au).length; out.push({ id: 'auto', e: '🤖', t: 'Automatizar', b: n, ui: 'auto' }); }
+  if (S && S.status === 'playing' && S.mine.some(u => !u.sm && !u.cart && !u.bld && !u.sg && !u.gr && !u.bs)) { const n = S.mine.filter(u => u.au).length; out.push({ id: 'auto', e: '🤖', t: 'Automatizar', b: n, ui: 'auto' }); }
   for (const id of ['nStory', 'nWorld', 'nHist', 'nSum', 'nSnd', 'nHelp', 'nMan', 'nChat']) {
     const b = $(id); if (!b || b.classList.contains('hidden')) continue;
     const sm = b.querySelector('small'); const t = { nStory: S.ct ? 'Ciudadela' : 'Historia', nWorld: 'Mundo', nHist: 'Historial', nSum: 'Resumen', nSnd: sndOn ? 'Sonido: sí' : 'Sonido: no', nHelp: 'Cómo se juega', nMan: 'Manual y avisos', nChat: 'Chat' }[id];
@@ -784,12 +824,23 @@ const SQC = ['#4aa3ff', '#ff7a45', '#5fd36b', '#c77dff', '#ffd34a', '#ff5c8a', '
 const SQ_ORD = { free: ['✋', 'Libre'], guard: ['🛡️', 'Defender'], hunt: ['⚔️', 'Cazar'], city: ['🏠', 'A la ciudad'], raid: ['🕳️', 'Invadir mazmorra'] };
 let citTab = 'war';
 const citSt = () => ((S.cities.find(c => c.cit) || {}).st || { m: {} }).m || {};
-const skTxt = sk => { const L = { dano: '⚔️', salud: '❤️', movilidad: '👟', medico: '✚', doble: '⚡', defensa: '🛡️', general: '🎖️' }; return Object.keys(sk || {}).filter(k => sk[k] > 0).map(k => L[k] + sk[k]).join(' '); };
+const SK_ICON = { dano: '⚔️', salud: '❤️', movilidad: '👟', medico: '✚', doble: '⚡', defensa: '🛡️', general: '🎖️', alcance: '🎯', provocar: '📢', embestida: '🐎', esquiva: '💨', contra: '↩️', regen: '💚' };
+const SK_TREE = [['⚔️ Ataque', ['dano', 'doble', 'embestida', 'alcance']], ['🛡️ Defensa', ['defensa', 'salud', 'provocar', 'contra']], ['✚ Apoyo', ['medico', 'general', 'regen']], ['👟 Agilidad', ['movilidad', 'esquiva']]];
+function skillTree(u) {
+  const cur = sheet.sk && SH.SKILLS[sheet.sk] ? sheet.sk : 'dano', d = SH.SKILLS[cur], vc = u.sk[cur] || 0;
+  let h = '<div class="sktree">' + SK_TREE.map(([t, ks]) => `<div class="skcol"><div class="skhead">${t}</div>` + ks.map((k, i) => {
+    const v = u.sk[k] || 0, c = SH.SKILLS[k].cap, pr = i ? (u.sk[ks[i - 1]] || 0) : 1;
+    return (i ? `<div class="sklink ${v > 0 ? 'on' : ''}"></div>` : '') + `<button class="sknode ${v > 0 ? 'on' : ''} ${v >= c ? 'max' : ''} ${k === cur ? 'sel' : ''} ${u.pts > 0 && v < c ? 'can' : ''}" style="--p:${Math.round(100 * v / c)}" data-ui="sksel:${k}"><i>${SK_ICON[k]}</i><b>${v}/${c}</b></button><div class="sknm">${SH.SKILLS[k].n}</div>`;
+  }).join('') + '</div>').join('') + '</div>';
+  h += `<div class="skinfo"><div class="row" style="align-items:center;gap:10px"><div style="font-size:30px">${SK_ICON[cur]}</div><div style="flex:1"><b>${d.n}</b> <span class="pips">${vc}/${d.cap}</span><div class="hint" style="margin:2px 0 0">${d.d}</div></div><button class="btn gold" ${u.pts > 0 && vc < d.cap ? '' : 'disabled'} data-c='${jattr({ a: 'skill', u: u.id, s: cur })}'>+ Subir</button></div></div>`;
+  return h;
+}
+const skTxt = sk => { const L = { dano: '⚔️', salud: '❤️', movilidad: '👟', medico: '✚', doble: '⚡', defensa: '🛡️', general: '🎖️', alcance: '🎯', provocar: '📢', embestida: '🐎', esquiva: '💨', contra: '↩️', regen: '💚' }; return Object.keys(sk || {}).filter(k => sk[k] > 0).map(k => L[k] + sk[k]).join(' '); };
 const costChips = (cost, pool) => SH.MAT_ORDER.filter(k => cost[k]).map(k => `<span class="chip ${(pool[k] || 0) >= cost[k] ? 'ok' : 'lack'}">${SH.MATS[k].e} ${cost[k]}</span>`).join(' ');
 const clsTxt = (c, sub) => c && SH.CLASSES[c] ? SH.CLASSES[c].e + ' ' + SH.CLASSES[c].n + (sub && SH.CLASSES[c].sub[sub] ? ' · ' + SH.CLASSES[c].sub[sub].n : '') : '';
 function citSheet() {
-  const tabs = [['war', '⚔️ Defensa'], ['bar', '🍺 Taberna'], ['arena', '🏟️ Arena'], ['mkt', '🛒 Mercado']];
-  return hd('🏰 La Ciudadela') + `<div class="row" style="flex-wrap:wrap;gap:4px;margin:6px 0">${tabs.map(([k, t]) => `<button class="btn sm ${citTab === k ? 'gold' : ''}" data-cittab="${k}">${t}</button>`).join('')}</div>` + (citTab === 'bar' ? citBarHtml() : citTab === 'arena' ? citArenaHtml() : citTab === 'mkt' ? citMktHtml() : citWarHtml());
+  const tabs = [['war', '⚔️ Defensa'], ['gar', '💂 Guarniciones'], ['def', '🛡️ Defensas'], ['bar', '🍺 Taberna'], ['arena', '🏟️ Arena'], ['mkt', '🛒 Mercado']];
+  return hd('🏰 La Ciudadela') + `<div class="row" style="flex-wrap:wrap;gap:4px;margin:6px 0">${tabs.map(([k, t]) => `<button class="btn sm ${citTab === k ? 'gold' : ''}" data-cittab="${k}">${t}</button>`).join('')}</div>` + (citTab === 'gar' ? citGarHtml() : citTab === 'def' ? citDefHtml() : citTab === 'bar' ? citBarHtml() : citTab === 'arena' ? citArenaHtml() : citTab === 'mkt' ? citMktHtml() : citWarHtml());
 }
 function citBarHtml() {
   const bar0 = S.ct.bar, st = citSt(); if (!bar0) return '<p class="dim">La taberna aún no abre.</p>';
@@ -804,7 +855,7 @@ function citArenaHtml() {
   if (ar.last) h += `<div class="line"><div class="g">Último combatiente: <b>${esc(ar.last.name)}</b> (${esc(ar.last.p)}) ganó <b>${ar.last.won}/${ar.last.rounds}</b> rondas</div></div>`;
   if (!ar.open) return h + `<p class="dim">El torneo está cerrado. Próxima apertura en <b>${ar.next}</b> turno(s).</p>`;
   h += `<p><b>¡Torneo abierto!</b> Se cierra en ${ar.left} turno(s).</p>`;
-  const us = S.mine.filter(u => !u.sm && !u.cart && !u.bld && !u.sg && !u.bs && !u.dg && u.x >= r.x0 && u.x <= r.x1 && u.y >= r.y0 && u.y <= r.y1);
+  const us = S.mine.filter(u => !u.sm && !u.cart && !u.bld && !u.sg && !u.gr && !u.bs && !u.dg && u.x >= r.x0 && u.x <= r.x1 && u.y >= r.y0 && u.y <= r.y1);
   if (!us.length) return h + '<p class="dim">Ninguna de tus unidades está dentro de las murallas.</p>';
   return h + us.map(u => { const done = ar.ent.includes(u.id); return `<div class="line"><div class="g"><b>${esc(u.name)}</b> <span class="dim">nivel ${u.lv} · ${u.hp}/${u.e ? u.e.maxHp : '?'} ❤️</span></div>${done ? '<span class="dim">ya compitió</span>' : `<button class="btn sm gold" data-c='${jattr({ a: 'arena', u: u.id })}'>⚔️ Enviar a la arena</button>`}</div>`; }).join('');
 }
@@ -814,8 +865,69 @@ function citMktHtml() {
   if (!ms.length) return h + '<p class="dim">Ahora mismo no hay ningún vendedor. Llegan cada pocos turnos.</p>';
   return h + ms.map(m => `<div class="line"><div class="g">🛒 <b>${esc(m.name)}</b> <span class="dim">· se marcha en ${m.left} turno(s)</span></div><button class="btn sm gold" data-minfo="${m.id}">Ver</button></div>`).join('');
 }
+let defPlace = null; // tipo de defensa que se está colocando (toca una casilla del mapa)
+
+function garInfoHtml(u) {
+  const G = SH.GAR, T = G.types[u.gt || 'esp'], bonus = Math.round((G.bonus * (u.gn || 0) + G.mix * (u.gx || 0)) * 100);
+  return `<p class="hint ok" style="margin-top:8px">${T.e} <b>${T.n}</b>: ${u.gr} ${u.gr === 1 ? 'soldado' : 'soldados'} de ${G.n}. ${T.d} Cada soldado que cae le quita daño. Sin equipo ni niveles; <b>cualquier jugador</b> puede darle órdenes.</p>
+  <p class="hint ${bonus ? 'ok' : ''}">🤝 <b>Ejército</b>: junto a otras guarniciones (a ${G.near} casillas) +${Math.round(G.bonus * 100)}% de daño y defensa por cada una (hasta +${Math.round(G.bonus * G.maxNear * 100)}%) y +${Math.round(G.mix * 100)}% más por cada <b>tipo distinto</b> cerca (hasta +${Math.round(G.mix * G.maxMix * 100)}%). Ahora: <b>${bonus ? '+' + bonus + '%' : 'ninguna cerca'}</b>.</p>
+  <p class="hint">Se curan junto a la ciudad y descansando. Si no las mueves, defienden solas a la criatura que esté a su alcance.</p>`;
+}
+function citGarHtml() {
+  const ct = S.ct, g = ct.gar, st = citSt(), gs = S.mine.filter(u => u.gr), cid = (S.cities.find(q => q.cit) || {}).id;
+  let h = `<p class="hint" style="margin-top:0">${SH.GAR.e} Las <b>guarniciones</b> son grupos de 4 soldados en una sola casilla: no llevan equipo, no suben de nivel y las controlan <b>todos los jugadores</b>. Junto a otras guarniciones se vuelven más fuertes, y más aún si son de <b>tipos distintos</b>: ¡forma ejércitos combinados! Hay <b>${g.n}/${g.cap}</b> (el tope sube con los jugadores).</p>`;
+  h += Object.keys(SH.GAR.types).map(k => { const T = SH.GAR.types[k], cost = g.costs[k], ok = SH.MAT_ORDER.every(m => !cost[m] || (st[m] || 0) >= cost[m]) && g.n < g.cap;
+    return `<div class="card"><div class="line"><div class="g"><b>${T.e} Guarnición de ${T.n.toLowerCase()}</b><div class="dim">${T.d} ❤️${T.hp * SH.GAR.n} · ⚔️${T.dmg * SH.GAR.n} · 🛡️${T.def} · alcance ${T.range}</div><div style="margin-top:3px">${costChips(cost, st)}</div></div><button class="btn sm gold" ${ok ? '' : 'disabled'} data-c='${jattr({ a: 'garrison', c: cid, k })}'>Reclutar</button></div></div>`; }).join('');
+  h += '<p class="hint">Aparecen en la plaza y descansan ese turno. El precio sube un 15% por cada guarnición que ya tengas.</p>';
+  h += '<h4 style="margin:10px 0 4px">Tus guarniciones</h4>' + (gs.length ? gs.map(u => { const T = SH.GAR.types[u.gt || 'esp']; return `<div class="line"><div class="g"><b>${T.e} ${esc(u.name)}</b> <span class="dim">${u.gr}/4 soldados · ${u.hp}/${u.e.maxHp} ❤️${u.gn || u.gx ? ' · 🤝+' + Math.round((SH.GAR.bonus * u.gn + SH.GAR.mix * u.gx) * 100) + '%' : ''}</span></div><button class="btn sm" data-ui="pick:${u.id}">Ver</button><button class="btn sm" data-ui="defgo:${u.x},${u.y}">📍</button></div>`; }).join('') : '<p class="dim">Aún no hay guarniciones.</p>');
+  const wl = ct.wl || [], br = wl.filter(w => w[2] === 0).length;
+  h += `<h4 style="margin:10px 0 4px">🧱 Muralla</h4><p class="hint">Las criaturas terrestres ya no esperan a las puertas: <b>golpean la muralla</b> (${ct.wm} de vida por tramo) y abren brechas. Las voladoras la cruzan. Entre oleadas se repara sola, gastando ${SH.MAT_ORDER.filter(m => SH.WALL.repair[m]).map(m => SH.WALL.repair[m] + ' ' + SH.MATS[m].e).join(' ')} por brecha. Ahora: <b>${wl.length ? wl.length + ' tramo(s) dañado(s), ' + br + ' roto(s)' : 'sin daños'}</b>.</p>`;
+  return h;
+}
+function citDefHtml() {
+  const ct = S.ct, st = citSt(), ds = ct.df || [];
+  let h = `<p class="hint" style="margin-top:0">🛡️ Las defensas se construyen con el almacén de la ciudad, <b>fuera de la muralla</b> (hasta 7 casillas). Todos los jugadores comparten el límite: <b>${ds.length}/${ct.dcap}</b> (mejorar la muralla lo sube). Se reparan solas al superar una oleada. Han abatido <b>${ct.dk || 0}</b> criaturas.</p>`;
+  h += Object.keys(SH.DEFS).map(k => { const T = SH.DEFS[k], can = SH.MAT_ORDER.every(m => !T.cost[m] || (st[m] || 0) >= T.cost[m]) && ds.length < ct.dcap;
+    return `<div class="card"><div class="line"><div class="g"><b>${T.e} ${T.n}</b><div class="dim">${T.d}</div><div style="margin-top:3px">${costChips(T.cost, st)}</div></div><button class="btn sm ${defPlace === k ? 'gold' : ''}" ${can ? '' : 'disabled'} data-ui="defplace:${k}">${defPlace === k ? 'Cancelar' : 'Colocar'}</button></div></div>`; }).join('');
+  if (defPlace) h += '<p class="hint lack">Cierra este panel y toca en el mapa la casilla (la zona verde, fuera de la muralla).</p>';
+  h += '<h4 style="margin:10px 0 4px">Construidas</h4>' + (ds.length ? ds.map(d => { const T = SH.DEFS[d.k], up = d.lv < 3 ? T.up[d.lv - 1] : null;
+    return `<div class="card"><div class="line"><div class="g"><b>${T.e} ${T.n}</b> <span class="pips">nivel ${d.lv}/3</span> <span class="dim">(${d.x},${d.y})</span>${d.k === 'barricada' ? ` <span class="dim">· ${Math.max(0, d.hp)}/${d.mx} ❤️</span>` : ''}${d.k === 'trampa' ? ` <span class="dim">· ${d.ch} cargas</span>` : ''}</div>
+      <button class="btn sm" data-ui="defgo:${d.x},${d.y}">📍</button></div><div class="row" style="gap:6px;flex-wrap:wrap;margin-top:4px">${up ? `<button class="btn sm gold" ${SH.MAT_ORDER.every(m => !up[m] || (st[m] || 0) >= up[m]) ? '' : 'disabled'} data-c='${jattr({ a: 'def', op: 'up', id: d.id })}'>⬆️ Mejorar</button>${costChips(up, st)}` : '<span class="dim">Nivel máximo</span>'}
+      <button class="btn sm" data-c='${jattr({ a: 'def', op: 'sell', id: d.id })}'>Vender</button></div></div>`; }).join('') : '<p class="dim">Aún no has construido ninguna defensa.</p>');
+  return h;
+}
+function drawDefs(ox, oy, z, x0, y0, x1, y1) {
+  const ct = S.ct; if (!ct || !ct.df) return; const now = performance.now();
+  if (defPlace) { // zona de construcción en verde
+    const r = ct.r; ctx.fillStyle = 'rgba(80,220,120,.16)';
+    for (let y = Math.max(y0, r.y0 - 7); y <= Math.min(y1, r.y1 + 7); y++) for (let x = Math.max(x0, r.x0 - 7); x <= Math.min(x1, r.x1 + 7); x++) if (!(x >= r.x0 - 1 && x <= r.x1 + 1 && y >= r.y0 - 1 && y <= r.y1 + 1)) ctx.fillRect(ox + x * z, oy + y * z, z, z);
+  }
+  for (const d of ct.df) {
+    if (d.x < x0 - 1 || d.x > x1 + 1 || d.y < y0 - 1 || d.y > y1 + 1) continue;
+    const X = ox + d.x * z, Y = oy + d.y * z, cx = X + z / 2, u = z / 16;
+    ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(cx, Y + z * .88, z * .36, z * .1, 0, 0, 7); ctx.fill();
+    if (d.k === 'torre' || d.k === 'escarcha') {
+      const fr = d.k === 'escarcha', body = fr ? '#8ccfe8' : '#9a8f7c', dark = fr ? '#4f8fa8' : '#6a604f', top = fr ? '#d8f4ff' : '#7a6f5c';
+      ctx.fillStyle = dark; ctx.fillRect(X + 3 * u, Y + 5 * u, 10 * u, 10 * u); ctx.fillStyle = body; ctx.fillRect(X + 4 * u, Y + 5 * u, 8 * u, 9 * u);
+      ctx.fillStyle = top; for (let i = 0; i < 4; i++) ctx.fillRect(X + (3 + i * 3) * u, Y + 3 * u, 2 * u, 3 * u);
+      ctx.fillStyle = '#1c1812'; ctx.fillRect(X + 7 * u, Y + 8 * u, 2 * u, 4 * u);
+      if (fr) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(cx, Y + 0 * u); ctx.lineTo(cx + 2 * u, Y + 4 * u); ctx.lineTo(cx - 2 * u, Y + 4 * u); ctx.fill(); }
+      else { ctx.fillStyle = '#c0392b'; ctx.fillRect(cx - u * .5, Y, u, 4 * u); ctx.fillStyle = '#e74c3c'; ctx.fillRect(cx + u * .5, Y, 3 * u + Math.sin(now / 250 + d.id) * u, 2 * u); }
+    } else if (d.k === 'trampa') {
+      ctx.fillStyle = '#4a4338'; ctx.fillRect(X + 2 * u, Y + 11 * u, 12 * u, 3 * u);
+      ctx.fillStyle = d.ch > 0 ? '#c9ccd3' : '#6b6f78';
+      for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(X + (2.5 + i * 3) * u, Y + 11 * u); ctx.lineTo(X + (4 + i * 3) * u, Y + 5 * u); ctx.lineTo(X + (5.5 + i * 3) * u, Y + 11 * u); ctx.fill(); }
+    } else { // barricada
+      ctx.fillStyle = '#5a3d22'; ctx.fillRect(X + 1 * u, Y + 6 * u, 14 * u, 3 * u); ctx.fillRect(X + 1 * u, Y + 11 * u, 14 * u, 3 * u);
+      ctx.fillStyle = '#8a6238'; ctx.fillRect(X + 1 * u, Y + 6 * u, 14 * u, 2 * u); ctx.fillRect(X + 1 * u, Y + 11 * u, 14 * u, 2 * u);
+      ctx.fillStyle = '#6e4a28'; for (let i = 0; i < 3; i++) ctx.fillRect(X + (2 + i * 5) * u, Y + 3 * u, 2 * u, 12 * u);
+      if (d.mx && d.hp < d.mx && z >= 14) { ctx.fillStyle = '#000a'; ctx.fillRect(X + 2 * u, Y + 1 * u, 12 * u, 2 * u); ctx.fillStyle = d.hp / d.mx > .4 ? '#6ad06a' : '#e5484d'; ctx.fillRect(X + 2 * u, Y + 1 * u, 12 * u * Math.max(0, d.hp) / d.mx, 2 * u); }
+    }
+    ctx.fillStyle = '#ffd23f'; for (let i = 0; i < d.lv; i++) ctx.fillRect(X + (3 + i * 3) * u, Y + 15 * u, 2 * u, u * 1.3); // puntos de nivel
+  }
+}
 function citWarHtml() {
-  const ct = S.ct, w = ct.w, free = S.mine.filter(u => !u.sm && !u.cart && !u.bld && !u.sg && !u.bs && !u.sq);
+  const ct = S.ct, w = ct.w, free = S.mine.filter(u => !u.sm && !u.cart && !u.bld && !u.sg && !u.gr && !u.bs && !u.sq);
   let h = '';
   h += `<p class="hint">${w.fin ? '¡Victoria! La Ciudadela resistió todas las oleadas' : w.lost ? 'La Ciudadela cayó' : w.n ? 'Oleada ' + w.n + ' de ' + w.total : 'Se acerca la primera oleada'}</p>` + bar('xp', w.cleared, w.total);
   h += `<div class="line"><div class="g">🏰 Integridad de la plaza <b>${ct.hp}/${ct.max}</b></div></div>` + bar(ct.hp / ct.max > .4 ? 'hp' : 'hp low', ct.hp, ct.max);
@@ -826,7 +938,7 @@ function citWarHtml() {
   h += `<p class="hint">Todos sois dueños de la ciudad: el almacén, los edificios y las mejoras son de todos. Estar dentro de las murallas cuenta como estar en la ciudad. Los enemigos entran por las puertas 🚪 y, si llegan a la plaza, dañan su integridad.</p>`;
   { const pv = ct.pv, cn = t => (SH.CREATURES[t] || {}).n || t, ce = t => (SH.CREATURES[t] || {}).e || '';
     h += hd('🕳️ Mazmorras') + `<p class="hint" style="margin-top:0">Hay 3 entradas fuera de las murallas. Dentro solo puedes tener <b>${ct.raid}</b> unidades a la vez (ahora: <b>${ct.inDg}/${ct.raid}</b>). Al entrar <b>exploras</b> y ves qué trae la próxima oleada; vencer al jefe de una mazmorra hace la oleada un 10% más pequeña (hasta −30%). Se renuevan en cada oleada y suben de nivel.</p>`;
-    if (pv) h += `<div class="card"><div class="line"><div class="g">🔭 <b>Próxima oleada (${pv.n})</b>: <b>${pv.cnt}</b> enemigos de nivel ${pv.lv}</div></div><div class="row" style="flex-wrap:wrap;gap:4px">${pv.types.map(t => `<span class="chip">${ce(t)} ${esc(cn(t))}</span>`).join('')}${pv.boss ? `<span class="chip">👑 Jefe: ${esc(cn(pv.boss))}</span>` : ''}</div></div>`;
+    if (pv) h += `<div class="card"><div class="line"><div class="g">🔭 <b>Próxima oleada (${pv.n})</b>: <b>${pv.cnt}</b> enemigos de nivel ${pv.lv}${pv.theme && SH.CIT.themes[pv.theme] ? ' · ' + SH.CIT.themes[pv.theme].e + ' ' + SH.CIT.themes[pv.theme].n : ''}</div></div><div class="row" style="flex-wrap:wrap;gap:4px">${pv.types.map(t => `<span class="chip">${ce(t)} ${esc(cn(t))}</span>`).join('')}${pv.boss ? `<span class="chip">👑 Jefe: ${esc(cn(pv.boss))}</span>` : ''}</div></div>`;
     else if (!w.fin && !w.lost) h += `<div class="line"><div class="g dim">🔭 Aún no has explorado: entra en una mazmorra para ver la próxima oleada.</div></div>`;
     if (ct.weak) h += `<div class="line"><div class="g">⚔️ Mazmorras vencidas: la próxima oleada será un <b>${10 * ct.weak}%</b> más pequeña.</div></div>`; }
   h += hd('🛡️ Escuadras') + `<p class="hint" style="margin-top:0">Agrupa unidades y dales una <b>orden permanente</b>: se cumple al terminar el turno (y con «Ejecutar ahora»). Seguirás pudiendo tocar cada unidad.</p>`;
@@ -863,7 +975,7 @@ function citWarHtml() {
 
 const AUTO_T = ['✋ Manual', '⚔️ Moverse y atacar', '🎒 Equiparse', '🤖 Todo'];
 function autoSheet() {
-  const us = S.mine.filter(u => !u.sm && !u.cart && !u.bld && !u.sg && !u.bs), n = us.filter(u => u.au).length;
+  const us = S.mine.filter(u => !u.sm && !u.cart && !u.bld && !u.sg && !u.gr && !u.bs), n = us.filter(u => u.au).length;
   let h = hd('🤖 Automatizar') + `<p class="hint" style="margin-top:0">Las unidades en automático actúan solas <b>al terminar el turno</b> (y cuando pulses «Ejecutar ahora»): <b>⚔️ Moverse y atacar</b> cazan criaturas que puedan vencer, curan a aliados si llevan el báculo del sanador, vuelven a casa si están heridas o con la mochila llena. <b>🎒 Equiparse</b> se ponen lo mejor que tengan en la mochila o en el almacén de la ciudad junto a la que estén. Nunca atacan a otros jugadores.</p>`;
   h += `<div class="line"><div class="g"><b>Todas mis unidades</b> <span class="dim">(${n}/${us.length} en automático)</span></div></div><div class="row" style="flex-wrap:wrap;gap:6px;margin:6px 0">${AUTO_T.map((t, i) => `<button class="btn sm ${us.length && us.every(u => (u.au || 0) === i) ? 'gold' : ''}" data-c='${jattr({ a: 'auto', all: 1, m: i })}'>${t}</button>`).join('')}</div>`;
   h += `<button class="btn block gold" data-c='${jattr({ a: 'autorun' })}' ${n ? '' : 'disabled'}>▶ Ejecutar ahora</button>`;
@@ -924,25 +1036,25 @@ function recapSheet() {
 }
 function unitSheet(u) {
   if (u.sm) sheet.tab = 'state';
-  const e = u.e, tabs = u.sm ? [['state', 'Estado']] : u.bs ? [['state', 'Estado'], ['skills', 'Habilidades' + (u.pts ? ' ⭐' + u.pts : '')], ['bag', 'Mochila']] : u.bld || u.sg ? [['state', 'Estado']] : u.cart ? [['state', 'Estado'], ['bag', 'Carga']] : [['state', 'Estado'], ['skills', 'Habilidades' + (u.pts ? ' ⭐' + u.pts : '')], ['class', 'Clase' + (classAvail(u) ? ' ⭐' : '')], ['gear', 'Equipo'], ['bag', 'Mochila']];
+  const e = u.e, tabs = u.sm ? [['state', 'Estado']] : u.bs ? [['state', 'Estado'], ['skills', 'Habilidades' + (u.pts ? ' ⭐' + u.pts : '')], ['bag', 'Mochila']] : u.bld || u.sg || u.gr ? [['state', 'Estado']] : u.cart ? [['state', 'Estado'], ['bag', 'Carga']] : [['state', 'Estado'], ['skills', 'Habilidades' + (u.pts ? ' ⭐' + u.pts : '')], ['class', 'Clase' + (classAvail(u) ? ' ⭐' : '')], ['gear', 'Equipo'], ['bag', 'Mochila']];
   let h = `<div class="hd"><span class="sw" style="background:${S.players[S.you].color}"></span><b>${esc(u.name)} ${sxTag(u.sx)} <span class="dim">niv. ${u.lv}</span> ${clsTag(u)}${u.kl ? ` <span class="dim" title="Enemigos eliminados">☠️${u.kl}</span>` : ''}</b><button class="btn sm fix" data-ui="rename" title="Cambiar nombre" style="margin-left:auto">✏️</button><button class="x" data-ui="close">✕</button></div>`;
   h += `<div class="tabs">${tabs.map(t => `<button class="tab ${sheet.tab === t[0] ? 'on' : ''}" data-ui="tab:${t[0]}">${t[1]}</button>`).join('')}</div>`;
   if (sheet.tab === 'state') {
     const w = u.eq.arma;
-    const pt0 = !u.sm && !u.bs && !u.bld && !u.sg && !u.cart; if (pt0) h += '<div style="display:flex;gap:10px;align-items:flex-start">' + ptHtml(ptUnit(u), 92, u.vp ? '#6a1830' : u.hr ? '#8a6a1e' : '#3a3550') + '<div style="flex:1;min-width:0">';
+    const pt0 = !u.sm && !u.bs && !u.bld && !u.sg && !u.gr && !u.cart; if (pt0) h += '<div style="display:flex;gap:10px;align-items:flex-start">' + ptHtml(ptUnit(u), 92, u.vp ? '#6a1830' : u.hr ? '#8a6a1e' : '#3a3550') + '<div style="flex:1;min-width:0">';
     h += `<div style="display:flex;justify-content:space-between"><span>❤️ Salud</span><span>${u.hp}/${e.maxHp}</span></div>${bar('hp', u.hp, e.maxHp)}`;
-    h += `<div style="display:flex;justify-content:space-between;margin-top:8px"><span>✨ Experiencia</span><span>${u.xp}/${u.xpn}</span></div>${bar('xp', u.xp, u.xpn)}`;
+    if (u.gr) h += garInfoHtml(u); else h += `<div style="display:flex;justify-content:space-between;margin-top:8px"><span>✨ Experiencia</span><span>${u.xp}/${u.xpn}</span></div>${bar('xp', u.xp, u.xpn)}`;
     if (pt0) h += '</div></div>';
-    if (S.ct && !u.sm && !u.bld && !u.sg && !u.cart) h += `<div class="row" style="flex-wrap:wrap;gap:4px;margin-top:8px"><span class="dim">Escuadra:</span><button class="btn sm ${!u.sq ? 'gold' : ''}" data-sq='${jattr({ d: 'unit', u: u.id, id: 0 })}'>Ninguna</button>${S.ct.sq.map(q => `<button class="btn sm ${u.sq === q.id ? 'gold' : ''}" data-sq='${jattr({ d: 'unit', u: u.id, id: q.id })}'>${esc(q.n)}</button>`).join('')}</div>`;
-    if (S.ct && u.sq && !u.sm && !u.bld && !u.sg && !u.cart) { const role = u.fm || (u.e.range >= 2 || u.e.heal ? 'b' : 'f'); h += `<div class="row" style="flex-wrap:wrap;gap:4px;margin-top:6px"><span class="dim">Formación${u.fm ? '' : ' (auto: ' + ({ f: 'frente', b: 'retaguardia' })[role] + ')'}:</span>${[['a', 'Auto'], ['f', 'Frente'], ['c', 'Centro'], ['b', 'Atrás']].map(([v, t]) => `<button class="btn sm ${(u.fm || 'a') === v ? 'gold' : ''}" data-sq='${jattr({ d: 'fm', u: u.id, v })}'>${t}</button>`).join('')}</div>${u.rtr ? '<p class="hint">🩹 Se está retirando a curarse; volverá a su puesto al recuperarse.</p>' : ''}`; }
+    if (S.ct && !u.sm && !u.bld && !u.sg && !u.gr && !u.cart) h += `<div class="row" style="flex-wrap:wrap;gap:4px;margin-top:8px"><span class="dim">Escuadra:</span><button class="btn sm ${!u.sq ? 'gold' : ''}" data-sq='${jattr({ d: 'unit', u: u.id, id: 0 })}'>Ninguna</button>${S.ct.sq.map(q => `<button class="btn sm ${u.sq === q.id ? 'gold' : ''}" data-sq='${jattr({ d: 'unit', u: u.id, id: q.id })}'>${esc(q.n)}</button>`).join('')}</div>`;
+    if (S.ct && u.sq && !u.sm && !u.bld && !u.sg && !u.gr && !u.cart) { const role = u.fm || (u.e.range >= 2 || u.e.heal ? 'b' : 'f'); h += `<div class="row" style="flex-wrap:wrap;gap:4px;margin-top:6px"><span class="dim">Formación${u.fm ? '' : ' (auto: ' + ({ f: 'frente', b: 'retaguardia' })[role] + ')'}:</span>${[['a', 'Auto'], ['f', 'Frente'], ['c', 'Centro'], ['b', 'Atrás']].map(([v, t]) => `<button class="btn sm ${(u.fm || 'a') === v ? 'gold' : ''}" data-sq='${jattr({ d: 'fm', u: u.id, v })}'>${t}</button>`).join('')}</div>${u.rtr ? '<p class="hint">🩹 Se está retirando a curarse; volverá a su puesto al recuperarse.</p>' : ''}`; }
     h += `<div class="grid" style="margin-top:10px">
       <div class="stat"><small>Daño</small>${e.dmg}${e.attacks > 1 ? ' ×' + e.attacks : ''}</div><div class="stat"><small>Defensa</small>${e.def}</div>
       <div class="stat"><small>Alcance</small>${e.min === e.range ? e.range : e.min + '–' + e.range}</div><div class="stat"><small>Movimiento</small>${Math.round(u.mp * 10) / 10}/${e.mov}</div>
       <div class="stat"><small>Ataques</small>${u.at}/${e.attacks}</div><div class="stat"><small>Arma</small>${w ? SH.KINDS[w.k].e + ' ' + SH.itemName(w) : u.bs ? '🐾 Garras' : '✊ Puños'}</div></div>`;
-    if (!u.sm && !u.cart && !u.bld && !u.sg) h += `<p class="hint" style="margin:6px 0">☠️ <b>${u.kl || 0}</b> ${u.kl === 1 ? 'enemigo eliminado' : 'enemigos eliminados'}</p>`;
+    if (!u.sm && !u.cart && !u.bld && !u.sg && !u.gr && !u.gr) h += `<p class="hint" style="margin:6px 0">☠️ <b>${u.kl || 0}</b> ${u.kl === 1 ? 'enemigo eliminado' : 'enemigos eliminados'}</p>`;
     if (!u.sm && (u.hr || (S.cfg && S.cfg.mode === 'uno'))) h += `<div class="row" style="margin:4px 0"><button class="btn sm" data-ui="design:${u.id}">🎨 ${!u.hd ? 'Diseñar a ' + (u.hr ? 'mi protagonista' : 'mi personaje') : S.turn <= SH.HERO.pickTurn ? 'Cambiar diseño' : 'Rediseñar (5 almas)'}</button></div>`;
     if (e.heal) h += `<p class="hint ok">✚ <b>Cura ${e.heal}</b> de salud a un aliado a distancia ${e.range} (gasta un ataque). Con este báculo equipado, toca a un aliado herido para curarlo.</p>`;
-    if (!u.sm && !u.cart && !u.bld && !u.sg && !u.bs) h += `<div class="row" style="gap:4px;align-items:center;margin:8px 0"><span class="dim">🤖 Automático:</span>${[0, 1, 2, 3].map(i => `<button class="btn sm ${(u.au || 0) === i ? 'gold' : ''}" title="${AUTO_T[i]}" data-c='${jattr({ a: 'auto', u: u.id, m: i })}'>${['✋', '⚔️', '🎒', '🤖'][i]}</button>`).join('')}<button class="btn sm fix" data-ui="auto" style="margin-left:auto">Todas…</button></div>`;
+    if (!u.sm && !u.cart && !u.bld && !u.sg && !u.gr && !u.bs) h += `<div class="row" style="gap:4px;align-items:center;margin:8px 0"><span class="dim">🤖 Automático:</span>${[0, 1, 2, 3].map(i => `<button class="btn sm ${(u.au || 0) === i ? 'gold' : ''}" title="${AUTO_T[i]}" data-c='${jattr({ a: 'auto', u: u.id, m: i })}'>${['✋', '⚔️', '🎒', '🤖'][i]}</button>`).join('')}<button class="btn sm fix" data-ui="auto" style="margin-left:auto">Todas…</button></div>`;
     h += dgUnitHtml(u);
     if (S.cfg && S.cfg.mode === 'mundo' && !u.dg) { const R = SH.WORLD.regions[regionAt(u.x, u.y)]; h += `<p class="hint">${R.e} <b>${R.n}</b>: monstruos hasta ~${Math.round(R.lv * 100)}% de su nivel máximo y botín ×${R.loot}.</p>`; }
     if (u.bs) h += `<p class="hint ok">${SH.CREATURES[u.bs].e} Bestia del Rey Demonio: su fuerza viene de su especie y su nivel; no usa equipo ni clases, pero sí gasta puntos de habilidad y carga botín.</p>`;
@@ -980,7 +1092,7 @@ function unitSheet(u) {
     h += u.nearCity ? '<p class="hint ok">🏰 Junto a una ciudad tuya: puedes equipar, guardar y retirar objetos, y recuperas salud.</p>' : u.nearCart ? `<p class="hint ok">🛒 Junto a una carreta tuya: estación de suministros. Puedes equipar, guardar y retirar objetos; +${SH.CART.aura} de defensa y recuperas ${Math.round(SH.CART.heal * 100)}% de salud por turno.</p>` : '<p class="hint">Toca una casilla azul para moverte o un enemigo marcado en rojo para atacar. Si el enemigo está lejos, la unidad se acerca sola.</p>';
   } else if (sheet.tab === 'skills') {
     h += `<p class="hint">Puntos disponibles: <b class="pips">${u.pts}</b> (ganas 1 por nivel)</p>`;
-    h += SH.SKILL_ORDER.map(s => { const d = SH.SKILLS[s], v = u.sk[s]; return `<div class="line"><div class="g"><b>${d.n}</b> <span class="pips">${'●'.repeat(v)}${'○'.repeat(d.cap - v)}</span><div class="hint" style="margin:2px 0 0">${d.d}</div></div><button class="btn sm gold fix" ${u.pts > 0 && v < d.cap ? '' : 'disabled'} data-c='${jattr({ a: 'skill', u: u.id, s })}'>+</button></div>`; }).join('');
+    h += skillTree(u);
   } else if (sheet.tab === 'class') {
     h += classTab(u);
   } else if (sheet.tab === 'gear') {
@@ -1092,14 +1204,14 @@ function citySheet() {
   } else if (c.vela) {
     h += `<p class="hint">En el laberinto no se recluta: solo cuentas con tus unidades. Aquí puedes <b>revivir</b> a las que caigan (cuesta almas y huesos del almacén).</p>`;
   } else {
-    const cost = c.rc, n = S.mine.filter(x => !x.sm && !x.cart && !x.bld && !x.sg).length, ok = SH.MAT_ORDER.every(m => !cost[m] || (c.st.m[m] || 0) >= cost[m]) && n < S.maxUnits;
+    const cost = c.rc, n = S.mine.filter(x => !x.sm && !x.cart && !x.bld && !x.sg && !x.gr).length, ok = SH.MAT_ORDER.every(m => !cost[m] || (c.st.m[m] || 0) >= cost[m]) && n < S.maxUnits;
     h += `<p>Unidades: <b>${n}/${S.maxUnits}</b></p><div>Coste: ${SH.MAT_ORDER.filter(m => cost[m]).map(m => `<span class="chip ${(c.st.m[m] || 0) >= cost[m] ? 'ok' : 'lack'}">${SH.MATS[m].e} ${c.st.m[m] || 0}/${cost[m]}</span>`).join('')}</div>`;
     if (S.king === S.you && c.rcb) h += `<p class="hint ok">👑 Eres el Rey Demonio: solo puedes reclutar bestias.</p>` + Object.keys(SH.KING.beasts).map(k => { const bc = c.rcb[k], okb = SH.MAT_ORDER.every(m => !bc[m] || (c.st.m[m] || 0) >= bc[m]) && n < S.maxUnits, d = SH.CREATURES[k]; return `<div class="line"><div class="g">${d.e} <b>${d.n}</b> <span class="dim">❤️${d.hp} ⚔️${d.dmg} 🛡️${d.def} 👟${d.mov}</span><div>${SH.MAT_ORDER.filter(m => bc[m]).map(m => `<span class="chip ${(c.st.m[m] || 0) >= bc[m] ? 'ok' : 'lack'}">${SH.MATS[m].e} ${c.st.m[m] || 0}/${bc[m]}</span>`).join('')}</div></div><button class="btn sm ${okb ? 'gold' : ''}" ${okb ? '' : 'disabled'} data-c='${jattr({ a: 'recruit', c: c.id, k })}'>Reclutar</button></div>`; }).join('') + '<p class="hint">Las bestias empiezan en nivel 1 y descansan el turno en que llegan. Suben de nivel y gastan puntos de habilidad.</p>';
     else if (S.cfg.mode === 'mundo') h += '<p class="hint lack">🌍 Mundo abierto: no se recluta. Las unidades nuevas nacen por reproducción: deja a dos unidades tuyas juntas, cerca de una ciudad tuya, durante varios turnos.</p>';
     else if (S.cfg.mode === 'uno') h += '<p class="hint lack">🎯 Reto de una unidad: aquí no se puede reclutar.</p>'; else h += `<button class="btn gold block" style="margin-top:10px" ${ok ? '' : 'disabled'} data-c='${jattr({ a: 'recruit', c: c.id })}'>Reclutar unidad</button><p class="hint">La nueva unidad empieza en nivel 1 y descansa el turno en que llega. Cada reclutamiento cuesta más.</p>`;
   }
   if (S.graves && S.graves.length) {
-    const n = S.mine.filter(x => !x.sm && !x.cart && !x.bld && !x.sg).length;
+    const n = S.mine.filter(x => !x.sm && !x.cart && !x.bld && !x.sg && !x.gr).length;
     h += `<h3 class="hint" style="margin-top:12px">🪦 Caídos</h3>` + S.graves.map(gr => {
       const hl = (c.b && c.b.iglesia) || 0, gc = {}; for (const m in gr.cost) gc[m] = (m === 'hueso' || m === 'alma') && hl ? Math.max(1, Math.ceil(gr.cost[m] * (1 - SH.CHURCH.disc * hl))) : gr.cost[m];
       const okr = SH.MAT_ORDER.every(m => !gc[m] || (c.st.m[m] || 0) >= gc[m]) && n < S.maxUnits;
@@ -1118,13 +1230,15 @@ function tutSteps() {
   const st = [
     { e: '🗺️', t: 'Tu aventura empieza aquí', p: 'En el mapa están tu ciudad 🏰 y tus unidades 🛡️. <b>Toca una unidad</b> para seleccionarla: se marcan las casillas a las que puede llegar. Toca una casilla para moverte o toca a un enemigo para atacarlo. Arrastra para recorrer el mapa y usa 🏠 para volver a tu ciudad.' },
     { e: '⚔️', t: 'Criaturas y botín', p: 'Por el mundo hay criaturas 🐺 que dan <b>experiencia y botín</b>. Antes de atacar, toca una para ver su nivel, su vida y su daño. Las más peligrosas son los <b>jefes</b> 🐉: no vayas solo.' },
-    { e: '⭐', t: 'Sube de nivel', p: 'Al subir de nivel ganas puntos para mejorar <b>salud, daño, defensa, movilidad</b> y más (en «Habilidades»). En el nivel ' + SH.CLASS_LV + ' eliges una <b>clase</b> (arquero, mago, nigromante…) y en el ' + SH.SUB_LV + ' una especialización.' },
-    { e: '🏰', t: 'Tu ciudad', p: 'Lleva el botín a tu ciudad: allí se <b>guarda</b>, se <b>forja equipo</b> ⚒️ y se construyen edificios. Las unidades cerca de la ciudad se curan' + (world ? '.' : ' y allí puedes <b>reclutar</b> más.') + ' Dos unidades juntas junto a una ciudad pueden tener <b>crías</b> 👶.' },
+    { e: '⭐', t: 'Sube de nivel (hasta el 99)', p: 'Al subir de nivel ganas puntos para gastar en el <b>árbol de habilidades</b> (pestaña «Habilidades»): salud, daño, defensa, movilidad y también <b>esquiva, embestida, contraataque, provocar, alcance y regeneración</b>. En el nivel ' + SH.CLASS_LV + ' eliges una <b>clase</b> (arquero, mago, nigromante…) y en el ' + SH.SUB_LV + ' una especialización.' },
+    { e: '🏰', t: 'Tu ciudad', p: 'Lleva el botín a tu ciudad: allí se <b>guarda</b>, se <b>forja equipo</b> ⚒️ y se construyen edificios. Las unidades cerca de la ciudad se curan' + (world ? '.' : ' y allí puedes <b>reclutar</b> más.') + ' Una pareja ♂ + ♀ junto a una ciudad, unos turnos seguidos, puede tener una <b>cría</b> 👶 que nace con el nivel medio de sus padres y un bonus que crece cada generación.' },
     { e: '🛡️', t: 'Equipo y rarezas', p: 'La rareza de un objeto es su número de efectos: ' + SH.RARITY.map(r => r.e).join(' ') + ' (común, poco común, raro, épico, legendario y mítico). En la forja puedes <b>mejorar</b>, <b>encantar</b> y <b>reforjar</b>. Con 3 piezas de armadura de la misma calidad activas un <b>set</b>.' },
     { e: '🤝', t: 'Otros jugadores', p: 'En «Jugadores» ofreces <b>paz o alianzas</b>. Con 💬 chateas con todos (también con los bots, mencionando su nombre). Una alianza puede compartir la victoria.' },
   ];
   const m = c.mode;
-  if (m === 'mundo') st.push({ e: '🌍', t: 'Mundo abierto', p: 'Aquí no hay «Fin de turno»: el mundo avanza solo con el reloj y entras cuando quieras. No se recluta (solo crías). Si una ciudad pasa mucho tiempo sin unidades tuyas cerca, <b>vuelve a ser neutral</b>. Los monstruos pueden ser de cualquier nivel: ¡cuidado!' });
+  if (c.dn !== 'no' && m !== 'laberinto') st.splice(5, 0, { e: '🌙', t: 'Día y noche', p: 'Cada 100 turnos hay <b>80 de día y 20 de noche</b> (míralo junto al turno: ☀️/🌙). De noche el mapa se oscurece, <b>ves menos</b> y las criaturas agresivas pegan <b>+25%</b>, se mueven más y detectan de más lejos. La <b>antorcha 🔦</b> (se forja como cualquier equipo) te devuelve la vista y quita ese bono a quien la lleva y a los aliados cercanos. ¡Caza de día y vuelve a la ciudad de noche!' });
+  if (m === 'ciudadela') st.push({ e: '🏰', t: 'La Ciudadela', p: 'Una gran ciudad amurallada <b>compartida por todos</b>. Cada cierto número de turnos llega una <b>oleada</b> de criaturas cada vez más fuertes (hay 101 tipos, por temas). Entre oleadas: <b>sal a cazar</b> y sube de nivel, entra a la <b>mazmorra</b> 🕳️ para ver la próxima oleada, recluta en la <b>taberna</b> 🍺, prueba la <b>arena</b> y levanta <b>defensas</b> 🛡️ fuera de la muralla (torres, trampas, barricadas). Las <b>guarniciones</b> 💂 (4 soldados por casilla, de todos) mejoran junto a otras: ¡forma ejércitos! Ojo: las criaturas terrestres <b>rompen la muralla</b>; solo las voladoras la cruzan. Con las <b>escuadras</b> das órdenes a varias unidades a la vez: defender, cazar o retirarse.' });
+  else if (m === 'mundo') st.push({ e: '🌍', t: 'Mundo abierto', p: 'Aquí no hay «Fin de turno»: el mundo avanza solo con el reloj y entras cuando quieras. No se recluta (solo crías). Si una ciudad pasa mucho tiempo sin unidades tuyas cerca, <b>vuelve a ser neutral</b>. Los monstruos pueden ser de cualquier nivel: ¡cuidado!' });
   else if (m === 'oleadas') st.push({ e: '🌊', t: 'Modo Oleadas', p: 'Todos están aliados. Cada pocos turnos llega una <b>oleada</b> de criaturas que marcha sobre vuestras ciudades, cada vez más fuerte, y cada 5 viene un jefe. Toca 🌊/📖 para ver el avance. Superar una oleada da materiales a cada capital. ¡Resistid las 20!' });
   else if (m === 'laberinto') st.push({ e: '🕯️', t: 'Modo Laberinto', p: 'No hay ciudades: cada jugador tiene una <b>vela</b> por piso para guardar, forjar, mejorar y revivir (sin bonos). Todos están aliados. Busca la escalera ⬇️ de cada piso; cada 2 pisos un jefe sella la bajada. Vence al del último piso para ganar. Toca 🕯️/📖 para ver el avance.' });
   else if (m === 'historia') st.push({ e: '📖', t: 'Modo Historia', p: 'Todos están aliados contra el mundo. Toca 📖 para ver el capítulo y los objetivos. Al cumplirlos, cada capital recibe materiales y botín, y aparece el siguiente reto hasta el Dragón de Ceniza.' });
@@ -1137,18 +1251,97 @@ function tutSteps() {
 }
 function renderTut() {
   const st = tutSteps(), x = st[Math.min(tutI, st.length - 1)];
-  $('tut').innerHTML = `<div class="card"><div class="big">${x.e}</div><h3>${x.t}</h3><p>${x.p}</p><div class="dots">${st.map((_, i) => `<i class="${i === tutI ? 'on' : ''}"></i>`).join('')}</div><div class="row">${tutI > 0 ? '<button class="btn" data-tut="prev">Atrás</button>' : '<button class="btn" data-tut="skip">Saltar</button>'}<button class="btn gold" data-tut="next">${tutI < st.length - 1 ? 'Siguiente' : '¡A jugar!'}</button></div></div>`;
+  $('tut').innerHTML = `<div class="card"><div class="big">${x.e}</div><h3>${x.t}</h3><p>${x.p}</p><div class="dots">${st.map((_, i) => `<i class="${i === tutI ? 'on' : ''}"></i>`).join('')}</div><div class="row">${tutI > 0 ? '<button class="btn" data-tut="prev">Atrás</button>' : '<button class="btn" data-tut="skip">Saltar</button>'}<button class="btn gold" data-tut="next">${tutI < st.length - 1 ? 'Siguiente' : '🎓 Misiones guiadas'}</button></div></div>`;
   $('tut').classList.remove('hidden');
 }
 const tutOpen = () => { tutI = 0; renderTut(); };
-const tutClose = () => { tutMark(); $('tut').classList.add('hidden'); $('tut').innerHTML = ''; };
+const tutClose = go => { tutMark(); $('tut').classList.add('hidden'); $('tut').innerHTML = ''; if (go === true) qStart(); };
 $('tut').addEventListener('click', e => {
   const b = e.target.closest('[data-tut]'); if (!b) return;
   const a = b.dataset.tut, n = tutSteps().length;
   if (a === 'skip') tutClose();
   else if (a === 'prev') { tutI = Math.max(0, tutI - 1); renderTut(); }
-  else if (tutI >= n - 1) tutClose(); else { tutI++; renderTut(); }
+  else if (tutI >= n - 1) tutClose(true); else { tutI++; renderTut(); }
 });
+
+/* ---------- misiones guiadas (v1.70): te piden hacer lo básico con una flecha en el mapa y se marcan solas ---------- */
+const qSeen = () => { try { return localStorage.getItem('ada_q') === '1'; } catch (e) { return false; } };
+const qMark = () => { try { localStorage.setItem('ada_q', '1'); } catch (e) {} };
+let Q = null, qTimer = 0;
+const qOwn = () => S && S.mine && S.mine.find(u => u.id === selId) || (S && S.mine && S.mine[0]) || null;
+const qCre = () => { if (!S || !S.cre || !S.cre.length) return null; const o = qOwn() || { x: cam.x, y: cam.y }; return S.cre.slice().sort((a, b) => Math.hypot(a.x - o.x, a.y - o.y) - Math.hypot(b.x - o.x, b.y - o.y))[0]; };
+const qCity = () => S && S.cities && (S.cities.find(c => c.owner === S.you) || S.cities.find(c => c.cit)) || null;
+function qSteps() {
+  const c = S && S.cfg || {}, world = c.mode === 'mundo', cit = !!(S && S.ct);
+  const st = [
+    { e: '👆', t: 'Toca una de tus unidades', h: 'Se marcarán las casillas a las que puede llegar.', ok: () => selId != null && S.mine.some(u => u.id === selId), at: qOwn },
+    { e: '🚶', t: 'Muévela', h: 'Toca una de las casillas marcadas.', ok: q => S.mine.some(u => { const b = q.pos[u.id]; return b && (b[0] !== u.x || b[1] !== u.y); }), at: () => null },
+    { e: '🐺', t: 'Toca una criatura', h: 'Verás su nivel, su vida y su daño antes de atacar.', ok: () => !!(sheet && sheet.mode === 'info'), at: qCre, skipIf: () => !S.cre || !S.cre.length },
+    { e: '🏰', t: cit ? 'Abre la Ciudadela' : 'Abre tu ciudad', h: 'Toca la ciudad en el mapa: allí se guarda el botín, se forja y se reclutan unidades.', ok: () => !!(sheet && sheet.mode === 'city'), at: qCity },
+  ];
+  if (cit) st.push({ e: '🛡️', t: 'Mira la pestaña «Defensas»', h: 'En la parte de arriba del panel: ahí construyes torres y trampas fuera de la muralla.', ok: () => !!(sheet && sheet.mode === 'city' && citTab === 'def'), at: () => null });
+  st.push({ e: '⭐', t: 'Abre las habilidades de una unidad', h: 'Toca la unidad y elige la pestaña «Habilidades»: ahí gastas los puntos de nivel.', ok: () => !!(sheet && sheet.mode === 'unit' && sheet.tab === 'skills'), at: () => (sheet ? null : qOwn()) });
+  if (!world) st.push({ e: '⏭️', t: 'Termina el turno', h: 'Toca «Fin de turno» cuando acabes tus acciones.', ok: q => S.turn > q.turn, at: () => null, glow: 'bGo' });
+  return st;
+}
+function qBase() { return { pos: Object.fromEntries((S.mine || []).map(u => [u.id, [u.x, u.y]])), turn: S.turn }; }
+function qStart() { if (!S || S.status !== 'playing') return; Q = Object.assign({ i: 0 }, qBase()); clearInterval(qTimer); qTimer = setInterval(qTick, 400); qRender(); }
+function qStop(done) { clearInterval(qTimer); Q = null; if (done) qMark(); $('quest').classList.add('hidden'); $('quest').classList.remove('ok'); document.querySelectorAll('.qglow').forEach(e => e.classList.remove('qglow')); dirty = true; }
+function qRender(flash) {
+  const q = $('quest'); if (!Q) return q.classList.add('hidden');
+  const st = qSteps(), x = st[Q.i];
+  document.querySelectorAll('.qglow').forEach(e => e.classList.remove('qglow'));
+  if (flash) { q.classList.remove('hidden'); q.classList.add('ok'); q.innerHTML = `<div class="qe">✅</div><div class="qt"><b>${flash}</b></div>`; return; }
+  q.classList.remove('ok');
+  if (!x) { q.classList.remove('hidden'); q.classList.add('ok'); q.innerHTML = `<div class="qe">🎉</div><div class="qt"><b>¡Misiones completadas!</b><span>Ya sabes lo básico. Explora, caza y ¡suerte, aventurero! (Puedes repetirlas desde ❓.)</span></div><button class="btn" data-q="end">Cerrar</button>`; return; }
+  q.classList.remove('hidden');
+  q.innerHTML = `<div class="qe">${x.e}</div><div class="qt"><div class="qn">MISIÓN ${Q.i + 1} DE ${st.length}</div><b>${x.t}</b><span>${x.h}</span></div><button class="btn" data-q="skip">Saltar</button><button class="btn" data-q="end">✕</button>`;
+  if (x.glow) { const el = $(x.glow); if (el) el.classList.add('qglow'); }
+  dirty = true;
+}
+function qTick() {
+  if (!Q || !S || S.status !== 'playing') return;
+  const st = qSteps(), x = st[Q.i]; if (!x) return;
+  let adv = false;
+  try { adv = x.skipIf && x.skipIf() ? 'skip' : x.ok(Q); } catch (e) { adv = false; }
+  if (!adv) return;
+  const flash = adv === 'skip' ? null : x.t;
+  Q.i++; Object.assign(Q, qBase());
+  if (flash) { qRender('¡Hecho! ' + flash); setTimeout(() => { if (Q) qRender(); }, 900); } else qRender();
+}
+$('quest').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (!b) return; const a = b.dataset.q; if (a === 'end') qStop(true); else if (a === 'skip') { Q.i++; Object.assign(Q, qBase()); qRender(); } });
+
+function drawGarFx(ox, oy, z) { // hilos dorados entre guarniciones cercanas y grietas en la muralla dañada
+  if (!S || !S.ct) return;
+  const gs = S.mine.filter(u => u.gr);
+  ctx.save(); ctx.strokeStyle = 'rgba(255,210,63,.75)'; ctx.lineWidth = Math.max(1.5, z * .08); ctx.setLineDash([z * .2, z * .15]);
+  for (let i = 0; i < gs.length; i++) for (let j = i + 1; j < gs.length; j++) if (Math.max(Math.abs(gs[i].x - gs[j].x), Math.abs(gs[i].y - gs[j].y)) <= SH.GAR.near) { ctx.beginPath(); ctx.moveTo(ox + (gs[i].x + .5) * z, oy + (gs[i].y + .5) * z); ctx.lineTo(ox + (gs[j].x + .5) * z, oy + (gs[j].y + .5) * z); ctx.stroke(); }
+  ctx.setLineDash([]);
+  for (const w of S.ct.wl || []) { const px = ox + w[0] * z, py = oy + w[1] * z, f = Math.max(0, w[2] / S.ct.wm); if (w[2] === 0) { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(px, py, z, z); continue; }
+    ctx.strokeStyle = 'rgba(20,20,30,' + (0.35 + 0.5 * (1 - f)) + ')'; ctx.lineWidth = Math.max(1, z * .07); ctx.beginPath(); ctx.moveTo(px + z * .2, py + z * .1); ctx.lineTo(px + z * .5, py + z * .5); ctx.lineTo(px + z * .35, py + z * .9); ctx.moveTo(px + z * .5, py + z * .5); ctx.lineTo(px + z * .85, py + z * .6); ctx.stroke();
+    if (z >= 14) hpBar(px + z / 2, py - 3, z * .9, f); }
+  ctx.restore();
+}
+function drawQuest(ox, oy, z) { // flecha que rebota sobre lo que toca pulsar
+  if (!Q || !S) return; const x = qSteps()[Q.i]; if (!x || !x.at) return; const t = x.at(); if (!t) return;
+  const cx = ox + (t.x + .5) * z, cy = oy + t.y * z, b = Math.abs(Math.sin(performance.now() / 280)) * z * .35;
+  ctx.save(); ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 3; ctx.globalAlpha = .6 + .4 * Math.abs(Math.sin(performance.now() / 280)); ctx.beginPath(); ctx.arc(cx, cy + z * .5, z * (.55 + b / z * .3), 0, 7); ctx.stroke(); ctx.globalAlpha = 1;
+  ctx.font = Math.round(z * .9) + 'px ' + EMO; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText('👇', cx, cy - b + z * .1); ctx.restore();
+}
+
+/* ---------- consejos de una sola vez (v1.70): aparecen la primera vez que ocurre algo nuevo ---------- */
+const tipsGet = () => { try { return JSON.parse(localStorage.getItem('ada_tips') || '{}'); } catch (e) { return {}; } };
+const tipsSet = k => { try { const t = tipsGet(); t[k] = 1; localStorage.setItem('ada_tips', JSON.stringify(t)); } catch (e) {} };
+function tipsCheck() {
+  if (!S || S.status !== 'playing' || Q || !tutSeen() || !$('tut').classList.contains('hidden') || !S.mine) return;
+  const seen = tipsGet();
+  const tips = [
+    ['lvl', () => S.mine.some(u => u.pts > 0), '⭐ ¡Una unidad subió de nivel! Tócala y abre «Habilidades» para gastar el punto.'],
+    ['cls', () => S.mine.some(u => classAvail(u)), '🎖️ Una unidad ya puede elegir clase: tócala y revisa sus pestañas.'],
+  ];
+  for (const [k, f, msg] of tips) { let on = false; try { on = f(); } catch (e) {} if (on && !seen[k]) { tipsSet(k); toast(msg); return; } }
+}
+setInterval(tipsCheck, 2500);
 $('nHelp').onclick = tutOpen;
 $('nMan').onclick = () => openSheet('manual', { tab: 'm' });
 
@@ -1388,7 +1581,7 @@ function infoSheet() {
   if (i.t === 'c') {
     const c = S.cre.find(x => x.id === i.id); if (!c) return hd('Criatura') + '<p class="dim">Ya no está a la vista.</p>';
     const d = SH.CREATURES[c.t];
-    return hd(`${d.e} ${c.el ? esc(c.el) + ' · ' : ''}${d.n} <span class="dim">niv. ${c.lv}</span>${c.boss ? ' <span class="tag">JEFE</span>' : ''}${c.el ? ' <span class="tag">⭐ ÉLITE</span>' : ''}${c.hd ? ' <span class="tag">🐺 HORDA</span>' : ''}${c.pz ? ' <span class="tag">☠️</span>' : ''}`) + `<div style="display:flex;justify-content:space-between"><span>Salud</span><span>${c.hp}/${c.mhp}</span></div>${bar('hp', c.hp, c.mhp)}<div class="grid" style="margin-top:10px"><div class="stat"><small>Daño</small>${c.dmg}</div><div class="stat"><small>Defensa</small>${c.def}</div></div><p class="hint">${d.agg ? 'Ataca a quien se acerque.' : 'No ataca hasta que la golpeen.'} Suelta: ${Object.keys(d.drops).map(m => SH.MATS[m].e + ' ' + SH.MATS[m].n.toLowerCase()).join(', ')}${d.soul ? ', y a veces almas' : ''}.</p>`;
+    return hd(`${d.e} ${c.el ? esc(c.el) + ' · ' : ''}${d.n} <span class="dim">niv. ${c.lv}</span>${c.boss ? ' <span class="tag">JEFE</span>' : ''}${c.el ? ' <span class="tag">⭐ ÉLITE</span>' : ''}${c.hd ? ' <span class="tag">🐺 HORDA</span>' : ''}${c.pz ? ' <span class="tag">☠️</span>' : ''}`) + `<div style="display:flex;justify-content:space-between"><span>Salud</span><span>${c.hp}/${c.mhp}</span></div>${bar('hp', c.hp, c.mhp)}<div class="grid" style="margin-top:10px"><div class="stat"><small>Daño</small>${c.dmg}</div><div class="stat"><small>Defensa</small>${c.def}</div></div>${d.ds ? `<p class="hint ok">${esc(d.ds)}</p>` : ''}<p class="hint">${d.agg ? 'Ataca a quien se acerque.' : 'No ataca hasta que la golpeen.'} Suelta: ${Object.keys(d.drops).map(m => SH.MATS[m].e + ' ' + SH.MATS[m].n.toLowerCase()).join(', ')}${d.soul ? ', y a veces almas' : ''}.</p>`;
   }
   if (i.t === 'u') {
     const o = S.others.find(x => x.id === i.id); if (!o) return hd('Unidad') + '<p class="dim">Ya no está a la vista.</p>';
@@ -1399,7 +1592,7 @@ function infoSheet() {
     const d = (S.dungeons || []).find(x => x.id === i.id); if (!d) return hd('Mazmorra') + '<p class="dim">Ya no está a la vista.</p>';
     const TT = SH.DUNGEON.tiers[d.tier - 1], cb = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
     let h = hd(`${TT.e} ${esc(d.name)}`) + `<p>Otro mundo bajo tierra: criaturas de nivel ${TT.lv[0]}–${TT.lv[1]}, un jefe al final, muchos 💎 tesoros y ⚠️ trampas ocultas. Nivel recomendado: <b>${d.rec}</b>.${d.cleared ? ' <b class="ok">Despejada: se reabastecerá pronto.</b>' : ''}</p><p class="hint">Entras con una unidad pegada a la entrada (🕳️) y sales por la puerta 🚪 de la primera sala. Si tu unidad cae dentro, se pierde como en cualquier combate.</p>`;
-    const near = S.mine.filter(u => !u.cart && !u.bld && !u.sg && (u.dg ? u.dg === d.id && cb(u, d.exit) <= 1 : d.x >= 0 && cb(u, d) <= 1));
+    const near = S.mine.filter(u => !u.cart && !u.bld && !u.sg && !u.gr && (u.dg ? u.dg === d.id && cb(u, d.exit) <= 1 : d.x >= 0 && cb(u, d) <= 1));
     h += near.length ? near.map(u => `<div class="line"><div class="g">${esc(u.name)} <span class="dim">nivel ${u.lv}</span></div>${dgBtn(u, u.dg ? { leave: d } : { enter: d })}</div>`).join('') : '<p class="hint"><b>Acerca una de tus unidades</b> (a una casilla o menos) para entrar o salir. <span class="dim">Tus invocaciones cercanas acompañan a su invocador; la carreta se queda fuera.</span></p>';
     return h;
   }
@@ -1471,6 +1664,9 @@ $('sheet').addEventListener('click', e => {
   else if (k === 'chsend') chatSend();
   else if (k === 'goto') { gotoMode = gotoMode === selId ? null : selId; if (gotoMode) toast('Toca la casilla de destino en el mapa'); renderSheet(); }
   else if (k === 'tab') { sheet.tab = v; renderSheet(); }
+  else if (k === 'sksel') { sheet.sk = v; renderSheet(); }
+  else if (k === 'defplace') { defPlace = defPlace === v ? null : v; if (defPlace) { toast('Cierra el panel y toca una casilla verde fuera de la muralla'); } dirty = true; renderSheet(); }
+  else if (k === 'defgo') { const [dx, dy] = v.split(',').map(Number); defPlace = null; closeSheet(); centerOn(dx, dy); }
   else if (k === 'pick') { selectUnit(+v, true); }
   else if (k === 'city') { openSheet('city', { cityId: +v }); const c = S.cities.find(c => c.id === +v); if (c) centerOn(c.x, c.y); }
   else if (k === 'en') { sheet.ench = sheet.ench === +v ? null : +v; sheet.rf = null; sheet.gem = null; renderSheet(); }
@@ -1549,6 +1745,7 @@ function clampCam() { if (!S) return; cam.x = Math.max(0, Math.min(S.w, cam.x));
 let sqPtMode = 0;
 function tapTile(x, y) {
   if (x < 0 || y < 0 || x >= S.w || y >= S.h) return;
+  if (defPlace) { const dk = defPlace; defPlace = null; dirty = true; act({ a: 'def', op: 'build', k: dk, x, y }); setTimeout(() => { citTab = 'def'; const cc = S.cities.find(q => q.cit); if (cc) openSheet('city', { cityId: cc.id }); }, 300); return; }
   if (sqPtMode) { const id = sqPtMode; sqPtMode = 0; act({ a: 'sq', d: 'ord', id, k: 'guard', x, y }); return; }
   if (gotoMode) { const uid = gotoMode; gotoMode = null; act({ a: 'ord', u: uid, o: 'goto', x, y }); renderSheet(); return; }
   const k = y * S.w + x, mine = maps.mine.get(k), cre = maps.cre.get(k), oth = maps.oth.get(k), city = maps.city.get(k), u = selUnit();
@@ -1797,7 +1994,7 @@ function drawCity(c, ox, oy, z) {
 /* ---- caché del terreno: el suelo casi no cambia, así que se dibuja una vez en un lienzo y luego solo se copia (mucho menos lag en el móvil) ---- */
 const TC = { terr: null, vis: null, sig: '', cv: [null, null], fog: null, sizeOk: true };
 const TCZ = 16;
-function tcSig() { const cc = S.ct && S.cities.find(c => c.cit); return (S.h0 || S.h) + ':' + S.w + ':' + (cc && cc.b ? (cc.b.muralla | 0) + '' + (cc.b.atalaya | 0) : '') + (S.ct ? 'c' : ''); }
+function tcSig() { const cc = S.ct && S.cities.find(c => c.cit); return (S.h0 || S.h) + ':' + S.w + ':' + (cc && cc.b ? (cc.b.muralla | 0) + '' + (cc.b.atalaya | 0) : '') + (S.ct ? 'c' + ((S.ct.wl || []).filter(q => q[2] === 0).length) : ''); }
 function tcBuild(fr) {
   const w = S.w, hh = S.h0 || S.h, cz = TCZ, c = document.createElement('canvas'); c.width = w * cz; c.height = hh * cz; const cx = c.getContext('2d'), save = ctx; ctx = cx;
   try {
@@ -1908,6 +2105,7 @@ function draw() {
     ctx.fillStyle = col; ctx.fillRect(cx - z * .17, cy - z * .1 - bob, z * .34, z * .42); ctx.fillStyle = '#e8c9a0'; ctx.fillRect(cx - z * .13, cy - z * .36 - bob, z * .26, z * .26); ctx.fillStyle = '#3a2a1a'; ctx.fillRect(cx - z * .15, cy - z * .4 - bob, z * .3, z * .1);
     if (z >= 10) { ctx.font = Math.round(z * .5) + 'px ' + EMO; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(n.k === 'recluta' ? '❗' : n.k === 'sanador' ? '✚' : '📖', cx, cy - z * .72 - bob); ctx.textBaseline = 'alphabetic'; }
   }
+  drawDefs(ox, oy, z, x0, y0, x1, y1);
   // criaturas
   for (const c of S.cre) {
     if (c.x < x0 - 1 || c.x > x1 + 1 || c.y < y0 - 1 || c.y > y1 + 1) continue;
@@ -1916,7 +2114,7 @@ function draw() {
     if (c.el) { ctx.strokeStyle = '#c58bff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(cx, cy, z * .46, 0, 7); ctx.stroke(); }
     if (c.hd) { ctx.strokeStyle = '#ff7a2f'; ctx.lineWidth = 2; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.arc(cx, cy, z * .47, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
     if (c.wb) { const pul = .5 + .5 * Math.sin(Date.now() / 300); ctx.strokeStyle = 'rgba(255,90,48,' + (.5 + pul * .4) + ')'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(cx, cy, z * (.62 + pul * .08), 0, 7); ctx.stroke(); }
-    if (SPR[c.t]) { ctx.fillStyle = '#0005'; ctx.beginPath(); ctx.ellipse(cx, cy + z * .36, z * (c.boss ? .4 : .3), z * .08, 0, 0, 7); ctx.fill(); drawSpr([c.t], cx, cy - z * .02, z * (c.boss ? 1 : .86) * (c.wb ? 1.3 : 1), null, true); if (c.wb) emoji('🌋', cx + z * .42, cy - z * .46, z * .3); } else emoji(d.e, cx, cy, z * (c.boss ? .8 : .62));
+    if (SPR[creSpr(c.t)]) { const lk = CRE_LOOK[c.t]; ctx.fillStyle = '#0005'; ctx.beginPath(); ctx.ellipse(cx, cy + z * .36, z * (c.boss ? .4 : .3) * (lk && lk.s || 1), z * .08, 0, 0, 7); ctx.fill(); drawSpr([creSpr(c.t)], cx, cy - z * .02, z * (c.boss ? 1 : .86) * (c.wb ? 1.3 : 1) * (lk && lk.s || 1), lk ? lk.d : null, true); if (c.wb) emoji('🌋', cx + z * .42, cy - z * .46, z * .3); } else emoji(d.e, cx, cy, z * (c.boss ? .8 : .62));
     if (c.el && z > 26) emoji('⭐', cx - z * .34, cy - z * .32, z * .26);
     if (c.pz && z > 26) emoji('☠️', cx + z * .3, cy + z * .12, z * .24);
     hpBar(cx, cy + z * .38, z * .7, c.hp / c.mhp);
@@ -1980,7 +2178,10 @@ function draw() {
       ctx.font = 'bold ' + Math.floor(bh * .75) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 2.5;
       const tx = '⚔ ' + bd.n; ctx.strokeText(tx, bx + bw / 2, by + bh / 2 + 1); ctx.fillText(tx, bx + bw / 2, by + bh / 2 + 1); } }
   ctx.textAlign = 'start';
+  if (S.dn && S.dn.n) { ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = 'rgba(8,14,48,.38)'; ctx.fillRect(0, 0, cv.width, cv.height); ctx.restore(); } // noche
   drawFx(ox, oy, z);
+  drawGarFx(ox, oy, z);
+  drawQuest(ox, oy, z);
   drawMini();
 }
 
@@ -2073,6 +2274,354 @@ $('nNext').onclick = () => {
 };
 /* ---------- pixel art (v1.40): sprites de 16x16 definidos como tablas de letras ---------- */
 const SPR = {};
+// v1.65: bestiario de la Ciudadela. Cada criatura reutiliza la forma de un sprite base con otros colores (b: base, d: colores, s: tamaño)
+SPR.slime = [
+'................',
+'................',
+'................',
+'.....kkkkkk.....',
+'....kwwwwwwk....',
+'...kwxxwwwwwk...',
+'..kwwxwwwwwwwk..',
+'..kwwwwwwwwwwk..',
+'.kwwwkwwwwkwwwk.',
+'.kwwwkwwwwkwwwk.',
+'.kwwwwwwwwwwwwk.',
+'.kwwwwkkkkwwwwk.',
+'..kwwwwwwwwwwk..',
+'...kkkkkkkkkk...',
+'................',
+'................'
+];
+SPR.hongo = [
+'................',
+'.....kkkkkk.....',
+'...kkrrrrrrkk...',
+'..krrwwrrrrrrk..',
+'.krrwwrrrrwwrrk.',
+'.krrrrrrrrwwrrk.',
+'.krrrrrrrrrrrrk.',
+'..kkkkkkkkkkkk..',
+'.....kxxxxk.....',
+'.....kxxxxk.....',
+'.....kxkkxk.....',
+'.....kxxxxk.....',
+'....kxxxxxxk....',
+'....kkkkkkkk....',
+'................',
+'................'
+];
+const CRE_LOOK = {
+  lgris: { b: 'lobo', d: { m: '#7d8189', w: '#d8dae0', d: '#4f525a' } },
+  linv: { b: 'lobo', d: { m: '#e6f0fa', w: '#9fd8f5', d: '#a9bfd4', k: '#2c4a66' } },
+  lsomb: { b: 'lobo', d: { m: '#2c2a3c', w: '#b04bd6', d: '#1c1a28', k: '#0b0912' } },
+  lceniza: { b: 'lobo', d: { m: '#5a4a44', w: '#ff8a2c', d: '#ff4a1c', k: '#1a0f0c' } },
+  lespec: { b: 'lobo', d: { m: '#8fe3d8', w: '#eafffb', d: '#5bb8ae', k: '#2d6f6a' } },
+  lhierro: { b: 'lobo', d: { m: '#8c96a6', w: '#e4ecf6', d: '#59627a', k: '#262b38' } },
+  alfa: { b: 'lobo', s: 1.25, d: { m: '#8a1f26', w: '#ffd2c8', d: '#5a1218', k: '#1a0508' } },
+  mantis: { b: 'escorpion', d: { o: '#6cc24a', S: '#d8f2a8' } },
+  escarab: { b: 'tortuga', d: { E: '#2b3f8a', e: '#4f6fd0', S: '#c9d2ee' } },
+  avispa: { b: 'murcielago', d: { P: '#f2c230', r: '#222', w: '#fff' } },
+  hormiga: { b: 'arana', d: { d: '#8a3a1c', r: '#ffd24a' } },
+  polilla: { b: 'murcielago', d: { P: '#d9d2f0', r: '#9a7ad0', w: '#fff' } },
+  ciempies: { b: 'serpiente', d: { E: '#b8542c', e: '#e08a4c', S: '#ffe0a0' } },
+  reina: { b: 'arana', s: 1.3, d: { d: '#8a3ab8', r: '#ffd24a' } },
+  zombierr: { b: 'zombi', d: { g: '#8a9a6a', E: '#5a6a44' } },
+  esqguer: { b: 'esqueleto', d: { x: '#b8b0a0', X: '#6a6a78' } },
+  espectro: { b: 'fantasma', d: { w: '#7fb2ff' } },
+  necrofago: { b: 'zombi', d: { g: '#c9c0cf', E: '#8a7f99', r: '#d62f3a' } },
+  cabmuerte: { b: 'esqueleto', s: 1.15, d: { x: '#4a4458', X: '#8a2430' } },
+  banshee: { b: 'fantasma', d: { w: '#c8f7d8' } },
+  lichem: { b: 'liche', s: .85, d: { P: '#3a3f5a', p: '#6a7090' } },
+  // tanda 2: bestias grandes, dracónidos (más grandes en pantalla), constructos y elementales
+  ospardo: { b: 'oso', s: 1.15, d: { n: '#6b4a2e', b: '#8a6a46' } },
+  jabpiedra: { b: 'jabali', s: 1.1, d: { b: '#8a8a92', n: '#55555e', w: '#eeeeee' } },
+  mamut: { b: 'oso', s: 1.5, d: { n: '#a0603a', b: '#e0c9a0', S: '#ffffff' } },
+  rino: { b: 'toro', s: 1.3, d: { b: '#7d8896', d: '#4a5360', w: '#f2f2f2' } },
+  uro: { b: 'toro', s: 1.3, d: { b: '#3a2a22', w: '#e8dcc0', d: '#1c1410' } },
+  bufalo: { b: 'toro', s: 1.3, d: { b: '#4a5a9a', w: '#ffe84a', d: '#2a3466' } },
+  behemot: { b: 'troll', s: 1.8, d: { g: '#7a8a9a', G: '#4a5868', y: '#f4d24f' } },
+  dracoroca: { b: 'dragon', s: 1.7, d: { R: '#7a7a84', r: '#a8a8b4', y: '#ffd24a' } },
+  wyvern: { b: 'dragon', s: 1.5, d: { R: '#3f8a5a', r: '#7ad08a' } },
+  salamandra: { b: 'dragon', s: 1.5, d: { R: '#c2410c', r: '#ffb020', y: '#fff2a0' } },
+  criaesm: { b: 'dragon', s: 1.3, d: { R: '#1fa86a', r: '#7fe8b0' } },
+  drake: { b: 'dragon', s: 1.7, d: { R: '#4a5a2a', r: '#8a9a4a' } },
+  dracescarcha: { b: 'dragon', s: 2.2, d: { R: '#8fc8ee', r: '#e6f6ff', y: '#4aa8ff' } },
+  serpdraco: { b: 'serpiente', s: 1.7, d: { E: '#8a2430', e: '#d9463e', S: '#f0e0a0' } },
+  golvolc: { b: 'golem', s: 1.35, d: { m: '#4a3a38', l: '#7a5a50', a: '#ff6a1c' } },
+  automata: { b: 'golem', s: 1.1, d: { m: '#b5773a', l: '#e0a864', a: '#6ad0c0' } },
+  golhierro: { b: 'golem', s: 1.4, d: { m: '#6a7384', l: '#a9b4c8', a: '#ffd24a' } },
+  centinela: { b: 'golem', s: 1, d: { m: '#b8704a', l: '#d89a6a', a: '#ffd24a' } },
+  gargola: { b: 'murcielago', s: 1.3, d: { P: '#6a6a72', r: '#d62f3a', w: '#cfcfd8' } },
+  colosocr: { b: 'coloso', s: 1.6, d: { d: '#7ad8f0', m: '#c6f1ff', o: '#ffffff' } },
+  elfuego: { b: 'fantasma', d: { w: '#ff8a2a' } },
+  elagua: { b: 'fantasma', s: 1.1, d: { w: '#4aa8ff' } },
+  eltierra: { b: 'golem', s: 1.2, d: { m: '#7a5a3a', l: '#8a9a4a', a: '#5a3a1c' } },
+  elaire: { b: 'fantasma', d: { w: '#e8f4ff' } },
+  elrayo: { b: 'fantasma', d: { w: '#ffe84a' } },
+  elhielo: { b: 'fantasma', s: 1.1, d: { w: '#9fe8ff' } },
+  // tanda 3: felinos, aves, reptiles y arácnidos
+  pantera: { b: 'lobo', d: { m: '#1f1d26', w: '#7a5ad0', d: '#12111a', k: '#05050a' } },
+  lince: { b: 'lobo', s: .95, d: { m: '#d8dde4', w: '#ffffff', d: '#8a93a3', k: '#2a2f3a' } },
+  sable: { b: 'lobo', s: 1.25, d: { m: '#d98a2c', w: '#fff3d0', d: '#8a4a12', k: '#1c0f05' } },
+  leon: { b: 'lobo', s: 1.2, d: { m: '#d6a64a', w: '#8a4a12', d: '#a8741f', k: '#2a1a08' } },
+  astral: { b: 'lobo', s: .9, d: { m: '#3a2f6a', w: '#9fe8ff', d: '#241c4a', k: '#0a0818' } },
+  jaguar: { b: 'lobo', s: 1.05, d: { m: '#c28a3a', w: '#2a1a0a', d: '#8a5a1f', k: '#1c1006' } },
+  halcon: { b: 'murcielago', d: { P: '#8a6a44', r: '#d9c9a8', w: '#ffffff' } },
+  buho: { b: 'murcielago', s: 1.1, d: { P: '#3a3550', r: '#ffd24a', w: '#cfc8e8' } },
+  aguila: { b: 'murcielago', s: 1.35, d: { P: '#4a5a7a', r: '#f2f2f2', w: '#ffd24a' } },
+  cuervo: { b: 'murcielago', s: .9, d: { P: '#15141c', r: '#5a5a6a', w: '#8a8a9a' } },
+  fenix: { b: 'murcielago', s: 1.3, d: { P: '#ff7a1c', r: '#ffd24a', w: '#fff2a0' } },
+  roc: { b: 'murcielago', s: 2.1, d: { P: '#8a5a2c', r: '#e0c07a', w: '#f2f2f2' } },
+  basilisco: { b: 'dragon', s: 1.15, d: { R: '#7a8a3a', r: '#d0d85a', y: '#d62f3a' } },
+  constrictora: { b: 'serpiente', s: 1.4, d: { E: '#3f7a3a', e: '#8ac05a', S: '#e8e0a0' } },
+  camaleon: { b: 'escorpion', s: 1.1, d: { o: '#4ab88a', S: '#c8f5a0' } },
+  sapo: { b: 'tortuga', s: .9, d: { E: '#6a4a8a', e: '#a8d05a', S: '#e8f0a0' } },
+  cocodrilo: { b: 'tortuga', s: 1.5, d: { E: '#2f5a3a', e: '#5a8a4a', S: '#e0e0c0' } },
+  triton: { b: 'serpiente', s: .95, d: { E: '#2f6ab8', e: '#6ac0e8', S: '#f0f0ff' } },
+  tejedora: { b: 'arana', d: { d: '#4a3a30', r: '#e8e0d0' } },
+  viuda: { b: 'arana', s: .85, d: { d: '#15141c', r: '#d62f3a' } },
+  tarantula: { b: 'arana', s: 1.2, d: { d: '#6a4a2c', r: '#c29a6a' } },
+  arcristal: { b: 'arana', d: { d: '#a8e8f5', r: '#ffffff' } },
+  escdunas: { b: 'escorpion', s: 1.15, d: { o: '#d6a64a', S: '#f5e0a0' } },
+  nieblaar: { b: 'arana', s: 1.05, d: { d: '#b8c0cf', r: '#7a8aa8' } },
+  // tanda 4: plantas, demonios, sombras, aberraciones y slimes
+  treant: { b: 'troll', s: 1.5, d: { g: '#6a4a2a', G: '#3a5a2a', y: '#9ad04a' } },
+  hongo: { b: 'hongo', d: { r: '#d9463e', w: '#ffffff', x: '#e8d8b0' } },
+  plantacarn: { b: 'serpiente', s: 1.2, d: { E: '#3a8a3a', e: '#d9463e', S: '#ffffff' } },
+  liana: { b: 'serpiente', s: 1.3, d: { E: '#2f7a2f', e: '#8ac05a', S: '#e8f0a0' } },
+  florsolar: { b: 'fantasma', d: { w: '#ffd24a' } },
+  musgo: { b: 'slime', s: 1.1, d: { w: '#4a7a3a', x: '#8ac05a' } },
+  diablillo: { b: 'murcielago', s: .85, d: { P: '#d9463e', r: '#ffd24a', w: '#ffffff' } },
+  sabinf: { b: 'lobo', s: 1.1, d: { m: '#1a1420', w: '#ff7a1c', d: '#0a0710', k: '#000000' } },
+  cadenas: { b: 'troll', s: 1.3, d: { g: '#8a2430', G: '#4a1018', y: '#ffb020' } },
+  sucubo: { b: 'bandido', d: { d: '#4a2a6a', S: '#f0c0d0', r: '#e585b8', R: '#8a2460' } },
+  bruto: { b: 'minotauro', s: 1.3, d: { b: '#7a1f2a', n: '#3a0f14', w: '#f2e0c0' } },
+  senorbr: { b: 'conde', s: 1.35, d: { R: '#e0501c', S: '#ffe0a0', d: '#3a1a10', r: '#ffb020' } },
+  sabpes: { b: 'lobo', s: 1.1, d: { m: '#2a2038', w: '#b04bd6', d: '#15101f', k: '#05030a' } },
+  cuervoecl: { b: 'murcielago', s: .95, d: { P: '#0a0a12', r: '#ff6ad0', w: '#6a4a9a' } },
+  ciervobr: { b: 'ciervo', d: { B: '#c8d8e8', b: '#8aa0b8' } },
+  gatomed: { b: 'lobo', s: .95, d: { m: '#15131c', w: '#ffd24a', d: '#0a0910', k: '#000000' } },
+  torotin: { b: 'toro', s: 1.3, d: { b: '#2a2038', w: '#9fd8f5', d: '#15101f' } },
+  tejsue: { b: 'arana', s: 1.1, d: { d: '#8a5ad0', r: '#ffc8f0' } },
+  ojo: { b: 'fantasma', d: { w: '#b04bd6' } },
+  devsom: { b: 'fantasma', s: 1.2, d: { w: '#2a1f3a' } },
+  tentabis: { b: 'serpiente', s: 1.5, d: { E: '#5a2a7a', e: '#d06ad0', S: '#ffffff' } },
+  mimico: { b: 'tortuga', s: 1.2, d: { E: '#7a4a1c', e: '#d2a43a', S: '#ffd24a' } },
+  susurrador: { b: 'fantasma', d: { w: '#6a4a9a' } },
+  espastral: { b: 'fantasma', s: 1.1, d: { w: '#8af0ff' } },
+  slimev: { b: 'slime', d: { w: '#58b04c', x: '#c8f08a' } },
+  cubo: { b: 'slime', s: 1.3, d: { w: '#9fe8ff', x: '#ffffff' } },
+  slimeac: { b: 'slime', d: { w: '#d4e04a', x: '#fff7a0' } },
+  baba: { b: 'slime', d: { w: '#a05ad0', x: '#e0b8ff' } },
+  slimemag: { b: 'slime', s: 1.2, d: { w: '#e0501c', x: '#ffd24a' } },
+  lodo: { b: 'slime', s: 1.3, d: { w: '#6a4a2c', x: '#a8844a' } },
+};
+/* sprites propios de las 101 criaturas de la Ciudadela (v1.67): cada una con su silueta y su paleta */
+SPR.c_lgris = ["................","..kk.kk.........","..kmkmk.........",".kkmmmmkkkkk.kk.","kmmymmmmmmmmkmmk","kllmmmmmmmmmmmmk","kkkllmmmmmmmmmk.",".kkkllmmmmmmmk..","..kllmmmmmmmmk..","..kmmmmmmmmmmk..","...kmk.kmkkmk...","...kmk.kmk.kmk..","...kdk.kdk.kdk..","...kkk.kkk.kkk..","................","................"];
+CRE_LOOK.lgris = { b: 'c_lgris', d: {"m":"#7d7f8c","l":"#c4c6d0","d":"#4a4b57","y":"#f4d24f"} };
+SPR.c_linv = ["................","..kk.kk.........","..kmkmk.a.a.a...",".kkmmmmkkkkkakk.","kmmymmmmwmwmkmmk","kllmmmmmmmmmmmmk","kkkllmmmmmmmmmk.",".kkkllmmmmmmmk..","..kllmmmmmmmmk..","..kmmmmmmmmmmk..","...kmk.kmkkmk...","...kmk.kmk.kmk..","...kdk.kdk.kdk..","...kkk.kkk.kkk..","................","................"];
+CRE_LOOK.linv = { b: 'c_linv', d: {"m":"#dcebf8","l":"#ffffff","d":"#8fb0d0","k":"#23365a","y":"#1f9bff","a":"#7fe6ff"} };
+SPR.c_lsomb = ["................","..kk.kk......p.p","..kmkmk.....p.p.",".kkmmmmkkkkk.kp.","kmmymmmmmmmmkmmk","kllmmmmmmmmmmmmk","kkkllmmmmmmmmmk.",".kkkllmmmmmmmk..","..kllmmmmmmmmk..","..kmmmmmmmmmmk..","...kmk.kmkkmk...","...kmk.kmk.kmk..","...pdk.pdk.pdk..","...p.k.p.k.p.k..","................","................"];
+CRE_LOOK.lsomb = { b: 'c_lsomb', d: {"m":"#3b2f5c","l":"#5c4a8c","d":"#221a38","k":"#0d0914","y":"#ff40f0","p":"#7a5ac0"} };
+SPR.c_lceniza = ["................","..kk.kk.........","..kmkmk.........",".kkmmmmkkkkk.kr.","kmmymmmomomokmrk","kllmmmmmmmmmmmmk","kkkllmmmmmmmmmk.",".kkkllmmmmmmmk..","..kllmmmmmmmmk..","..kmmmmmmmmmmk..","...kmk.kmkkmk...","...kmk.kmk.kmk..","...kok.ko.kok...","...kkk.kkk.kkk..","................","................"];
+CRE_LOOK.lceniza = { b: 'c_lceniza', d: {"m":"#7b7670","l":"#b8b1a8","d":"#3a3430","k":"#1a1512","y":"#ff8a1a","o":"#ff9a20","r":"#e03a18"} };
+SPR.c_lespec = ["................","..kk.kk.........","..kmkmk.........",".kkmmmmkkkkk.kk.","kmmymmmmmmmmkmmk","kllmmmmmmmmmmmmk","kkkllmmmmmmmmmkk",".kkkllmmmmmmmmmk","..kllmmmmmmmmmk.","..kmmmmmmmmmmk..","...kmmmmmmmmk...","....kmmmmmmk.k..",".....kmmkmk.....","......kk.kk.....","................","................"];
+CRE_LOOK.lespec = { b: 'c_lespec', d: {"m":"#9fd8f0","l":"#e8fbff","d":"#6fb0d8","k":"#2a6a9a","y":"#1b2f9a"} };
+SPR.c_lhierro = ["................","..kk.kk.........","..kmkmk..l.l.l..",".kkmmmmkkkkkkkk.","kmmymmmlmmlmmmmk","kllmmmmlmmlmmmmk","kkkllmmlmmlmmmk.",".kkkllmlmmlmmk..","..kllmmlmmlmmk..","..kmmmmmmmmmmk..","...kmk.kmkkmk...","...kmk.kmk.kmk..","...kdk.kdk.kdk..","...kkk.kkk.kkk..","................","................"];
+CRE_LOOK.lhierro = { b: 'c_lhierro', d: {"m":"#8791a6","l":"#d0d8e6","d":"#4a5266","k":"#161a24","y":"#ffd040"} };
+SPR.c_alfa = [".kk.kk..........",".kmkmmk.....kk..",".kmmmmkkkkkkmmk.","kmmymwmmmmmmmmmk","kllmmwmmmmmmmmmk","kwllwwmmmRRmmmmk","kwwlwmmmmmRRmmk.",".kkkwmmmmmmmmmk.","..kllmmmmmmmmmk.","..kmmmmmmmmmmmk.","..kmmkmmkkmmmk..","..kmmk.kmmkmmk..","..kmmk.kmmkmmk..","..kddk.kddkddk..","..kkkk.kkkkkkk..","................"];
+CRE_LOOK.alfa = { b: 'c_alfa', s: 1.25, d: {"m":"#6a2a30","l":"#b84a40","d":"#3a1218","k":"#150508","y":"#ffee30","w":"#f4eeee","R":"#ff3030"} };
+SPR.c_mantis = [".k..k...........","..k.k...........","..kkkk..........",".kyeeyk.........",".kceeck.........","wlkkekk..kkk....","wlwkekkkkeeek...",".wlkekeeeeeeek..","..wkekeeeEEEEk..","...kekkkEEEEk...","....kk.kkkEEk...","...k.k.k.k.kk...","..k..k.k..k..k..",".k...k.k.....k..","................","................"];
+CRE_LOOK.mantis = { b: 'c_mantis', d: {"e":"#58b04c","E":"#2f7038","c":"#98d95a","y":"#ff3030","w":"#f4f4ff","l":"#b8c0d0"} };
+SPR.c_escarab = ["................","................",".....kkkkkk.....","...kkuuaauuukk..","..kuuuuaauuuuuk.",".kuuuuuUUuuuuuuk","kkkuuuuUUuuuuuUk","kwkuuuuUUuuuuuUk","kdkuuuuUUuuuuUUk",".kdkuuuUUuuuuUk.","..kkUUUUUUUUUk..",".kk.kkkkkkkk.kk.","kk..k.k..k.k..kk","k..kk.k..k.kk..k","................","................"];
+CRE_LOOK.escarab = { b: 'c_escarab', d: {"u":"#3a6fd8","U":"#1f3a8a","a":"#8ae8ff","d":"#4a3a2a","w":"#e8e0c8"} };
+SPR.c_avispa = ["..k...........k.","...k..kkkkk..k..","..kkk.kaaaakk...",".kryk.kaaaaak...",".krrkkkaaaakyk..",".kkkkkkkkkkyyk..","..k.kyykkyykk...","..k.kkkyykkYYk..",".k..kyykkyyYYk..",".k...kkkyykkk...",".k....kyykk.....",".......kkkkk....","........kk.k....",".........kk.k...","................","................"];
+CRE_LOOK.avispa = { b: 'c_avispa', d: {"y":"#f4d24f","Y":"#c79a22","a":"#bfe8ff","r":"#e03030","k":"#1b1218"} };
+SPR.c_hormiga = ["................","................",".kk.............","k.kkkkk.........","kdkrrrrk........",".kkrykyrk.......","..kkrrrkk.kkkk..","...kkrkkkkrrrrk.",".....kkrrrrrrrrk","....kkkrrrrrrRRk","...kk.krrrrrRRk.","..kk.k.kkrrRRk..",".k..k..k.kkkk...","k..k...k..k.k...","................","................"];
+CRE_LOOK.hormiga = { b: 'c_hormiga', d: {"r":"#b0502c","R":"#7a2e18","d":"#3a2018","y":"#f4e060","k":"#1e0c08"} };
+SPR.c_polilla = ["..k.........k...","..kk.......kk...","...kkk.k.kkk....","kk..kkkwkkk..kk.","kwkkwwkwkwwkkwk.","kwwwwwkkkwwwwwk.","kwwuuwkwkwuuwwk.",".kwuuwwkwwuuwk..",".kwwwwkwkwwwwk..","..kwwwkwkwwwk...","...kwwkwkwwk....","....kkkwkkk.....",".....kwwwk......","......kkk.......","................","................"];
+CRE_LOOK.polilla = { b: 'c_polilla', d: {"w":"#e8ecf8","u":"#7a8ad8","l":"#a8b0d0","k":"#2a2a4a"} };
+SPR.c_ciempies = ["................","................","................",".kkk.....kkkk...","kryrk.kkk.kRk.kk","krrrkkRrRkkRkkRk",".kkrrRrrRrrRrRrk","..kkkkkkkkkkkkk.",".k.k.k.k.k.k.kk.",".k.k.k.k.k.k.k..","................","................","................","................","................","................"];
+CRE_LOOK.ciempies = { b: 'c_ciempies', d: {"r":"#e86a28","R":"#9a3a18","y":"#fff060","k":"#2a0e08"} };
+SPR.c_reina = [".....k...k......","..kk..k.k..kkk..",".kaak.yykyk.kaak",".kaaakyYyYkkaaak",".kaaakkkkkkaaak.","..kkkkyyyykkkk..",".....kyrykk.....","....kkyyyykk....","...kYykkkkykkk..","..kkyYkYYkYykk..",".kyyYkkyyYkkyyk.",".kyYYkkYYkkYYyk.","..kyykkyykkyyk..","...kYkkYYkkYk...","....kkk..kkk....","................"];
+CRE_LOOK.reina = { b: 'c_reina', s: 1.3, d: {"y":"#f4d24f","Y":"#7a4a10","a":"#bfe8ff","r":"#e03050","k":"#1b1218"} };
+SPR.c_zombierr = ["................",".....knnnk......","....kgggggk.....","....kgyggyk.....","....kgggggk.....","....kgkwkgk.....",".kkkkgggggk.....","kgggkbbbbbbk....","kgkkbbRbbbbk....",".kk.kbbbbbgk....","....kbbbbbgk....","....kbkkbbk.....","....kgk.kgk.....","....kgk.kgk.....","...kkgk.kgkk....","...kkkk.kkkk...."];
+CRE_LOOK.zombierr = { b: 'c_zombierr', d: {"g":"#7c9a5a","b":"#6a4a3a","n":"#2a2418","y":"#f4e040","R":"#8a2430","w":"#d8d0a8"} };
+SPR.c_esqguer = [".....kkkkk......","....kmmmmmk.....","....kxyxxyk.....","....kxxkxxk.....","....kkxwxkk...l.","..kk.kkkkk....l.",".kuukbbBbbk...l.",".kuukbxBxbk.kkl.",".kuukbbBbbkkxlk.",".kuuk.kBbk.kkk..","..kk..kxxk..k...",".....kxkkxk.....",".....kxk.kxk....",".....kxk.kxk....","....kkxk.kxkk...","....kkk...kkk..."];
+CRE_LOOK.esqguer = { b: 'c_esqguer', d: {"x":"#e8e0c0","y":"#ff3030","m":"#8a6a50","b":"#7a5a4a","B":"#a07848","u":"#4a6a9a","l":"#c8ccd8","w":"#a8a088"} };
+SPR.c_espectro = ["................","....kkkkkk......","...kPPPPPPk.....","..kPPkkkkPPk....","..kPkyykyykk....","..kPkkkkkkPk....",".kPPPPkkPPPPk...","kppkPPPPPPPPPk..","kpppkPPpPPPPPk..",".kpkPPPPPpPPk...","..kkPPpPPPPk....","....kPPPPPk.....","....kPpPPk.k....",".....kPPk.k.....","......kk.k......","................"];
+CRE_LOOK.espectro = { b: 'c_espectro', d: {"P":"#5a3a9a","p":"#9a7ad8","k":"#150a28","y":"#7aff9a"} };
+SPR.c_necrofago = ["................","....kkkk........","...kggggk.......","..kgyggykk......","..kggggggk......","..kkwkwkwk......","...kkkkkkgkkk...","..kggggggggggk..",".kwgkgRgkgggggk.","kwwkggkRkggggggk","kw.kgRRgkgkgggk.","k..kggggggkkgk..","...kgkkgggk.kk..","..kggk.kggk.....","..kwwk.kwwk.....","................"];
+CRE_LOOK.necrofago = { b: 'c_necrofago', d: {"g":"#8a9078","R":"#8a2430","y":"#ff5030","w":"#e8e0c0","k":"#1a1812"} };
+SPR.c_cabmuerte = ["..k.......k.....","..kk.kkk.kk...w.","...kkkddkkk...w.","...kddddddk...w.","...kdaddadk...l.","....kddddk...kl.","..kkkkddkkkk.kl.",".kmmkmddmkmmkkl.",".kmmkmmmmkmmkJk.",".kdkkkmmkkkdkkk.","..k.kmmmmmk.k...","....kdkkkdk.....","....kdk.kdk.....","....kdk.kdk.....","...kkdk.kdkk....","...kkkk.kkkk...."];
+CRE_LOOK.cabmuerte = { b: 'c_cabmuerte', s: 1.15, d: {"d":"#3a3a52","m":"#6a6a88","a":"#40d0ff","l":"#c0c8dc","w":"#f0f4ff","J":"#5a2a4a","k":"#0e0a18"} };
+SPR.c_banshee = ["................","....kkkkkk......","...kwwwwwwk.....","..kwwkwwkwwk....",".kwwwkkwwkwwk...",".kwwwwkkwwwwk...",".kwwwwwwwwwwk...","..kwwkRRkwwk....","..kwkkRRkkwk....",".kwwwkkkkwwwk...",".kwwwwwwwwwwwk..","..kwwkwwwwkwwk..","...kwwkwwwkwk...","....kwkkwkwk....",".....kk.kk.k....","................"];
+CRE_LOOK.banshee = { b: 'c_banshee', d: {"w":"#9ad8c8","R":"#401030","k":"#143a3a"} };
+SPR.c_lichem = [".......kkk......",".......kyk.k....",".kkkkk..k.kak...","kPPPPPkkk.kak...","kPkkkPk...kuk...","kPkyykPk..kuk...","kPkkkkPk..kuk...",".kPkxkPk..kuk...",".kPPPPPPkkkuk...",".kPpPPPPPPkuk...","kPPpPPPPPPPk....","kPPPPpPPPPPk....","kPPpPPPPpPPk....","kPPPPPPPPPPk....",".kkkkkkkkkkk....","................"];
+CRE_LOOK.lichem = { b: 'c_lichem', s: 0.85, d: {"P":"#54307e","p":"#7a4ab0","y":"#40ff90","x":"#e8e0c0","a":"#c0ffd8","u":"#6a4a2a","k":"#150a22"} };
+SPR.c_ospardo = ["................","..kk............",".kbbk...kkkk....",".kbbbkkkbbbbkk..","kbbbbbbbbbbbbbk.","kbkbbbbbbbbbbbbk","kzzkbbbbbbbbbbbk","kzkkbbbbbbbbbbk.",".kkbbbbbbbbbbbk.","..kbbbbbbbbbbk..","..kbbkbbbbkbbk..","..kbbkbbbbkbbk..",".kwbbkkbbkkwbbk.",".kkkkk.kkkk.kkk.","................","................"];
+CRE_LOOK.ospardo = { b: 'c_ospardo', s: 1.15, d: {"b":"#7a4a28","z":"#d2a46a"} };
+SPR.c_jabpiedra = ["................","................","......k.k.k.k...","....kkmkmkmkmk..","..kkmmmmmmmmmmk.",".kbbbbbbbbbbbbbk","kbwkbbbbbbbbbbbk","ksssbbbbbbbbbbk.","kxsskbbbbbbbbbk.",".kxxkbbbbbbbbbk.","..kkkbbbbbbbbk..","...kbbkbbbbkbbk.","...kbbkbbbbkbbk.","...kddkdddkddk..","................","................"];
+CRE_LOOK.jabpiedra = { b: 'c_jabpiedra', s: 1.1, d: {"m":"#3a3744","b":"#6a5848","s":"#c88a62","x":"#cfd3da","w":"#f4d24f","d":"#2a2230"} };
+SPR.c_mamut = ["....kkkkkkk.....","..kkbbbbbbbkk...",".kbbbbbbbbbbbk..",".kbbbbbbbbbbbbk.","kbbkbbbbbbbbbbbk","kbbbkbbbbbbbbbbk","kxBBkbbbbbbbbbk.","kxxBkbbnbbnbbbk.",".kxBkbbbbbbbbbk.","..kBkbnbbnbbnbk.","..kBkbbkbbbkbbk.","..kBkbbkbbbkbbk.","...kkkkkkkkkkkk.","................","................","................"];
+CRE_LOOK.mamut = { b: 'c_mamut', s: 1.5, d: {"b":"#8a5a3a","B":"#b8825a","n":"#4a2e1b","x":"#f5f0dc"} };
+SPR.c_rino = ["................","................","..x.............",".kxxk..kk.kk....",".kxkkkkmmkmmkk..","kmmwkmmlmmlmmmk.","kmmmmmmlmmlmmmmk","kmmmmmmlmmlmmmmk",".kmmmmmmmmmmmmmk","..kmmmmmmmmmmmk.","..kmmkmmmmmkmmk.","..kmmkmmmmmkmmk.","..kddkddddkddk..","................","................","................"];
+CRE_LOOK.rino = { b: 'c_rino', s: 1.3, d: {"m":"#7e8494","l":"#b4bac8","d":"#3a3f50","x":"#f5f0dc"} };
+SPR.c_uro = ["................","xx..............","kxxk..kkkkkk....",".kxkkkkwwwwkkk.k",".kbbbbbbbbbbbbkk","kbybbbbbbbbbbbbk","kssbbbbbbbbbbbk.","kskkbbbbbbbbbbk.",".kk.kbbbbbbbbk..","...kbbkbbbbkbbk.","...kxbkbbbbkxbk.","...kxbkbbbbkxbk.","...kkkk.kkkkkk..","................","................","................"];
+CRE_LOOK.uro = { b: 'c_uro', s: 1.3, d: {"b":"#4a2a2a","x":"#f5f0dc","w":"#e0d8c0","y":"#f4d24f","s":"#a87a5a"} };
+SPR.c_bufalo = ["................","...kkkkkk....y..","..kbbbbbbkk.yy..",".kbbPbbbbbbk.y..","xxkbPbbbbbbbbk..",".xkbbbbbbbbbbbk.","kbbkbbbbbbbbbbbk","kybbkbbbbbbbbbk.","kbbbbbbbbbbbbbk.",".kkbbbbbbbbbbk..","..kbbkbbbbkbbk..","..kbbkbbbbkbbk..","..kddkbbbbkddk..","..kkkk.kkkkkka..","..............a.","................"];
+CRE_LOOK.bufalo = { b: 'c_bufalo', s: 1.3, d: {"b":"#4a5a8a","P":"#7a8ac0","x":"#f5f0dc","y":"#f4d24f","a":"#66d0ea","d":"#1b1522"} };
+SPR.c_behemot = ["................",".....kkkkkk.....","....kmmmmmmk....","...kmmmmmmmmk...","...kmrkmmkrmk...","...kmmmkkmmmk...","..kkmmllllmmkk..",".kmmkmmmmmmkmmk.","kmmmmkmmmmkmmmmk","kmmmmmkmmkmmmmmk","kmlmmmmmmmmmmlmk","kmmmkmmmmmmkmmmk",".kmkkmmkkmmkkmk.",".kmmkmmk.kmmkmmk","..kkk.kk..kk.kkk","................"];
+CRE_LOOK.behemot = { b: 'c_behemot', s: 1.8, d: {"m":"#6e7a90","l":"#b8c4d8","r":"#f4d24f"} };
+SPR.c_dracoroca = ["................","................","..k.k...........",".kmkmk..k.k.k...",".kmmmkkkmkmkmk..","kmymmmmmmmmmmmk.","kmmmmmmmlmmmmmmk","kxkxkmmmmmmmmmk.","kddddkmmlmmmmk..",".kmmmkmmmmlmmk..","..kkkkmmmmkmmk..","...kmmkmmkmmmk..","...kwdkkwdkkwdk.","................","................","................"];
+CRE_LOOK.dracoroca = { b: 'c_dracoroca', s: 1.7, d: {"m":"#8a8d96","l":"#b8bac4","y":"#f4d24f","x":"#f5f0dc","w":"#d6d8de","d":"#4a4c58"} };
+SPR.c_wyvern = ["....k.......k...","...kUk.....kUk..","..kUUUk...kUUUk.",".kUUuUUk.kUuUUUk","kkUUuUUUkUUuUUkk","kekkUUUUUUUUUk.k","keekkEEEEEEkk...","kkEEEEEEEEEEEk..",".kEEEEEEEEEEEEk.","..kwEkEEEEkEkEkP","...kkk.kkEkk..kk","......kk.kk.kkP.","................","................","................","................"];
+CRE_LOOK.wyvern = { b: 'c_wyvern', s: 1.5, d: {"U":"#2f6a6a","u":"#4a9a8a","E":"#4a7a58","e":"#98d95a","w":"#f5f0dc","P":"#9a5bd0"} };
+SPR.c_salamandra = ["................","..............o.","............ooyo","..kkkk.......kRk",".kRrrRkkkkkkkRRk","kRyRrrrorrorrRk.","okRRrrrrrrrrrk..","yokRrrorrrorrk..","..kRkRrrrrRkRk..",".kRRkkkkkkkkRRk.","................","................","................","................","................","................"];
+CRE_LOOK.salamandra = { b: 'c_salamandra', s: 1.5, d: {"R":"#6a1a1a","r":"#d9463e","o":"#ec8a2c","y":"#f4d24f"} };
+SPR.c_criaesm = ["................","..k...kk........",".kck.kEEk.......",".kcckkEEEk...kk.","kccccEEEEEkkkEk.","kcwkcEEEEEEEEEk.","kccccEEEEEEEEEk.",".kkcckEEEEEEEk..","..kcckEEEEEEk...","..kccEEEEEEEk.k.","...kkkEkkkEkEEk.","...kcckkcckkkk..","....kkk.kkk.....","................","................","................"];
+CRE_LOOK.criaesm = { b: 'c_criaesm', s: 1.3, d: {"c":"#98d95a","E":"#2f9a58","w":"#f4d24f"} };
+SPR.c_drake = ["................","................","................","......k.k.k.k...",".kkkkkkgkgkgkkk.","kggggggggggggggk","kgyggggggggggggk","kxkxgggggggggggk","kkkkkGGGGGGGGGkk",".kkkGGGgGGGGkk..","..kGkGgkkgkGkGk.","..kkkkk.kkkkkk..","................","................","................","................"];
+CRE_LOOK.drake = { b: 'c_drake', s: 1.7, d: {"g":"#5a7a3a","G":"#3e5a2a","y":"#f4d24f","x":"#f5f0dc"} };
+SPR.c_dracescarcha = ["................","..........k..k..",".........kuk.kuk","..k.k...kuuukuuk",".kwkwkk.kuwuuuk.","kwwwwwwkkuwuuk..","kwywwwwwwkkkwk..","kxxkwwwwwwwwwwk.","kakkkwwwwwwwwwwk",".aakkwwwwwwwwwk.","..kkwwwuwwuwwk..","...kwkwwkwkwwkk.","...kkk.kkk.kkwk.","................","................","................"];
+CRE_LOOK.dracescarcha = { b: 'c_dracescarcha', s: 2.2, d: {"w":"#cfeaf8","u":"#4a9ae0","x":"#ffffff","a":"#66d0ea"} };
+SPR.c_serpdraco = ["................","..kk.kk.........",".kxxkxxk..kkkk..",".kooxoxkkkkEEEk.","kyyokkkEEEEEEEEk","kkkkkEEeEEkkkEEk","....kEEkkkk.kEEk","..kkEEk.....kEEk",".kEEEk...kkkEEk.",".kEEEEkkkEEEEk..","..kkEEEEEEEEkk..","....kkkkkkkk....","................","................","................","................"];
+CRE_LOOK.serpdraco = { b: 'c_serpdraco', s: 1.7, d: {"E":"#2f8a48","e":"#98d95a","x":"#f5f0dc","o":"#ec8a2c","y":"#f4d24f"} };
+SPR.c_golvolc = ["................",".....kkkkkk.....","....kmmmmmmk....","....kmymmymk....","..kkkdmmmmdkkk..",".kmmmkdmommdkmmk","kmdmkmmommdmkmdk","kmdmkdmmmmodkmdk","kkkkkdmommmdkkkk","...kdmmmommdk...","...kdmmmmmmdk...","...kdmdkkdmdk...","...kmmk..kmmk...","..kmmmk..kmmmk..","..kkkkk..kkkkk..","................"];
+CRE_LOOK.golvolc = { b: 'c_golvolc', s: 1.35, d: {"o":"#ff7a1a","y":"#ffd23f","m":"#5a5560","d":"#2e2a33"} };
+SPR.c_automata = ["................","....kkkkkkkk....","...kQQQQQAAAk...","...kQkaaaakAk...","....kAkkkkAk....","..kkkkAAAAkkkk..",".kQAkAQQQQAkAQk.",".kAVkAAaaAAkVAk.",".kVVkAAAAAAkVVk.",".kkkkVAAAAVkkkk.","...kAAkkkkAAk...","...kAVk..kAVk...","...kAAk..kAAk...","..kQQAk..kAQQk..","..kkkkk..kkkkk..","................"];
+CRE_LOOK.automata = { b: 'c_automata', s: 1.1, d: {"A":"#b87333","Q":"#e8b060","V":"#6e4120"} };
+SPR.c_golhierro = ["................","....kkkkkkkk....","...kllllllllk...","...kmkrkkrkmk...","...kmmmmmmmmk...",".kkkkkmmmmkkkkk.","kllllkmwwmklllk.","kmlmlkmmmmkmlmlk","kmmmmkdmmdkmmmmk","kddddkmmmmkddddk","kkkkkkdmmdkkkkkk","...kllkddkllk...","...kmmk..kmmk...","..kmmmmk..kmmmmk","..kkkkkk..kkkkkk","................"];
+CRE_LOOK.golhierro = { b: 'c_golhierro', s: 1.4, d: {"l":"#9aa7bd","m":"#6a768c","d":"#3b4358","w":"#dfe6f2"} };
+SPR.c_centinela = ["................","................",".....kkkkkk.....","....kCCCCCCk....","....kCyCCyCk....","....kCCCCCCk....","..kkkkCCCCkkkk..",".kCCkCCyyCCkCCk.",".kCDkCyyyyCkDCk.",".kCDkDCCCCDkDCk.",".kkkkDDDDDDkkkk.","....kCCkkCCk....","....kCCk.kCCk...","....kDDk.kDDk...","...kkkkk.kkkkk..","................"];
+CRE_LOOK.centinela = { b: 'c_centinela', s: 1, d: {"C":"#c27a50","D":"#8f4a2e","y":"#ffd84a"} };
+SPR.c_gargola = ["................",".kk..k....k..kk.","kmmk.kk..kk.kmmk","kmmmkkmmmmkkmmmk","kmmmkmrmmrmkmmmk",".kmmkmmmmmmkmmk.",".kdmmkmwwmkmmdk.","..kdmkmmmmkmdk..","...kkmmmmmmkk...","...kmmmddmmmk...","...kmdmmmmdmk...","...kmmmmmmmmk...","...kmmkddkmmk...","..kmmmk..kmmmk..","..kkkkk..kkkkk..","................"];
+CRE_LOOK.gargola = { b: 'c_gargola', s: 1.3, d: {"m":"#7d7f8c","d":"#4b4d5a","l":"#b3b5c2","r":"#ff4a3a"} };
+SPR.c_colosocr = ["................",".k....kkkk....k.","kwk..kwwwak..kak","kwkk.kqwwqk.kkak",".kwwkkkaaakkwwk.","kwwaakwwaauakwak","kwaaukwaaauukaak","kaauukaaauuUkauk",".kuUkkuuuUUkkUk.","..kkkuwauuUkkk..","...kuaauuuUUk...","...kuaukkkuUk...","...kauk..kuUk...","..kwauk..kuUUk..","..kkkkk..kkkkk..","................"];
+CRE_LOOK.colosocr = { b: 'c_colosocr', s: 1.6, d: {"w":"#f4fdff","a":"#8fe8ff","u":"#4fb3e8","U":"#2a6fb8","q":"#ff6ad0"} };
+SPR.c_elfuego = ["................",".......R........","..R...RoR...R...","..oR..RooR.RoR..","..RoRRoooooRoR..","...RooooyyooR...","..RooykooykooR..",".RooyyyyyyyyooR.",".RooyywwwwyyooR.",".RoooyyyyyyoooR.","..RooooyyooooR..","..RroooooooorR..","...RrrooooorrR..","....RrrrrrrrR...",".....RRRRRRR....","................"];
+CRE_LOOK.elfuego = { b: 'c_elfuego', d: {"R":"#9a1c1c","r":"#e03a1e","o":"#ff8a1c","y":"#ffe35a","w":"#fff6c8","k":"#2a0e0e"} };
+SPR.c_elagua = ["................","................",".....UaaU...U...","....UawaaU.UaU..","....UaaaaaUaaaU.","..UaawaaaaaaaaU.","..UaakaaaakaaaU.",".UaaaawwwwaaaaU.",".UaaaaaaaaaaaaU.","UuaaaaaaaaaaaauU","UuuaaaaaaaaaauuU",".UuuuuaauuuuuU..","..UUuuuuuuuuUU..","....UUUUUUUU....","................","................"];
+CRE_LOOK.elagua = { b: 'c_elagua', s: 1.1, d: {"U":"#1f4fa8","u":"#3d82e0","a":"#7fd0f5","w":"#e8fbff"} };
+SPR.c_eltierra = ["................","......kkkk......","...kk.kzBBk.kk..","..kzBkkBBBBkkBk.","..kBBbkyBByBkbk.",".kzBBkBBnnBBkBzk","kzBbkBBBBBBkbBzk","kBBbbkBnBBnBkbbk","kkkkbbkBBBBkbbkk","..kBBbBBBBBBbBk.",".kzBBbBBnnBBbBzk",".kBbBBbBBBBbBBbk",".kbbBBBnnBBBbbk.","..kkkkbbbbbbkkkk","................","................"];
+CRE_LOOK.eltierra = { b: 'c_eltierra', s: 1.2, d: {"y":"#ffe04a","b":"#6d4a2a","B":"#9a7248","z":"#c9a56e","n":"#4a3220"} };
+SPR.c_elaire = ["................","..AAAAAAAAAAAA..",".AwwwwwwwwwwwwA.","AwwwkwwwwwwkwwwA",".AAAAaaaaaaaAAA.","..AwwwwwwwwwwA..","...AAaaaaaaAA...","....AwwwwwwA....",".....AAaaAA.....",".....AwwwA......","......AwwA......",".....AAwA.......","....AwwA........",".....AAA........","................","................"];
+CRE_LOOK.elaire = { b: 'c_elaire', d: {"A":"#7f9cc0","w":"#f4fbff","a":"#a8dcf2"} };
+SPR.c_elrayo = ["................",".P.....P.....P..",".yP..PPPPP..Py..","..yPPyyyyyyPPy..","...PykyyyykyP...",".PPPyyywwyyyPPP.","PyyyPyywwyyPyyyP",".PPPPPyyyyPPPPP.",".....PyywyP.....",".....PyyyP......","....PyywP.......","...PyyyyyyP.....","...PPPPyyyP.....","......PyyP......",".....PyyP.......",".....PP........."];
+CRE_LOOK.elrayo = { b: 'c_elrayo', d: {"P":"#5a2d9a","y":"#ffe94a","w":"#ffffff","k":"#2a1450"} };
+SPR.c_elhielo = ["................",".w.....kk.....w.","......kwwk......",".....kwwaak.....","..kkkwwaaaakkk..",".kwwwaUaaUaaauk.","..kwwaaaaaauuk..","...kkwaaaaauukk.",".w..kkaaaauukk..",".....kkauuukk.w.","......kuuuk.....",".......kUk......",".w.....kk....w..","................","................","................"];
+CRE_LOOK.elhielo = { b: 'c_elhielo', s: 1.1, d: {"w":"#f2feff","a":"#9fe6f7","u":"#55b0e0","U":"#1d3f99","k":"#2a4a80"} };
+SPR.c_pantera = ["................","............kkk.","............kJk.",".kk.kk......kJk.","kJJkJJk.....kJk.","kJJJJJkkkkkkkJk.","kJyJyJJJJJJJJJk.","kJJJJJJmmmmJJJJk",".kJwJJJJJJJJJJk.","..kkJJJJJJJJJk..","..kJJkkJJJkJJk..","..kJk..kJk.kJk..","..kJk..kJk.kJk..","..kkk..kkk.kkk..","................","................"];
+CRE_LOOK.pantera = { b: 'c_pantera', d: {"J":"#3a3048","m":"#6a5c80","y":"#ffe030"} };
+SPR.c_lince = ["................","k..k............","kwkkwk..........","kwwwwwkkkkkkkk..","kwywywwlwwwwwwk.","kdwwwwwlwdwwdwwk",".kwxwlwwwwwwwwk.",".kwwwwwwdwwwdwkk","..kwwwwwwwwwwwk.","..kwwwk..kwwwk..","..kwwk....kwwk..","..kwwk....kwwk..",".kwwwk....kwwwk.",".kkkkk....kkkkk.","................","................"];
+CRE_LOOK.lince = { b: 'c_lince', s: 0.95, d: {"w":"#f0f0f6","l":"#b8b8c8","d":"#4a4658","y":"#ffd23a","x":"#e8a8a0"} };
+SPR.c_sable = ["................","................","..kk.kk.........",".kooookkkkkkkk..",".koyoyoonoonook.","kooooooonoonoook","kwkooooonooonook","kwkoooooooooooo.","kwk.kooooooooook",".k..kooooooooook","....kooknokkook.","....kook.kook.k.","....kook.kook...","....kkkk.kkkk...","................","................"];
+CRE_LOOK.sable = { b: 'c_sable', s: 1.25, d: {"o":"#e8862a","n":"#3a2210","y":"#ffe040","w":"#fffbe8"} };
+SPR.c_leon = ["................","..kkkkkk........",".kbbbbbbk.......","kbbBBBBbbkkkkk..","kbBzzzzBbbzzzzk.","kbzkzzkzbzzzzzzk","kbzzznzzbzzzzzzk","kbBzwwwzBzzzzzzk",".kbBzzzBbzzzzzk.","..kbbbbbbzzzzzk.","...kkbbbkzzzzzk.","....kzzk.kzzkzk.","....kzzk.kzzk.zk","....kkkk.kkkk.kk","................","................"];
+CRE_LOOK.leon = { b: 'c_leon', s: 1.2, d: {"b":"#7a4018","B":"#b06a28","z":"#e0b060","n":"#3a2010"} };
+SPR.c_astral = ["................",".kk.....kk.....y",".kAHkkkkHAk.....",".kAAAAAAAAAk..y.",".kAaaAAAAaaAk...",".kAAAAqqAAAAk...","..kkAAAAAAAkk...","..kAAHAAAAAAk.kk",".kAAAAyAAAAAAkAk",".kAAHAAAAAAAAAAk",".kAAAAAAyAAAAAAk",".kAAAkAAAAkAAAk.",".kwwk.kwwk.kkk..",".kkkk.kkkk......","................","................"];
+CRE_LOOK.astral = { b: 'c_astral', s: 0.9, d: {"A":"#2b2a78","H":"#5a58c8","y":"#ffe85a","w":"#ffffff","a":"#6af0ff","q":"#ff9ad0"} };
+SPR.c_jaguar = ["................","................",".kk.kk..........","kFFkFFk.........","kFyFFyFkkkkkkk..","kFFFnFFFFFnFFFk.","kfwfFFFnFFFnFFFk",".kffkFFFFnFFnFk.","..kkFFnFFFFFFnk.","...kFFFFnFFFFFk.","...kFFkkFFFnkFk.","...kFk..kFk.kFk.","...kFk..kFk.kFk.","...kkk..kkk.kkk.","................","................"];
+CRE_LOOK.jaguar = { b: 'c_jaguar', s: 1.05, d: {"F":"#e0a438","f":"#f6d88a","n":"#4a2a10","y":"#fff060"} };
+SPR.c_halcon = ["................","...kkkk.........","..kbbbbkk.......",".kbbwbbbbkk.....","kyykbbbbbbbkk...","kyyykbbbbbbbbkk.",".kkkwwbbbbbbbbbk","...kwwwbbBBbbbbk","...kwwwwbbBBbkk.","....kwwwwbbbbk..","....kkwwwbbkk...",".....kyykkbk....","......kyk.kdk...","......kk..kk....","................","................"];
+CRE_LOOK.halcon = { b: 'c_halcon', d: {} };
+SPR.c_buho = ["..kk........kk..",".kdkk......kkdk.",".kdddkkkkkkdddk.","kddddddddddddddk","kdmyyymddmyyymdk","kdmykymddmykymdk","kdmyyymmmmyyymdk","kddmmmYYYYmmmddk","kdddmmYYYYmmdddk","kdkddmmmmmmddkdk","kdkdddmmmmdddkdk","kddkddmmmmddkddk",".kddkddmmddkddk.","...kkkyyyykkk...","....kkkkkkkk....","................"];
+CRE_LOOK.buho = { b: 'c_buho', s: 1.1, d: {"d":"#4a3f5c","m":"#8a7fa0","y":"#f4d24f","Y":"#e08a2c"} };
+SPR.c_aguila = ["...........kk...","..kkkk....kyyk..",".kwwwwk..kbyybk.","kwwkwwwkkbbybbk.","kyywwwwwbbyybbk.","kyyykwwwbbbybbbk",".kkkwwwbbBBybbbk","...kwwwbbBBbbbbk","...kkwwbbbbbbbk.","....kbbbbbbbbk..","....kbbbbbbbk...",".....kkbbbbkk...","......kyykyk....","......kkkkkk....","................","................"];
+CRE_LOOK.aguila = { b: 'c_aguila', s: 1.35, d: {"b":"#5a4636","B":"#8a6a48","w":"#f4f0e6"} };
+SPR.c_cuervo = ["................","....kkkk........","...kddddk.......","..kdlkdddk......","kmkdddddddk.....","kmmkdddddddkk...",".kmkddddddddddk.","..kkddUddddddddk","...kdddUUddddddk","...kddddUUdddkk.","....kdddddddk...",".....kkdddkkk...","......kmkmk.....","......kkkkk.....","................","................"];
+CRE_LOOK.cuervo = { b: 'c_cuervo', s: 0.9, d: {"d":"#2c2838","U":"#4a5fa8","m":"#9a98a8"} };
+SPR.c_fenix = ["........k..k....","..kk...kok.kok..",".kook..kork.kork","kyykokkorkkork..","kykoooorooorork.",".kkyooooyoooork.","..kkoooyyoooork.","...kkooyyooorrk.","....kkoooooorrk.",".....kkorrorrk..","......kkyokork..",".......kyk.kyk..","........kk..kk..","................","................","................"];
+CRE_LOOK.fenix = { b: 'c_fenix', s: 1.3, d: {} };
+SPR.c_roc = ["................","kk....kkkk....kk","kzkk.kzzzzk.kkzk","kzzzkkzkzzkkzzzk","kzzzzkzzyyzkzzzk","kBzzzzkzyykzzzBk",".kBzzzzzzzzzzBk.","..kBBzzzzzzBBk..","...kkBzzzzBkk...","....kzzzzzzk....","....kzzBBzzk....","....kkzzzzkk....",".....kyk.kyk....",".....kyk.kyk....","......kk..kk....","................"];
+CRE_LOOK.roc = { b: 'c_roc', s: 2.1, d: {"z":"#c9a36a","B":"#7a5230"} };
+SPR.c_basilisco = ["................","................","......k.k.k.....",".....kcrcrck....","..kkkkeeeeeek...",".kyYkeeeeEEEek..","kkeeeeeeEEEEEek.","krkeeeeeEEEEEEkk",".kkkeeeeeEEEEEEk","..kekeeeeeEEkkk.","..kek.kekkkk....","..kek.kek.......","..kkk.kkk.......","................","................","................"];
+CRE_LOOK.basilisco = { b: 'c_basilisco', s: 1.15, d: {"y":"#f4d24f"} };
+SPR.c_constrictora = ["..kkkk..........",".keeeek.........","kyekeeek........","rkkeeeek........","..keeeEek.......","...keeeek.......","..kkeeeekkkkk...",".keeEEEEeeeeek..","keeeeEEEEEEeeek.","kkeeeeeeeeeeeekk","keEEeeEEeeEEeek.",".kkeeeeeeeeeekk.","..keeEEeeEEeeek.","...kkkkkkkkkkkk.","................","................"];
+CRE_LOOK.constrictora = { b: 'c_constrictora', s: 1.4, d: {"y":"#f4d24f"} };
+SPR.c_camaleon = ["................","...kkk..........","..kyykkkkk......",".kykkkeeeeekk...","kkeeeeeeeeeeek..","keeeppeeeeEEEek.","kerekeeeeeeEEEek",".kkeeepeeeeEEEek","..kcceeeeeeeEEek","..kckeceekkkkEk.","..kk.kek.k..kEk.","......kk....kEk.","............kk..","................","................","................"];
+CRE_LOOK.camaleon = { b: 'c_camaleon', s: 1.1, d: {"y":"#f4d24f","r":"#d9463e","p":"#9a5bd0"} };
+SPR.c_sapo = ["................","..kkk......kkk..",".kyykkkkkkkkyyk.",".kykeeeeeeeekyk.","kkeeeeeeeeeeeekk","keeeepeeeepeeeek","keeeeeeeeeeeeeek","keeEEEEEEEEEEeek","kekkkkkkkkkkkkek","kerrrrrrrrrrrrek","keeeEEeeeeEEeeek","keEeeeeeeeeeeEek",".kkeeeeeeeeeekk.","kkekeekeekeekekk","kekkkkkkkkkkkkek","................"];
+CRE_LOOK.sapo = { b: 'c_sapo', s: 0.9, d: {"p":"#9a5bd0","y":"#f4d24f"} };
+SPR.c_cocodrilo = ["................","................","................","..kk...k.k.k.k..",".kEykkkkEkEkEkkk","kEEEEEEEEEEEEEEk","kxkxkxEEEeEeEEkk","kkkkkEEEEEEEkk..","....kEkkEkkEk...","....kk.kk.kk....","................","................","................","................","................","................"];
+CRE_LOOK.cocodrilo = { b: 'c_cocodrilo', s: 1.5, d: {} };
+SPR.c_triton = ["................","...q.q..........","..kkqkqk........",".kuuuuuukk......",".kuyukuuuuukk...","kuuuuuuuuuuuuk..",".kkuuaaaaauuuuk.","..kuuuaaaauuuuuk","..kukuuuuukkuuak","..kuk.kukk..kkak","..kk..kk.....kk.","................","................","................","................","................"];
+CRE_LOOK.triton = { b: 'c_triton', s: 0.95, d: {"q":"#e585b8","y":"#f4d24f","a":"#66d0ea"} };
+SPR.c_tejedora = [".......kk.......",".......kk.......","......kkkk......",".....kddddk.....","kk..kdyddydk..kk",".kk.kddddddk.kk.","..kkkkddddkkkk..","k.kkPPPPPPPPkk.k",".kkPPwPPPPwPPkk.","kkkPPPwPPwPPPkkk","k.kkPPPPPPPPkk.k","..k.kPPPPPPk.k..",".....kkkkkk.....","................","................","................"];
+CRE_LOOK.tejedora = { b: 'c_tejedora', d: {"y":"#f4d24f","d":"#3a3744"} };
+SPR.c_viuda = ["................","kk............kk",".kk...kkkk...kk.","..kk.kddddk.kk..","k..kkkddddkkk..k","kk.kmddddddmk.kk",".kkkddrrrrddkkk.","..kkdddrrdddkk..","..kkdddrrdddkk..","k.kkddrrrrddkk.k",".k.kkddddddkk.k.","k..kkkkkkkkkk..k","................","................","................","................"];
+CRE_LOOK.viuda = { b: 'c_viuda', s: 0.85, d: {"r":"#d9463e","d":"#2a2430","m":"#6b6877"} };
+SPR.c_tarantula = ["................","................","................","....kkkkkkkk....","kk.kbbbbbbbbk.kk",".kkkbrbrrbrbkkk.","kkkkbbbbbbbbkkkk",".kbkkbbbbbbkkbk.","kkkbBbbBBbbBbkkk","kbkbbbbbbbbbbkbk","kbkbbBbbbbBbbkbk","kk.kbbbbbbbbk.kk","k...kkkkkkkk...k","................","................","................"];
+CRE_LOOK.tarantula = { b: 'c_tarantula', s: 1.2, d: {"r":"#d9463e"} };
+SPR.c_arcristal = ["................",".......kk.......","......kaak......",".....kawwak.....","k...kawaawak...k",".k..kakkkkak..k.","..kkkaaaaaakkk..","k.kkaawaawaakk.k",".kkaaawaawaaakk.","kkkaawaaaawaakkk","k.kkaaaaaaaakk.k","..k.kaaaaaak.k..",".....kkkkkk.....","................","................","................"];
+CRE_LOOK.arcristal = { b: 'c_arcristal', d: {"a":"#8fe6f5","w":"#eafcff"} };
+SPR.c_escdunas = ["......kkkkk.....",".....kbbbbbk....","....kbkkkkbbk...","....krk..kbbbk..","....kk....kbbk..","kkk.....kkbbk...","kbbkkkkkkbbbk...","kbkbbBbbbbbk....","kkkkbbBBbbbk....","..kkbbbbbbk.....",".k.kk.kk.kk.k...","k.k.k.k.k.k.k...","................","................","................","................"];
+CRE_LOOK.escdunas = { b: 'c_escdunas', s: 1.15, d: {"b":"#d2a46a","B":"#a8713f"} };
+SPR.c_nieblaar = ["................","................",".....kkkkkk.....","....kllllllk....","k..kklwllwlkk..k",".kkkllllllllkkk.","..kkllllllllkk..","k.kkmmmmmmmmkk.k",".kkmmwmmmmwmmkk.","kkkmmwmwwmwmmkkk","k.kmmmmmmmmmmk.k","..k.kmmmmmmk.k..",".....kkkkkk.....","..l.l......l.l..",".l....l..l....l.","................"];
+CRE_LOOK.nieblaar = { b: 'c_nieblaar', s: 1.05, d: {"l":"#c8c6d6","m":"#8a88a0","w":"#f4f2fa"} };
+SPR.c_treant = ["...kkkkkkkkkk...","..kecceEeeccek..",".kecEeeeccEeeek.",".kEeeccEeeecEek.","..kkeEeeeEekk...",".kk.kbbbbbk.kk..","kbbkbybbybkkbbk.","kBbbkbbbbbkbbBk.","kbbk.kbkkbk.kbk.",".kk.kbbBbbbk.kk.","....kbbBbbbk....","....kbbkkbbk....","...kbbk..kbbk...","..kbbbk..kbbbk..","..kkkkk..kkkkk..","................"];
+CRE_LOOK.treant = { b: 'c_treant', s: 1.5, d: {} };
+SPR.c_hongo = ["................","....kkkkkkkk....","..kkrrwwrrrrkk..",".krrrwwrrrwwrrk.",".krwwrrrrrwwrrk.","krrwwrrrwrrrrrrk","kRrrrrrwwrrrrRRk","kkRRRRRRRRRRRkkk","..kkxxxxxxxkk...","...kxkxxxkxk....","...kxxxxxxxk....","...kxxkkkxxk....","...kXxxxxxXk....","..kkXXXXXXXkk...",".g..kkkkkkk..g..","..g.........g..."];
+CRE_LOOK.hongo = { b: 'c_hongo', d: {"g":"#b5e06a"} };
+SPR.c_plantacarn = ["................","...kkkk.........","..krrrrkk.......",".krrRrrrrk......","krrrRrrrrrk.....","kwkwkwkRrrk.....","kPPPPPPPPk......","kwkwkwkwrk......",".krrrrrrRkk.....","..kkRRRRkEk.....","......kEEek.....","..kkk.kEek.kk...",".keeEkkEekeek...","keeeEEkEEEeEEk..",".kkkkEEEEEkkk...","......kkkk......"];
+CRE_LOOK.plantacarn = { b: 'c_plantacarn', s: 1.2, d: {"P":"#3a1a4a"} };
+SPR.c_liana = ["................","..kk......kk....",".kecek...kece...",".kEeek.kkeEek...","..kEek.kEek.....","...kekkEeeekk...","..kkeeeeEeeEek..",".kecekyeeyekeek.",".kEeekeeEeekEek.","..kEeeeEEeeeek..",".kk.kEeeeeEk.kk.","kecekeEkkEekecek","kEek.kek.kek.kEk",".kek.kk...kk.kek","..kk.........kk.","................"];
+CRE_LOOK.liana = { b: 'c_liana', s: 1.3, d: {} };
+SPR.c_florsolar = [".....kkkkkk.....","..kk.kyyyyk.kk..",".kyykyYyyYkkyyk.",".kyYkyyyyyykYyk.","..kykbbnnbbkyk..",".kyykbknnkbkyyk.",".kyYkbbbbbbkYyk.",".kyykbBnnBbkyyk.","..kk.kbkkbk.kk..","...k..kEek..k...",".kkEk.kEek.kEkk.","kEeeEkkEekkEeeEk",".kkeEEkEeEEekk..","...kkeEEEEek....",".....kkEEkk.....","......kkkk......"];
+CRE_LOOK.florsolar = { b: 'c_florsolar', d: {} };
+SPR.c_musgo = ["................","................","................",".....kkkkkk.....","...kkcceeccekk..","..kceeEeecceecek",".kceEeeeeeEeeek.",".kecekeeeekEeck.","kceeekeeeekeeeEk","kEeeeeeccEeeEeek","keEeEEeeeeEEeEek","kEeeeEEeeEeeeEek",".kEEeEEEEEEEEEk.","..kkkEEEEEEkkk..",".....kkkkkk.....","................"];
+CRE_LOOK.musgo = { b: 'c_musgo', s: 1.1, d: {} };
+SPR.c_diablillo = ["................","...k......k.....","..kRk....kRk....","..kRRkkkkRRk.kk.","...kmmmmmmmkkmmk","...kwwmmwwmkmmmk","...kmmmmmmmkmmk.","...kmwwwwmkkmk..",".o..kmmmmkmk....","oyo.kmmmmkk.....",".ok.kmmmmk......","..kmkmmmmkmk....","...k.kmmk.k.kk..","....kdk.kdk.kmk.","....kkk.kkk..kk.","................"];
+CRE_LOOK.diablillo = { b: 'c_diablillo', s: 0.85, d: {"o":"#ff9a2c","R":"#c0302a","m":"#8a8696","w":"#ffd84a","d":"#4a4658"} };
+SPR.c_sabinf = ["................","...k....oo.o....","..kdk..ooyooo...",".kddkkkkdoroo...","kddddddddddddk..","kodkddddddddddk.","kddddddddddddddk",".kkddddddddddddk","..kddddddddddmk.","...kddkddkddkk..","...kdk.kdk.kdk..","...kdk.kdk.kdk..","..kdmk.kdmkkdmk.","..kkkk.kkk.kkk..","................","................"];
+CRE_LOOK.sabinf = { b: 'c_sabinf', s: 1.1, d: {"d":"#2c2430","m":"#5a4c60","o":"#ff7a1a","y":"#ffd23a","r":"#d9302a"} };
+SPR.c_cadenas = ["..kk......kk....",".kRRk....kRRk...",".kRRkkkkkkRk....","..kkrrrrrrkk....","...krykkyrk.....","...krrrrrrk..ll.","..kkrkwwkrkk.lk.",".klklrrrrlklk.l.",".kl.krrrrk.lk.l.",".klkkrllrkklk.l.",".kl..krrk..lkkl.","..lk.krrk..kl.k.","...ll.kk.kk.l...","....kkrk.krkk...","....kkkk.kkkk...","................"];
+CRE_LOOK.cadenas = { b: 'c_cadenas', s: 1.3, d: {"r":"#b0302a","R":"#6a1a22","l":"#a9a7b4","y":"#ffd23a","w":"#ffe8c0"} };
+SPR.c_sucubo = [".k..k....k..k...","kPk.kk..kk.kPk..","kPPkqkkkkqkPPk..","kPPPkqqqqkPPPk..",".kPPkqqqqkPPk...","..kkkqkkqkkk....","...kqqqqqqqk....","..kkqqwwqqkk....",".kPkkPPPPkkPk...","kPPkkPrPPkkPPk..","kPk.kPPPPk.kPk..",".k..kPPPPk..k..k","....kPkkPk...kPk","....kPk.kPkkkkPk","....kkk.kkk..kk.","................"];
+CRE_LOOK.sucubo = { b: 'c_sucubo', d: {"q":"#b87aa8","P":"#5a2f7a","r":"#ff4a8a","w":"#ffd24a"} };
+SPR.c_bruto = ["kk..........kk..","kRk.kkkkkk..kRk.",".kRkkRRRRkkkRk..",".kRRkRykyRkRRk..","..kkkRRRRRkkk...","...kRkwkwkRk....",".kkkRRRRRRkkkk..","kRRRkRRrrRkRRRk.","kRRRRkRrrRkRRRRk","kRRRkkRRRRkkRRRk",".kkk.kRRRRk.kkk.",".....kRkkRk.....","....kRRk.kRRk...","...kRRRk.kRRRk..","...kkkkk.kkkkk..","................"];
+CRE_LOOK.bruto = { b: 'c_bruto', s: 1.3, d: {"R":"#9a2a2e","r":"#cc4a3a","y":"#ffd23a","w":"#f5f0dc"} };
+SPR.c_senorbr = ["..o.o.oo.o.o....","..okoooooook....","...kooyyook.....","...kkkkkkkk.....","...kddddddk.....","...kdoddodk.....","..kkddddddkk....",".kddkddmmdkddk..","kdddkdmmmdkdddk.","kddokddddddkodk.",".kdkkdoddodkkdk.","..kkdddoodddk...","..kdddddddddk...",".kdddmdddmdddk..",".kmdddddddddmk..","..kkmmkkkmmkk..."];
+CRE_LOOK.senorbr = { b: 'c_senorbr', s: 1.35, d: {"d":"#3a2a3a","m":"#6a5a6a","o":"#ff8a1a","y":"#ffe04a"} };
+SPR.c_sabpes = ["................",".........PP.PP..","..kk....PpPPpPk.",".kxxkkkkpPpPPPk.","kxkxxxxxPPpPPpk.","kxxxxxxxxxPPPk..",".kkxkxxxxxxxPk..","..kxkxkxkxxkk...","...kxxxxxxxk....","..kkxkkxkkxk....","..kxk.kxk.kxk...","..kxk.kxk.kxk...",".kxxk.kxxkkxxk..",".kkkk.kkk.kkk...","................","................"];
+CRE_LOOK.sabpes = { b: 'c_sabpes', s: 1.1, d: {"P":"#3a2a5a","p":"#7a5ab0","x":"#e8e4d0","k":"#14101c"} };
+SPR.c_cuervoecl = ["................",".........kk.....","...kk...kddk....","..kddkkkddddk...",".kddddkddddddk..","kyykddddddddddk.","kyokkdddddddddk.",".kkdkddddddddddk","...kdddmddddmdk.","....kddddddmdk..",".....kkdddddk...","......kyk.kyk...",".....kyk..kyyk..","......kk...kk...","................","................"];
+CRE_LOOK.cuervoecl = { b: 'c_cuervoecl', s: 0.95, d: {"d":"#26222e","m":"#4a4458","y":"#ffd23a","o":"#a07a2a"} };
+SPR.c_ciervobr = [".w...w..w.......",".ww.www.ww......","..wwwkwww.......","...kuuuk........","..kuukuuk.......",".kuuuuuuuk......","kkuukuuuuk......",".kkkkuuuk.......","....kuuuuk......","....kuuuuuuuuuk.","...kuuuuuuuuuuk.","...kuuuwuuuuwuk.","...kuk.kuk.kukk.","...kuk.kuk.kuk..","...kkk.kkk.kkk..","................"];
+CRE_LOOK.ciervobr = { b: 'c_ciervobr', d: {"u":"#8aa8c0","w":"#e6f0f8","k":"#2a3550"} };
+SPR.c_gatomed = ["................","..k.k...........",".kdkdk..........",".kddddk.....kk..","kdyddydk...kddk.","kdkddkdk...kdk..",".kdddddk..kdk...","..kkddddkkdk....","..kddddddddk....",".kdddddddddk....",".kdmdddddmdk....",".kddddddddddk...","..kddkkkkddk....","..kkkk..kkkk....","................","................"];
+CRE_LOOK.gatomed = { b: 'c_gatomed', s: 0.95, d: {"d":"#1e1a2c","m":"#4a4060","y":"#ffe030"} };
+SPR.c_torotin = [".w...........w..",".wk.........kw..","..wkkkkkkkkkkw..","..kwdddddddddk..",".kdddddddddddddk","kdkddddddddddddk","kwkkdddddmmmmddk","kkdkddddddmmmddk",".kdddddddddddddk","..kkddddddddddk.","...kdkddkddkdk..","..a.kdk.kdk.kdk.",".aa.kdk.kdk.kdk.",".a..kwk.kwk.kwk.","....kkk.kkk.kkk.","................"];
+CRE_LOOK.torotin = { b: 'c_torotin', s: 1.3, d: {"d":"#22202e","m":"#44405a","w":"#d8dce8","a":"#a8e8f8"} };
+SPR.c_tejsue = ["................","k.k..........k.k",".kpk..kkkk..kpk.","..kpk.kPPPkkpk..",".k.kpkPpppPkpk.k",".kk.kpPpppPpk.kk","k.kkPpwppwPkkk.k","...kkPppppppPkk.",".kkpkkPppppPkkpk","kk.kpkPPppPPkpk.","k..kpk.kPPk.kpk.","...kk..kPPk..kk.",".......kkkk.....","................","................","................"];
+CRE_LOOK.tejsue = { b: 'c_tejsue', s: 1.1, d: {"P":"#6a3aa0","p":"#b090e8","w":"#f0f8ff","k":"#1c1230"} };
+SPR.c_ojo = ["................","....kkkkkkkk....","..kkAAAAAAAAkk..",".kAAAkkkkkkAAAk.",".kAAkwwwwwwkAAk.","kAAkwwwIIwwwkAAk","kAAkwwIIkIwwkAAk","kAAkwwIIIIwwkAAk",".kAAkwwIIwwkAAk.",".kAAAkwwwwkAAAk.","..kAAAkkkkAAAk..","...kkAAAAAAkk...","....kFkFkFkk....","...kF.kF.kF.....","................","................"];
+CRE_LOOK.ojo = { b: 'c_ojo', d: {"A":"#b0506a","F":"#6e2a48","I":"#3fa0e0"} };
+SPR.c_devsom = ["................","......kkkk......","....kkAAAAkk....","...kAAAAAAAAk...","..kAAFFAAAAAAk..",".kAAFAAAAAAAAAk.",".kAAAAyyAAyyAAk.","kAAAAAyyAAyyAAAk","kAAAAAAAAAAAAAAk","kAAAAkkkkkkAAAAk",".kAAAAAAAAAAAAk.",".kAAkAAAAkAAAAk.","..kAk.kAAk.kAk..","..k.....kk..k...","................","................"];
+CRE_LOOK.devsom = { b: 'c_devsom', s: 1.2, d: {"A":"#2a1f3d","F":"#6a52a0"} };
+SPR.c_tentabis = ["................",".kk.............","kAAk............","kAFAkkkk........",".kAAAAAAk.......","..kkkkAAAk......","......kAFAk.....",".....kAAAAk.....","....kAAFAk......","....kAAAAk......","....kAAAAAk.....","...kAAFAAAAk....","..kAAAAAAAAAk...",".kAAAAAAAAAAAk..","kkGGGkGGkGGGGkk.","................"];
+CRE_LOOK.tentabis = { b: 'c_tentabis', s: 1.5, d: {"A":"#5b2a7a","F":"#8e56b0","G":"#c040c0"} };
+SPR.c_mimico = ["................","..kkkkkkkkkkkk..",".kBBBBBBBBBBBBk.",".kBBrrBBBBrrBBk.",".kBYBBBBBBBBYBk.","kkkkkkkkkkkkkkkk","kRwRRwRRwRRwRRwk","kRRRRRRqqRRRRRRk","kRRwRRwRRwRRwRRk","kkkkkkkkkkkkkkkk","kBBBBBBBBBBBBBBk","kBYBBBBzzBBBBYBk","kBBBBBBzYBBBBBBk","knBBBBBBBBBBBBnk",".kkkkkkkkkkkkkk.","................"];
+CRE_LOOK.mimico = { b: 'c_mimico', s: 1.2, d: {} };
+SPR.c_susurrador = ["................",".....kkkkkk.....","....kAAAAAAk....","...kAAFFAAAAk...","..kAkkkkkkkkAk..",".kAAkakkakkakAk.",".kAAkkkaakkkkAk.",".kAAAkkkkkkAAAk.","..kAAAAAAAAAAk..",".kAAFAAAAAAAAAk.",".kAAFAAAAAAAAAk.","kAAAAAAAAAAAAAAk","kAAkAAAkAAAkAAAk",".k.kAk.kAk.kAk..","................","................"];
+CRE_LOOK.susurrador = { b: 'c_susurrador', d: {"A":"#3b2a6a","F":"#6a4fb0"} };
+SPR.c_espastral = ["................",".......kk.......","......kFFk......",".....kAFFAk.....",".kk.kAAAAAAk.kk.","kAAkAACAACAAkAAk",".kAAAAAAAAAAAAk.","..kAAWAAAAAWAk..","...kAAAAAAAAk...","....kAAFAAAk....",".....kAAAAk.....","....kAAkAAAk....","...kAAk.kAAk....","..kAk....kAk....",".kk........kk...","................"];
+CRE_LOOK.espastral = { b: 'c_espastral', s: 1.1, d: {"A":"#4a3aa0","F":"#9a7af0","W":"#e8e0ff","C":"#30e0e0"} };
+SPR.c_slimev = ["................","................","................",".....kkkkkk.....","....kcceeeek....","...kcceeeeeek...","..kceeeeeeeeek..","..keewweeewweek.",".keeekkeeekkeek.",".keeeeeeeeeeeek.",".kEeeeeeeeeeeEk.",".kEEEEEEEEEEEEk.","..kkkkkkkkkkkk..","................","................","................"];
+CRE_LOOK.slimev = { b: 'c_slimev', d: {} };
+SPR.c_cubo = ["................","..kkkkkkkkkkkk..",".kWWAAAAAAAAAFk.",".kWAAAAAAAAAAFk.",".kAAAAAAAAAAAFk.",".kAAAAAAAAAAAFk.",".kAAAxxxxAAAAFk.",".kAAAxkxkAAAAFk.",".kAAAAxxxAAyyFk.",".kAAAAAAAAAyyFk.",".kAAAAAAAAAAAFk.",".kAAAAAAAAAAFFk.",".kFFFFFFFFFFFFk.","..kkkkkkkkkkkk..","................","................"];
+CRE_LOOK.cubo = { b: 'c_cubo', s: 1.3, d: {"A":"#9fe6f0","F":"#5cb0cc","W":"#e8fcff"} };
+SPR.c_slimeac = ["................","................","................","....kkkkk..kk...","..kkAAWAAkkWWk..",".kAAAAAAAAkkkk..",".kAAAAAAAAAAAk..","kAAAwkAAAwkAAAAk","kAAAkkAAAkkAAAAk","kAFAAAAAAAAAFAAk","kAAAAAkkkkAAAAAk","kAAFAAAAAAAAFAAk",".kkAAkAAAAkAAkk.","...kFk.kAAk.kFk.","....k...kk..k...","................"];
+CRE_LOOK.slimeac = { b: 'c_slimeac', d: {"A":"#d8e03a","F":"#98a820","W":"#f8fcb0"} };
+SPR.c_baba = ["................","................","................",".......kkkkkk...","......kAWWAAAk..",".....kAWAAAAAAk.",".....kAAAAAAAAAk",".....kAwwAAwwAAk","..kkk.kAkkAAkkAk",".kAAAkkAAAAAAAAk","kAWAAAAAAAAAAAFk","kAAkAAAAAAAAAFFk","kAAAAAAAAAAFFFFk",".kFFFFkFFFFFFFk.","..kkkk.kkkkkkk..","................"];
+CRE_LOOK.baba = { b: 'c_baba', d: {"A":"#a05ad8","F":"#6a3a98","W":"#d8a8f0"} };
+SPR.c_slimemag = ["................",".....y....y.....","....yoy..yoy....","....ooyyyyoo....","...kkkooooookk..","..kAAFkLLkAAAk..",".kAAAAAAAAAFAAk.",".kAAyyAAAAyyAAk.",".kAAyyAALAAAAAk.","kAFAAALLAAAALAAk","kAAALAAAAFAALAAk","kAFAAAAAAAAAAAAk",".kAAALAAAALAAAk.","..kkkkkkkkkkkk..","................","................"];
+CRE_LOOK.slimemag = { b: 'c_slimemag', s: 1.2, d: {"A":"#3a2a2a","F":"#5a4040","L":"#ff7a1a","Y":"#ffd040"} };
+SPR.c_lodo = ["................",".kk..........k..","kAAk........kAk.","kAAk..kkkk..kAk.",".kAAkkAAAAkkAk..",".kAAAAWAAAAAAk..","..kAAAWWAAAAAk..","..kAAAAAAAAAAk..",".kAAwkAAAwkAAAk.",".kAAAAAAAAAAAAk.","kAAAFAAAAAAFAAAk","kAAAAAAAAAAAAAAk","kAFAAAAFAAAAAFAk","kAAAAAAAAAAAAAAk",".kFFkFFFFFFkFFk.","..kk.kkkkkk.kk.."];
+CRE_LOOK.lodo = { b: 'c_lodo', s: 1.3, d: {"A":"#6b4a28","F":"#4a3018","W":"#8a6a40"} };
+function creSpr(t) { const l = CRE_LOOK[t]; return l ? l.b : t; }
+
 const SPR_PAL = { k: '#1b1522', d: '#3a3744', m: '#6b6877', l: '#a9a7b4', w: '#eceaf2', n: '#4a2e1b', b: '#7a4a28', B: '#a8713f', z: '#d2a46a', S: '#f0c096', s: '#c88a62', r: '#d9463e', R: '#8a2430', o: '#ec8a2c', y: '#f4d24f', Y: '#c79a22', e: '#58b04c', E: '#2f7038', c: '#98d95a', u: '#4a7be0', U: '#28458f', a: '#66d0ea', p: '#9a5bd0', P: '#54307e', q: '#e585b8', K: '#17121c', J: '#44344a', N: '#6b3a1a', x: '#f5f0dc', X: '#cfc7a8', g: '#7c8f5a', G: '#59683e' };
 
 // 16x16, '.' = transparente. Letras: ver SPR_PAL. Dinámicas: T/t equipo, H/h casco, C/D pechera.
@@ -2956,11 +3505,23 @@ function unitDyn(col, ah, ac) { // colores del equipo del jugador y de su casco/
   return d;
 }
 // dibuja cualquier unidad (soldado con su arma, invocación, bestia, carreta o constructor) con su sprite
+function unitPortrait(m, own) { // imagen del retrato (cacheada en la unidad); null mientras carga
+  if (m._pi === undefined) {
+    const o = own ? ptUnit(m) : { seed: m.pt || SH.ptSeed(m.id * 7 + 3), sx: m.sx, vp: m.vp, hr: m.hr, cls: m.cls, hd: m.hd || undefined, ah: m.ah, ac: m.ac, hm: m.hm, bt: m.bt, sh: m.sh, gl: m.gl, w: m.wk || null, wt: m.wt };
+    try { const im = new Image(); im.onload = () => { dirty = true; }; im.src = ptDraw(o); m._pi = im; } catch (e) { m._pi = null; }
+  }
+  return m._pi && m._pi.complete && m._pi.naturalWidth ? m._pi : null;
+}
 function drawUnitSpr(m, own, cx, cy, size, col) {
+  if (m.gr) { const n = m.gr, GT = SH.GAR.types[m.gt || 'esp'], wk = { esp: 'espada', lan: 'lanza', arq: 'arco', mag: 'varita' }[m.gt || 'esp'], sp = SPR['w_' + wk] ? ['unit', 'w_' + wk] : ['unit'], d = unitDyn(GT.c, m.gt === 'esp' || !m.gt ? 2 : 0, 2), o = [[-.2, -.18], [.2, -.18], [-.2, .2], [.2, .2]]; for (let i = 0; i < n; i++) drawSpr(sp, cx + o[i][0] * size, cy + o[i][1] * size, size * .56, d); return; }
   const sgk = m.sg && (typeof m.sg === 'string' ? m.sg : m.sg.k); if (sgk && SPR[sgk]) return drawSpr([sgk], cx, cy, size);
   if (m.cart || m.ct) return drawSpr(['cart'], cx, cy, size);
   if (m.bld || m.bl) return drawSpr(['builder'], cx, cy, size);
   const ck = m.sm || m.bs; if (ck) { if (SPR[ck]) return drawSpr([ck], cx, cy, size, null, true); return emoji(SH.CREATURES[ck].e, cx, cy, size * .7); }
+  { // el mismo diseño del panel (retrato con pelo, piel, ropa y equipo), a tamaño de mapa
+    const im = unitPortrait(m, own);
+    if (im) { const h = size * 1.12, wd = h * 2 / 3, sm = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false; ctx.drawImage(im, cx - wd / 2, cy - h * .56, wd, h); ctx.imageSmoothingEnabled = sm; return; }
+  }
   const w = own ? (m.eq && m.eq.arma && m.eq.arma.k) : m.w, ah = own ? (m.eq && m.eq.casco ? m.eq.casco.t : 0) : (m.ah || 0), ac = own ? (m.eq && m.eq.pechera ? m.eq.pechera.t : 0) : (m.ac || 0);
   drawSpr(w && SPR['w_' + w] ? ['unit', 'w_' + w] : ['unit'], cx, cy, size, unitDyn(col, ah, ac));
 }

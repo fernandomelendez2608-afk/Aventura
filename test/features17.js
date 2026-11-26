@@ -22,14 +22,14 @@ const sn0 = E.snapshot(g, 0), sn1 = E.snapshot(g, 1);
 ok(g.cities.filter(c => c.cit).length === 1, 'una sola ciudad compartida');
 ok(sn0.cities.find(c => c.cit).o === 0 && sn1.cities.find(c => c.cit).o === 1, 'cada jugador la ve como suya');
 ok(sn0.ct && sn0.ct.w.total === C.waves && sn0.ct.hp === C.hp, 'snapshot con integridad y oleadas');
-ok(g.units.filter(u => u.o === 0 && !u.sm).length === C.startUnits, 'unidades iniciales por jugador');
+ok(g.units.filter(u => u.o === 0 && !u.sm && !u.gr).length === C.startUnits, 'unidades iniciales por jugador');
 // cualquiera puede reclutar en la ciudad compartida
 const cit = g.cities.find(c => c.cit); cit.st = Object.assign(cit.st, { cuero: 500, hueso: 200, hierro: 100, acero: 40 });
 const before = g.units.filter(u => u.o === 1).length;
 const rr = E.cmd(g, 1, { a: 'recruit', c: cit.id });
 ok(rr && !rr.err && g.units.filter(u => u.o === 1).length === before + 1, 'el jugador 2 recluta en la ciudad compartida ' + (rr && rr.err || ''));
 // escuadras
-const me = g.players[0], mine = () => g.units.filter(u => u.o === 0 && !u.sm);
+const me = g.players[0], mine = () => g.units.filter(u => u.o === 0 && !u.sm && !u.gr);
 E.cmd(g, 0, { a: 'sq', d: 'new', n: 'Muro', ids: mine().map(u => u.id) });
 ok(me.sq.length === 1 && mine().every(u => u.sq === 1), 'escuadra nueva con todas las unidades');
 E.cmd(g, 0, { a: 'sq', d: 'ord', id: 1, k: 'guard', g: 'S' });
@@ -57,7 +57,7 @@ g.cw.next = g.turn; for (let i = 0; i < 3 && g.status === 'playing'; i++) E.adva
 ok(g.cw.n >= 1, 'al forzar el turno llega la oleada (n=' + g.cw.n + ')');
 // escuadras (v1.61.3): orden inmediata, unidades nuevas que se unen solas y resumen de estado
 { const h = E.createGame('SQ9', 'Host', 't'); h.cfg.mode = 'ciudadela'; h.cfg.idleTurns = 0; h.cfg.sim = true; E.addBot(h, 'azar'); E.startGame(h);
-  const mine = () => h.units.filter(u => u.o === 0 && !u.sm), p0 = h.players[0], x0 = mine().map(u => u.x + ',' + u.y).join();
+  const mine = () => h.units.filter(u => u.o === 0 && !u.sm && !u.gr), p0 = h.players[0], x0 = mine().map(u => u.x + ',' + u.y).join();
   E.cmd(h, 0, { a: 'sq', d: 'new', n: 'A', ids: mine().map(u => u.id) });
   const r1 = E.cmd(h, 0, { a: 'sq', d: 'ord', id: 1, k: 'guard', g: 'S' });
   ok(/ponen en marcha/.test(r1.msg || '') && mine().map(u => u.x + ',' + u.y).join() !== x0, 'al dar la orden las unidades se mueven en el momento');
