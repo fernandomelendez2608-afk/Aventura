@@ -7,7 +7,7 @@ console.log('Mazmorra en grupo');
 const cheb = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
 let deaths = 0, bigEntry = 0, entries = 0, kills = 0, spreadMax = 0, lone = 0, turnsIn = 0, retire = null;
 for (const seed of [1, 2, 3, 4, 5, 6]) {
-  const g = E.createGame('GR' + seed, 'H', 't'); Object.assign(g.cfg, { mode: 'ciudadela', idleTurns: 0, sim: true, waveGap: 200 }); E.addBot(g, 'azar'); E.startGame(g);
+  const g = E.createGame('GR' + seed, 'H', 't'); Object.assign(g.cfg, { mode: 'ciudadela', idleTurns: 0, sim: true, waveGap: 200, breed: 'apagado' }); E.addBot(g, 'azar'); E.startGame(g);
   const city = g.cities.find(c => c.cit); city.st.m = { cuero: 900, hueso: 300, hierro: 300, acero: 200, alma: 60 }; city.st.m.cuero += 50; E.cmd(g, 0, { a: 'recruit', c: city.id });
   const mine = () => g.units.filter(u => u.o === 0 && !u.sm && !u.bs), us = mine().slice(0, 5);
   for (const u of us) { u.lv = 6; for (let k = 0; k < 12; k++) { u.pts = 1; E.cmd(g, 0, { a: 'skill', u: u.id, s: ['dano', 'salud', 'defensa'][k % 3] }); } u.hp = E.eff(g, u).maxHp; }

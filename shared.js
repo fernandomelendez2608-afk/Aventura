@@ -166,6 +166,15 @@
   // coste de añadir el efecto nº (n+1) a un objeto que ya tiene n efectos, y calidad mínima que exige
   const ENCHANT_STEPS = [{ cost: { alma: 3 }, tier: 1 }, { cost: { alma: 3 }, tier: 1 }, { cost: { alma: 4 }, tier: 3 }, { cost: { alma: 6, escama: 2 }, tier: 4 }, { cost: { alma: 9, escama: 4 }, tier: 5 }];
   const ENCHANT_COST = ENCHANT_STEPS[0].cost;
+  // v1.81: destruir equipo devuelve los materiales de construcción, encantamientos, engarces y reforjas; las gemas engastadas se pierden
+  function scrapRefund(it) {
+    const r = {}, add = c => { for (const k in c) r[k] = (r[k] || 0) + c[k]; };
+    add(recipe(it.k, it.t || 1));
+    for (let i = 0; i < (it.fx || []).length; i++) add(ENCHANT_STEPS[i].cost);
+    for (let i = 0; i < (it.so || 0); i++) add(SOCKET_STEPS[i].cost);
+    for (let i = 0; i < (it.rf || 0); i++) add(REFORGE_COST);
+    return r;
+  }
   const REFORGE_COST = { alma: 2 };      // cambiar un efecto por otro al azar
   // ---- sets de armadura: piezas de la misma calidad (de las 7 ranuras de defensa) ----
   const SET_BONUS = {
@@ -351,12 +360,13 @@
   // ---- ciudad de 3×3 (v1.27): estar en ella (centro) o pegado a ella (anillo) da bonos ----
   // pvp: defensa contra jugadores; hordeDef / hordeAtk: defensa y ataque contra hordas que asaltan la ciudad [centro, anillo]
   // guarniciones (v1.73, Ciudadela): grupo de 4 soldados en una casilla, sin equipo, controlado por todos; mejoran junto a otras
-  const GAR = { n: 4, free: 2, cap: 6, perPlayer: 3, step: 0.15, near: 2, bonus: 0.10, maxNear: 4, mix: 0.05, maxMix: 3, e: '💂', name: 'Guarnición',
+  const LETGO = { alma: 5, acero: 1.5 }; // v1.81: «Dejar ir» una unidad viva: devuelve 1 alma cada 5 niveles y 1.5 de acero por nivel (mín. 1 de cada)
+const GAR = { air: 1.75, n: 4, free: 2, cap: 6, perPlayer: 3, step: 0.15, near: 2, bonus: 0.10, maxNear: 4, mix: 0.05, maxMix: 3, e: '💂', name: 'Guarnición',
     types: { // por soldado: vida y daño; el daño total depende de cuántos quedan (4 → 1)
       esp: { n: 'Espadachines', e: '⚔️', hp: 40, dmg: 8, def: 3, mov: 3, range: 1, min: 1, reach: false, pierce: 0, kind: null, c: '#8a93a6', cost: { hierro: 4, cuero: 6 }, d: 'Resistentes y equilibrados: la primera línea. Cuerpo a cuerpo.' },
       lan: { n: 'Lanceros', e: '🔱', hp: 36, dmg: 8, def: 2, mov: 3, range: 2, min: 1, reach: true, pierce: 0, kind: 'lanza', c: '#a78b4e', cost: { hierro: 5, cuero: 5, hueso: 4 }, d: 'Golpean a 2 casillas sin penalización: perfectos detrás de los espadachines.' },
-      arq: { n: 'Arqueros', e: '🏹', hp: 28, dmg: 8, def: 1, mov: 3, range: 3, min: 2, reach: false, pierce: 0, kind: 'arco', c: '#4f8f4f', cost: { cuero: 8, hueso: 6 }, d: 'Disparan a 3 casillas. Frágiles: protégelos.' },
-      mag: { n: 'Magos', e: '🔮', hp: 24, dmg: 9, def: 0, mov: 2, range: 3, min: 2, reach: false, pierce: 0.3, kind: 'varita', c: '#7a62d0', cost: { hierro: 3, hueso: 6, alma: 1 }, d: 'Magia a 3 casillas que ignora 30% de defensa. Los más frágiles.' },
+      arq: { n: 'Arqueros', e: '🏹', hp: 28, dmg: 8, def: 1, mov: 3, range: 3, min: 2, reach: false, pierce: 0, kind: 'arco', air: true, c: '#4f8f4f', cost: { cuero: 8, hueso: 6 }, d: 'Disparan a 3 casillas y hacen +75% de daño a criaturas voladoras. Frágiles: protégelos.' },
+      mag: { n: 'Magos', e: '🔮', hp: 24, dmg: 9, def: 0, mov: 2, range: 3, min: 2, reach: false, pierce: 0.3, kind: 'varita', air: true, c: '#7a62d0', cost: { hierro: 3, hueso: 6, alma: 1 }, d: 'Magia a 3 casillas que ignora 30% de defensa y hace +75% de daño a criaturas voladoras. Los más frágiles.' },
     } };
   // la muralla de la Ciudadela tiene vida por casilla: las criaturas terrestres la rompen (las voladoras y trepadoras la cruzan)
   const WALL = { hp: 600, perLevel: 250, repair: { hierro: 4, hueso: 4 }, regen: 0.05, perTurn: 2 };
@@ -381,6 +391,8 @@
       laberinto: 'Laberinto: sin mundo exterior; todos aliados bajan por los pisos de un laberinto (10–20) con una vela por piso en vez de ciudades y un jefe cada 2 pisos',
       historia: 'Historia: campaña cooperativa de 6 capítulos (todos los jugadores aliados) que termina contra el Dragón de Ceniza',
       rey: 'Reto del Rey Demonio: un jugador al azar es el Rey Demonio (solo recluta bestias) y los demás están aliados contra él' } },
+    citRoam:    { n: 'Ciudadela: criaturas errantes entre oleadas', def: 'si', o: { si: 'Sí: merodean por el mundo (peligro y botín)', no: 'No: solo vienen en las oleadas' } },
+    citDiff:    { n: 'Ciudadela: dificultad', def: 'normal', o: { normal: 'Normal (20 oleadas)', infierno: '🔥 Infierno: 100 oleadas, una cada 100 turnos, criaturas más fuertes y varios jefes' } },
     waveGap:    { n: 'Ciudadela: turnos entre oleadas (y hasta la primera)', def: 100, o: { 10: '10 turnos (muy intenso)', 25: '25 turnos', 50: '50 turnos', 100: '100 turnos (tiempo para explorar, recomendado)', 200: '200 turnos (partida muy larga)' } },
     victory:    { n: 'Tipo de final (modos Normal y Reto de una unidad)', def: 'ultimo', o: {
       ultimo: 'Último en pie (o alianza total)',
@@ -421,6 +433,7 @@
     torre:     { n: 'Torre de arqueros', e: '🏹', cost: { hueso: 10, hierro: 12 }, up: [{ hierro: 15, acero: 6 }, { acero: 12, alma: 3 }], d: 'Dispara a la criatura más cercana (alcance 5; nivel 3: alcance 6 y 2 disparos por turno).' },
     escarcha:  { n: 'Torre de escarcha', e: '❄️', cost: { hierro: 10, acero: 4, alma: 2 }, up: [{ acero: 8, alma: 2 }, { acero: 14, alma: 4 }], d: 'Congela a varias criaturas a 3 casillas: poco daño pero las ralentiza (nivel 3: ralentización doble).' },
     trampa:    { n: 'Trampa de pinchos', e: '🪤', cost: { hueso: 6, hierro: 4 }, up: [{ hierro: 8, hueso: 8 }, { acero: 5, hierro: 10 }], d: 'Daño fuerte al pisarla o pasar a su lado (3 cargas, se recarga al superar la oleada) y ralentiza.' },
+    farola:    { n: 'Farola', e: '🏮', cost: { hueso: 3, hierro: 2, cuero: 2 }, up: [{ hierro: 4, hueso: 4 }, { hierro: 8, acero: 2 }], free: true, d: 'Ilumina un área (radio 3; nivel 2: 4; nivel 3: 5). Revela el terreno y, de noche, las criaturas pierden su bono nocturno contra quien esté en la luz. También se puede poner dentro de la muralla.' },
     barricada: { n: 'Barricada', e: '🪵', cost: { hueso: 8, cuero: 6 }, up: [{ hueso: 10, cuero: 8, hierro: 4 }, { hierro: 12, acero: 4 }], d: 'Bloquea el paso de las criaturas (tus unidades pasan). Tienen que destruirla; se repara al superar la oleada.' },
   };
   const CIT = { w: 96, h: 76, r: { x0: 35, y0: 28, x1: 60, y1: 47 }, plaza: { x: 47, y: 38 }, gates: [{ k: 'S', x: 54, y: 48 }, { k: 'N', x: 42, y: 27 }, { k: 'E', x: 61, y: 37 }],
@@ -439,8 +452,8 @@
       aberracion: { n: 'Grieta del vacío', e: '👁️', t: [['ojo', 'susurrador', 'devsom'], ['mimico', 'espastral', 'ojo', 'susurrador', 'devsom', 'tentabis'], ['tentabis', 'mimico', 'espastral', 'ojo', 'devsom']] },
       slimes: { n: 'Marea de slimes', e: '🟢', t: [['slimev', 'slimeac', 'baba'], ['cubo', 'slimemag', 'lodo', 'baba', 'slimeac'], ['cubo', 'slimemag', 'lodo', 'baba', 'slimeac', 'slimev']] } },
     themeOrder: ['lobos', 'insectos', 'muertos', 'bestias', 'draconidos', 'constructos', 'elementales', 'felinos', 'aves', 'reptiles', 'aracnidos', 'plantas', 'demonios', 'pesadilla', 'aberracion', 'slimes'],
-    waves: 20, first: 100, rest: 100, boss: 5, bosses: ['reylobo', 'minotauro', 'liche', 'dragon'], hp: 100, units: 100, raid: 5, startUnits: 4,
-    base: 3, grow: 1.7, perPlayer: 0.35, maxEnemies: 140, repair: 4, spawnDist: 15,
+    waves: 20, first: 100, rest: 100, boss: 5, bosses: ['reylobo', 'minotauro', 'liche', 'dragon'], hp: 100, units: 999, raid: 5, startUnits: 4,
+    base: 3, grow: 1.7, perPlayer: 0.35, maxEnemies: 140, hpPerWall: 50, repair: 4, spawnDist: 15, roam: { cap: 3, per: 4, max: 12, chance: 0.3, life: 120, minDist: 14 },
     arena: { x: 69, y: 32 }, market: { dy: 7, dx: [-10, -6, -2, 3, 10] }, // arena fuera de la puerta este; puestos del mercado en la calle sur
     lots: [{ k: 'cuartel', n: 'Cuartel', dx: -8, dy: -6 }, { k: 'taller', n: 'Taller del Constructor', dx: 0, dy: -7 }, { k: 'asedio', n: 'Taller de Asedio', dx: 9, dy: -6 }, { k: 'taberna', n: 'Taberna', dx: 5, dy: -7 },
       { k: 'herreria', n: 'Herrería', dx: -9, dy: -1 }, { k: 'iglesia', n: 'Iglesia', dx: -7, dy: 5 }, { k: 'establo', n: 'Establos', dx: 11, dy: 5 }] };
@@ -738,8 +751,8 @@
   }
 
   return {
-    CIT, DEFS, GAR, WALL, SKILLS, SKILL_ORDER, MATS, MAT_ORDER, TIER_NAMES, WM, AM, KINDS, WEAPON_KINDS, GEAR_KINDS, SLOTS, SLOT_NAMES, PACK,
-    recipe, itemValue, MAX_TIER, ENCHANT_STEPS, MAX_FX, REFORGE_COST, SET_BONUS, armorSet, itemName, tierName, RARITY, AFFIX, WEAPON_FX, ARMOR_FX, affixText, upgradeCost, ENCHANT_COST,
+    CIT, DEFS, GAR, LETGO, WALL, SKILLS, SKILL_ORDER, MATS, MAT_ORDER, TIER_NAMES, WM, AM, KINDS, WEAPON_KINDS, GEAR_KINDS, SLOTS, SLOT_NAMES, PACK,
+    recipe, scrapRefund, itemValue, MAX_TIER, ENCHANT_STEPS, MAX_FX, REFORGE_COST, SET_BONUS, armorSet, itemName, tierName, RARITY, AFFIX, WEAPON_FX, ARMOR_FX, affixText, upgradeCost, ENCHANT_COST,
     ptSeed, sexSeed, sexOf, DESIGN, cleanDesign, BAR, NPC, ARENA, WORLD, WAVES, LAB, SIEGE, CART, HERO, KING, BOSS_IDS, DUNGEON, TEAM_E, STORY, CONVERT, VAMP, SUMMON, WORLD_OPTS, PRESETS, VICTORY, GEMS, GEM_IDS, GEM_LV, gemOf, gemFx, gemText, SOCKETS_BY_R, MAX_SOCKETS, SOCKET_STEPS, GEM_UP, CLASS_LV, SUB_LV, CLASSES, classMods, BUILDER, ROAD_COST, MAT_VAL, itemVal, INCOME, BUILDINGS, bMax, CHURCH, ANGEL, CITY_GUARD, BUILD_ORDER, BUILD_MAX, ORDERS,
     SEASON_LEN, SEASONS, seasonIdx, DN, isNight, nightLeft, dayLeft, torchR, WEATHER, WEATHER_ORDER, TOURN, MERCH, ELITE_NAMES, SITES, PERS, BOT_LEVELS, PACTS, TERR, CREATURES, DIRS, cheb, reach,
   };

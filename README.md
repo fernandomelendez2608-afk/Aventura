@@ -950,3 +950,63 @@ Medido con `node tools/botbench.js` (3 partidas de 4 bots, 150 turnos): las muer
 - La guarnición original pasa a ser **espadachines** y se suman: 🔱 **lanceros** (alcance 2 sin penalización, hierro/cuero/hueso), 🏹 **arqueros** (alcance 3, frágiles, cuero/hueso) y 🔮 **magos** (alcance 3, ignoran 30% de defensa, los más frágiles, cuestan 1 alma). Cada una: 4 soldados, vida y daño por soldado distintos, cada tipo con su color y arma en el mapa.
 - **Ejército combinado:** además del +10% por cada guarnición cercana, +5% por cada **tipo distinto** cerca (hasta +15%).
 - Panel «💂 Guarniciones»: una tarjeta por tipo con stats y precio; comando `{a:'garrison', c, k:'esp'|'lan'|'arq'|'mag'}` (por defecto espadachines). Empiezas con espadachines + arqueros gratis. Las guarniciones sin órdenes defienden con su alcance. Test: test/features42.js.
+
+## v1.75.0 — Selección por arrastre y farolas
+
+- **🔲 Selección por arrastre**: aparece un botón junto a 🏠 cuando tienes 2+ unidades (guarniciones incluidas). Actívalo y arrastra un recuadro sobre tus unidades (o toca una a una); luego toca una casilla para **mover** al grupo (cada una a una casilla distinta cercana; las lejanas reciben orden «ir a» de varios turnos) o toca una criatura/enemigo para **atacar** (acercándose a su alcance). Botones «+ Arrastrar», «Todas» y ✕ en el banner.
+- **🏮 Farola** (defensa en la Ciudadela): ilumina radio 3/4/5 según nivel; revela el mapa y de noche **anula el bono de las criaturas** contra quien esté dentro. Puede ir dentro de la muralla (no sobre ella); límite aparte de 12 y no gasta el cupo de defensas. Halo cálido en el mapa.
+- Test: `test/features43.js`.
+
+## v1.76.0 — Los bots usan guarniciones y farolas
+
+- En la Ciudadela, un bot por turno **recluta guarniciones** cuando le sobra el doble del coste (eligiendo el tipo del que hay menos, para mezclar ejércitos) hasta `2 + 2×jugadores` en total.
+- Las guarniciones reclutadas por bots (marca `bg`) se mueven solas al punto de defensa: la plaza en calma, y dentro de la puerta más cercana a los enemigos durante una oleada. **No tocan las guarniciones de los humanos.**
+- Los bots construyen **farolas** junto a cada puerta (dentro y fuera) en cuanto tienen algo de defensa; ya no cuentan contra el cupo de torres/trampas.
+- Los bots reparan la muralla sin hacer nada (es automático entre oleadas).
+- Test: `test/features44.js`.
+
+## v1.77.0 — Equilibrio de oleadas de la Ciudadela
+
+Simulación con `tools/citbench.js` (partidas de solo bots, `node tools/citbench.js [bots] [turnos entre oleadas] [semillas] [turnos]`):
+
+- **Hallazgo 1:** la cantidad de enemigos daba picos (con 1 jugador, de 8 en la oleada 9 a 18 en la 10; la 14 triplicaba a la 13). Ahora la cantidad se calcula para que la **fuerza total** de la oleada (vida × daño × defensa) siga una curva suave: criaturas más fuertes → menos; más débiles → más. El salto máximo entre oleadas consecutivas pasó de ~4× a ~2.4×.
+- **Hallazgo 2:** la integridad de la plaza era 100 fija. Ahora sube **+50 por nivel de muralla** (máx. 350 con muralla 5) y la vida actual sube con ella.
+- **Hallazgo 3 (sin cambiar):** con 3 bots y oleadas cada 100 turnos la ciudad cae en la oleada 9–10 (aves voladoras + élites que atraviesan la muralla). Los bots no son un buen proxy de un humano: sus unidades de campo mueren o quedan quietas.
+- Test: `test/features45.js`.
+
+## v1.78.0 — Dificultad Infierno (Ciudadela)
+
+- Nuevo ajuste del lobby **«Ciudadela: dificultad»**: *Normal* (20 oleadas) o *🔥 Infierno*.
+- **Infierno**: **100 oleadas, una cada 100 turnos** (ignora el ajuste de turnos entre oleadas), criaturas con más nivel (+2 y +0.2 por oleada), un 50 % más de fuerza total por oleada, la curva de dificultad sigue creciendo un 3.5 % por oleada más allá de la 20, y en las oleadas con jefe viene **1 jefe extra cada 25 oleadas** (2 desde la 25, 3 desde la 50, 4 desde la 75).
+- Límite de 140 criaturas por oleada (se alcanza hacia la oleada 50); medido: una oleada de 144 criaturas cuesta ~10 ms por turno.
+- Con 1 jugador + 1 bot la ciudad cae hacia la oleada 5: está pensado para grupos que ya dominen el modo normal.
+- Test: `test/features46.js`.
+
+## v1.79.0 — Crías en toda la Ciudadela
+
+- En la **Ciudadela** el espacio de reproducción ya no es solo «a 2 casillas de la plaza»: **vale cualquier casilla dentro de la muralla**, para todos los jugadores (antes solo contaba para el dueño de la ciudad compartida). Fuera de la muralla no cuenta. En los demás modos no cambia nada.
+- Test: `test/features47.js`.
+
+## v1.80.0 — Antiaéreo, criaturas errantes y sprites
+
+- **Guarniciones de arqueros 🏹 y magos 🔮: +75 % de daño contra criaturas voladoras** (aves, wyvern, gárgola, elemental de aire, cuervo de eclipse, ojo…). Se indica en la descripción de cada tipo.
+- **Criaturas errantes** en la Ciudadela: entre oleadas merodean por el mundo exterior (3 al inicio, +1 cada 4 oleadas, máx. 12; +3 en Infierno) con el tema y el nivel de la próxima oleada. Salen solo si no hay una oleada en marcha, se alejan solas a los ~120–160 turnos, no cuentan para superar la oleada y dan botín y experiencia. Ajuste del lobby **«Criaturas errantes entre oleadas»** (sí/no).
+- **Sprites rehechos:** ciempiés, tentáculo abisal y devorador de sombras.
+- Test: `test/features48.js`. Nota: `test/features25.js` desactiva las crías (para medir escuadras sin recién nacidos).
+
+## v1.81.0 — Dejar ir a unidades vivas
+
+- En la ficha de cada unidad (pestaña Estado) hay un botón **🕊️ Dejar ir**: dentro de tu ciudad (o dentro de la muralla en la Ciudadela) despides a la unidad y la ciudad recibe **1 👻 alma cada 5 niveles y 1.5 de acero por nivel** (mínimo 1 de cada), además de **todo su equipo y su mochila**. Pide confirmación y muestra lo que recuperas.
+- No se puede con el protagonista, con guarniciones, carretas, máquinas de asedio ni en el reto de una unidad, ni con tu última unidad; sus invocaciones desaparecen y se cancelan sus crías en curso.
+- Test: `test/features49.js`.
+- **🔨 Destruir equipo** (pestaña Mejorar del almacén): cada objeto tiene un botón «Destruir» y arriba hay «Destruir sobrantes» (todos los objetos sin efectos ni gemas). Devuelve los materiales de la receta de su calidad actual **más** lo gastado en encantar, perforar engarces y reforjar (las reforjas se cuentan desde esta versión); **las gemas engastadas no se devuelven**. Pide confirmación y muestra lo que recuperas. Los objetos hallados como botín también devuelven su receta.
+- **Sin límite de unidades en la Ciudadela** (técnicamente 999): ya no hay tope de 20 para las crías ni de 100 para reclutar, y el contador de la ciudad deja de mostrar «n/14» (el cliente recibía el límite del modo normal por error). En los demás modos el tope sigue igual (14 unidades, crías hasta 20).
+- **Corrección: «Dejar ir» a los caídos (iglesia) no funcionaba en partidas reales.** El servidor usa la orden `release` para que el anfitrión libere la plaza de un jugador ausente y la interceptaba antes de que llegara al motor: el botón daba un error («Solo se puede liberar a un jugador ausente…» o «Solo el anfitrión…»). Ahora usa su propia orden `letgrave`. Las pruebas antiguas llamaban al motor directamente y por eso no lo detectaban; `test/features50.js` lo comprueba a través del servidor real (y que no se puede dejar ir el caído de otro jugador).
+- **Menús de Clase, Equipo y Mochila más bonitos**: objetos como tarjetas con icono y borde según rareza (brillo en las raras), ranuras de equipo con su emoji y botón Quitar, resumen de daño/defensa/vida/piezas, mochila con barra de capacidad y fichas de materiales, almacén de la ciudad con el mismo estilo y tarjetas de clase/especialización con «tu clase». Solo cambia la presentación. Test: `test/features51.js`.
+
+## v1.81.1 — Correcciones del modo sin conexión (Ciudadela)
+
+- **Error grave sin conexión:** cada vez que moría una unidad el motor fallaba en el navegador (usaba `global`, que solo existe en Node) y el turno se quedaba atascado. Ahora funciona igual que en el servidor.
+- **Pestaña Mochila en la Ciudadela:** dentro de la muralla pero a más de 1 casilla de la plaza la ficha daba error al abrir la mochila (también pasaba en línea). Ahora muestra el almacén de la ciudad.
+- **Guardado sin conexión:** el guardado se aplazaba 0,5 s tras cada acción, así que jugando seguido podía no guardarse nunca hasta pararte; ahora se guarda al menos cada 3 s.
+- Probado: Ciudadela normal e Infierno sin servidor, ~580 turnos, recarga de la página y reanudar desde «Tus partidas». Test: `test/features52.js`.

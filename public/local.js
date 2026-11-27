@@ -4,7 +4,7 @@
    así el cliente no se entera de la diferencia. Las partidas se guardan en IndexedDB. */
 (function () {
   const LS = window.LS = { loaded: null, E: null, games: new Map(), err: null };
-  let bound = null, saveT = {}, db = null;
+  let bound = null, saveT = {}, saveFirst = {}, db = null;
 
   // Buffer mínimo para serializar/deserializar los mapas de niebla (Uint8Array ↔ base64)
   const Buf = {
@@ -41,8 +41,9 @@
   function save(g, now) {
     if (!db || !g) return;
     clearTimeout(saveT[g.code]);
-    const go = () => { try { tx('readwrite', s => s.put({ code: g.code, data: LS.E.serialize(g) })); } catch (e) { console.error('No se pudo guardar', e); } };
-    if (now) go(); else saveT[g.code] = setTimeout(go, 500);
+    const go = () => { saveFirst[g.code] = 0; try { tx('readwrite', s => s.put({ code: g.code, data: LS.E.serialize(g) })); } catch (e) { console.error('No se pudo guardar', e); } };
+    const t0 = saveFirst[g.code] || (saveFirst[g.code] = Date.now()); // si llevas jugando seguido, guarda al menos cada 3 s (antes el aplazo se renovaba con cada acción)
+    if (now || Date.now() - t0 > 3000) go(); else saveT[g.code] = setTimeout(go, 500);
   }
   LS.flush = () => { for (const g of LS.games.values()) if (saveT[g.code]) save(g, true); };
   LS.remove = code => { LS.games.delete(code); clearTimeout(saveT[code]); if (db) try { tx('readwrite', s => s.delete(code)); } catch (e) { /* nada */ } };

@@ -27,7 +27,8 @@ const INV_CAP = 45;
 const isAux = u => !!(u.sm || u.cart || u.bld || u.sg || u.gr); // invocaciones y carretas no cuentan como unidades
 const nightOn = g => !!g && g.cfg && g.cfg.dn !== 'no' && g.cfg.mode !== 'laberinto' && S.isNight(g.turn);
 const torchOf = u => u && u.eq && u.eq.antorcha || null;
-function torchCover(g, t) { // ¿hay una antorcha aliada que ilumine a esta unidad?
+function torchCover(g, t) { // ¿hay una antorcha aliada (o una farola) que ilumine a esta unidad?
+  if (g.defs && !t.dg) for (const d of g.defs) if (d.k === 'farola' && cheb(d, t) <= 2 + d.lv) return true;
   for (const u of g.units) { const it = torchOf(u); if (!it || u.dg !== t.dg) continue; if (u.o !== t.o && (u.o === null || pactOf(g, t.o, u.o) !== 'alianza')) continue; if (cheb(u, t) <= S.torchR(it)) return true; }
   return false;
 }
@@ -1247,6 +1248,7 @@ function visFor(g, pid) {
   const mine = o => o === pid || (o !== null && pactOf(g, pid, o) === 'alianza');
   const night = nightOn(g);
   for (const u of g.units) if (mine(u.o)) { const tr = torchOf(u); if (night && !u.dg) { if (tr) { const R = 3 + S.torchR(tr); mark(u.x, u.y, R * R + 1, R); } else mark(u.x, u.y, 10, 3); } else mark(u.x, u.y, 20, 4); }
+  if (isCit(g) && g.defs) for (const d of g.defs) if (d.k === 'farola') mark(d.x, d.y, (3 + d.lv) * (3 + d.lv) + 1, 3 + d.lv); // las farolas dan luz a todos
   for (const c of g.cities) if (mine(c.owner)) { const L = (c.b && c.b.atalaya) || 0, rr = 5 + 2 * L; mark(c.x, c.y, L ? (rr + 0.5) * (rr + 0.5) : 30, rr); }
   if (isCit(g)) { const R = S.CIT.r; for (let y = Math.max(0, R.y0 - 4); y <= Math.min(h - 1, R.y1 + 4); y++) for (let x = Math.max(0, R.x0 - 4); x <= Math.min(w - 1, R.x1 + 4); x++) v[y * w + x] = 1; } // la ciudad y su entorno siempre se ven
   if (isCit(g)) { const A = S.CIT.arena; for (let y = Math.max(0, A.y - 5); y <= Math.min(h - 1, A.y + 5); y++) for (let x = Math.max(0, A.x - 5); x <= Math.min(w - 1, A.x + 5); x++) v[y * w + x] = 1; } // y la arena
@@ -1279,6 +1281,20 @@ function cityNear(g, u) {
     if (near) return g.cities.find(c => c.vela && c.owner === u.o && c.dg === u.dg) || g.cities.find(c => c.vela && c.owner === u.o) || null;
   }
   return null;
+}
+function doLetGo(g, p, u) { // v1.81: dejar ir a una unidad viva dentro de tu ciudad; recuperas alma, acero y todo su equipo
+  if (u.o !== p.id || u.gr || u.cart || u.sg || u.bld) return 'Esa unidad no se puede dejar ir';
+  if (u.hero) return 'Tu protagonista no se puede dejar ir';
+  if (g.cfg.mode === 'uno') return 'En el reto de una unidad no puedes dejar ir a tu única unidad';
+  const c = cityNear(g, u); if (!c || u.dg) return 'Debe estar dentro de tu ciudad (junto a ella, o dentro de la muralla en la Ciudadela)';
+  if (g.units.filter(x => x.o === p.id && !isAux(x)).length <= 1) return 'No puedes dejar ir a tu última unidad';
+  for (const s of g.units) if (s.sm && s.sm.by === u.id) g.units.splice(g.units.indexOf(s), 1);
+  const lv = u.lv || 1, L = S.LETGO, alma = Math.max(1, Math.floor(lv / L.alma)), acero = Math.max(1, Math.floor(lv * L.acero));
+  depositAll(g, u, c); for (const k in (u.eq || {})) if (u.eq[k]) c.st.it.push(u.eq[k]); u.eq = {};
+  c.st.m.alma = (c.st.m.alma || 0) + alma; c.st.m.acero = (c.st.m.acero || 0) + acero;
+  for (const k of Object.keys(g.pairs || {})) { const [a, b] = k.split('-').map(Number); if (a === u.id || b === u.id) delete g.pairs[k]; }
+  g.units.splice(g.units.indexOf(u), 1); touch(g);
+  return { msg: `${u.name} se despide con gratitud: +${alma} 👻 alma y +${acero} acero (y su equipo queda en el almacén)` };
 }
 function depositAll(g, u, c) {
   if (c.cartU) { // la carreta tiene capacidad limitada
@@ -1775,6 +1791,16 @@ function doSocket(g, c, itemId) { // perfora un engarce nuevo
   it.so = n + 1; it.gm = it.gm || []; c.crafts++;
   return it;
 }
+function doScrap(g, c, ids) { // v1.81: destruir objetos del almacén; devuelve materiales (no las gemas)
+  const got = {}; let n = 0;
+  for (const id of ids) {
+    const i = c.st.it.findIndex(x => x.id === id); if (i < 0) continue;
+    const it = c.st.it[i], rf = S.scrapRefund(it);
+    for (const k in rf) { c.st.m[k] = (c.st.m[k] || 0) + rf[k]; got[k] = (got[k] || 0) + rf[k]; }
+    c.st.it.splice(i, 1); n++;
+  }
+  return n ? { n, got } : 'Esos objetos no están en el almacén';
+}
 function doGem(g, c, itemId, key, x) { // engasta una gema del almacén; si no hay engarce libre, x elige cuál sustituir (la gema vieja se pierde)
   const it = c.st.it.find(y => y.id === itemId);
   if (!it) return 'Ese objeto no está en el almacén';
@@ -1810,7 +1836,7 @@ function doReforge(g, c, itemId, x) { // cambia el efecto número x por otro al 
   if (!pool.length) return 'No hay otros efectos disponibles';
   if (!canAfford(c.st.m, S.REFORGE_COST)) return 'Faltan materiales: ' + fmtMats(S.REFORGE_COST);
   spend(c.st.m, S.REFORGE_COST);
-  it.fx[x] = pick(g, pool); c.crafts++;
+  it.fx[x] = pick(g, pool); it.rf = (it.rf || 0) + 1; c.crafts++;
   return it;
 }
 
@@ -1918,7 +1944,7 @@ function killCreature(g, c, u) {
   if (c.wb) wbReward(g, c);
 }
 function killUnit(g, u, by) { // by: {unit} o {creature}
-  if (global.__bd) global.__bd(g, u, by); // diagnóstico (solo pruebas)
+  if (typeof global !== "undefined" && global.__bd) global.__bd(g, u, by); // diagnóstico (solo pruebas)
   g.units.splice(g.units.indexOf(u), 1); touch(g);
   if (!u.sm) { const mine = g.units.filter(x => x.sm && x.sm.by === u.id); if (mine.length) { g.units = g.units.filter(x => !(x.sm && x.sm.by === u.id)); ev(g, `🌫️ Las invocaciones de ${u.name} se desvanecen.`, [u.o], 'summon'); } }
   const p = g.players[u.o];
@@ -1988,6 +2014,7 @@ function doAttack(g, u, tt, tid) {
   if (charge) raw *= 1 + 0.12 * u.sk.embestida;
   if (u.hits === 0 && mo.first) raw *= 1 + mo.first;
   if (tt === 'c' && mo.vsCre) raw *= 1 + mo.vsCre;
+  if (tt === 'c' && u.gr && S.GAR.types[u.gt] && S.GAR.types[u.gt].air && S.CREATURES[tgt.t].cross === 'g') raw *= S.GAR.air; // v1.80: arqueros y magos son letales contra voladoras
   if (mo.execute && tgt.hp < (tt === 'c' ? cstats(tgt, g).mhp : te.maxHp) * 0.5) raw *= 1 + mo.execute;
   const wk = e.kind ? K[e.kind] : null;
   if (wk && wk.exe && tgt.hp < (tt === 'c' ? cstats(tgt, g).mhp : te.maxHp) * 0.5) raw *= 1 + wk.exe;
@@ -2250,8 +2277,8 @@ function cmd(g, pid, m) {
     }
     case 'dismiss': {
       const u = unitOf(); if (!u) return { err: 'Unidad no encontrada' };
-      if (!u.sm) return { err: 'Solo se pueden despedir invocaciones' };
-      g.units.splice(g.units.indexOf(u), 1); touch(g); msg = 'Invocación despedida'; break;
+      if (u.sm) { g.units.splice(g.units.indexOf(u), 1); touch(g); msg = 'Invocación despedida'; break; }
+      const r = doLetGo(g, p, u); if (typeof r === 'string') err = r; else msg = r.msg; break;
     }
     case 'builder': {
       const c = cityOf(); if (!c) return { err: 'Ciudad no encontrada' };
@@ -2355,7 +2382,7 @@ function cmd(g, pid, m) {
       err = doRecruit(g, p, c, m.k || null); if (!err) msg = isKing(g, pid) ? 'Nueva bestia reclutada (descansa este turno)' : 'Nueva unidad reclutada (descansa este turno)';
       break;
     }
-    case 'release': { // dejar ir: el caído se borra de la lista y ya no se puede resucitar
+    case 'letgrave': case 'release': { // dejar ir: el caído se borra de la lista y ya no se puede resucitar
       const gr = (g.graves || []).find(x => x.id === (m.g | 0) && x.o === p.id); if (!gr) { err = 'Esa unidad no está entre los caídos'; break; }
       g.graves.splice(g.graves.indexOf(gr), 1); msg = `${gr.name} descansa en paz`; break;
     }
@@ -2369,6 +2396,12 @@ function cmd(g, pid, m) {
       const c = cityOf(); if (!c) return { err: 'Ciudad no encontrada' };
       const r = doUpgrade(g, c, m.i | 0);
       if (typeof r === 'string') err = r; else msg = `Mejorado: ${S.itemName(r)}`;
+      break;
+    }
+    case 'scrap': {
+      const c = cityOf(); if (!c) return { err: 'Ciudad no encontrada' };
+      const ids = (Array.isArray(m.ids) ? m.ids : [m.i]).map(x => x | 0).slice(0, 200), r = doScrap(g, c, ids);
+      if (typeof r === 'string') err = r; else { touch(g); msg = `Destruidos ${r.n}: recuperas ${fmtMats(r.got)}`; }
       break;
     }
     case 'enchant': {
@@ -3293,7 +3326,7 @@ function breedTick(g) {
   const need = BREED_NEED[g.cfg.breed];
   g.pairs = g.pairs || {};
   if (!need) { g.pairs = {}; return; }
-  const near = u => g.cities.some(c => c.owner === u.o && cheb(u, c) <= 2);
+  const near = u => isCit(g) ? citInside(u.x, u.y) : g.cities.some(c => c.owner === u.o && cheb(u, c) <= 2); // v1.79: en la Ciudadela vale cualquier lugar dentro de la muralla (y para todos los jugadores)
   const ok = u => u.hp >= eff(g, u).maxHp * 0.5 && (u.bc || 0) <= g.turn && near(u);
   const seen = {}, used = new Set(), next = {};
   const list = g.units.filter(u => !isAux(u) && !u.bs && ok(u));
@@ -3305,7 +3338,7 @@ function breedTick(g) {
     const key = Math.min(a.id, b.id) + '-' + Math.max(a.id, b.id);
     let n = Math.min(need, (g.pairs[key] || 0) + 1);
     if (n >= need) {
-      if (g.units.filter(u => u.o === a.o && !isAux(u)).length >= BREED_MAX) { next[key] = n; continue; } // espera a que haya sitio
+      if (g.units.filter(u => u.o === a.o && !isAux(u)).length >= (isCit(g) ? maxUnitsOf(g) : BREED_MAX)) { next[key] = n; continue; } // espera a que haya sitio
       const ix = idx(g); let spot = null;
       for (const p of [a, b]) for (let r = 1; r <= 2 && !spot; r++) for (let dy = -r; dy <= r && !spot; dy++) for (let dx = -r; dx <= r && !spot; dx++) {
         const x = p.x + dx, y = p.y + dy;
@@ -3723,7 +3756,8 @@ function citMap(g) {
   g.map = { w, h, h0: h, t: t.join('') };
   g.cities = [{ id: g.nid++, x: C.plaza.x, y: C.plaza.y, owner: 0, name: 'La Ciudadela', cap: true, cit: true, st: { m: { cuero: 40, hueso: 30, hierro: 16, acero: 4 }, it: [] }, crafts: 0, b: {} }];
 }
-const citGap = g => { const v = +(g.cfg && g.cfg.waveGap); return v > 0 ? v : S.CIT.rest; }; // turnos entre oleadas (ajuste del lobby)
+const citHell = g => !!(g.cfg && g.cfg.citDiff === 'infierno'); // v1.78: dificultad Infierno (100 oleadas, cada 100 turnos)
+const citGap = g => { if (citHell(g)) return 100; const v = +(g.cfg && g.cfg.waveGap); return v > 0 ? v : S.CIT.rest; }; // turnos entre oleadas (ajuste del lobby)
 function citDungeons(g) { // 3 entradas fuera de las murallas; se renuevan en cada oleada y suben de nivel
   const C = S.CIT, r = C.r, P = C.plaza, spots = [{ x: r.x0 - 3, y: P.y - 5 }, { x: r.x0 - 3, y: P.y + 5 }, { x: r.x1 + 3, y: r.y1 - 1 }];
   addDungeonBand(g);
@@ -3752,7 +3786,7 @@ function citStart(g) {
   for (let i = 0; i < 64; i++) spawnNormal(g, true);
   for (let i = 0, tr = 0; i < 22 && tr < 500; tr++) if (spawnSite(g)) i++;
   g.cit = { hp: C.hp, max: C.hp }; g.npcs = []; g.arena = null; g.bar = null; g.merch = [];
-  g.cw = { n: 0, next: citGap(g), ids: [], cleared: 0, total: C.waves };
+  g.cw = { n: 0, next: citGap(g), ids: [], cleared: 0, total: citHell(g) ? 100 : C.waves };
   g.status = 'playing'; g.turn = 1; weatherTick(g);
   for (let i = 0; i < 7; i++) npcMake(g, i < 5 ? 'recluta' : i === 5 ? 'sanador' : 'maestro');
   barRefresh(g);
@@ -3761,7 +3795,7 @@ function citStart(g) {
   for (const p of g.players) p.ready = false;
   refreshUnits(g);
   { const bs = g.players.filter(b => b.bot); for (let i = bs.length - 1; i > 0; i--) { const j = Math.floor(rng(g) * (i + 1)); [bs[i], bs[j]] = [bs[j], bs[i]]; } for (const b of bs.slice(0, 2)) botTalk(g, b, 'start', {}, true); }
-  ev(g, `🏰 ¡La Ciudadela! Todos sois dueños de esta ciudad amurallada. Resistid ${C.waves} oleadas: la primera llega en el turno ${citGap(g)}. Entre oleadas, mejorad la ciudad, reclutad y salid a por recursos. Usad las escuadras (🏰) para dar órdenes a muchas unidades a la vez.`, null, 'story');
+  ev(g, `🏰 ¡La Ciudadela! Todos sois dueños de esta ciudad amurallada. ${citHell(g) ? '🔥 ¡MODO INFIERNO! ' : ''}Resistid ${g.cw.total} oleadas: la primera llega en el turno ${citGap(g)}. Entre oleadas, mejorad la ciudad, reclutad y salid a por recursos. Usad las escuadras (🏰) para dar órdenes a muchas unidades a la vez.`, null, 'story');
   touch(g);
   return null;
 }
@@ -3769,7 +3803,7 @@ function citPlan(g, n) { // qué trae la oleada n (según los jugadores vivos)
   const C = S.CIT, P = Math.max(1, g.players.filter(p => p.alive).length), k = 1 + C.perPlayer * (P - 1);
   const boss = n % C.boss === 0 ? C.bosses[Math.min(C.bosses.length - 1, n / C.boss - 1)] : null;
   const types = n < 5 ? ['goblin', 'lobo', 'esqueleto'] : n < 10 ? ['goblin', 'orco', 'zombi', 'arana', 'lobo'] : n < 15 ? ['orco', 'troll', 'esqueleto', 'zombi'] : ['troll', 'orco', 'golem', 'esqueleto'];
-  let theme = null, ratio = 1;
+  let theme = null, ratio = 1, pw0 = 0;
   if (n >= 2) { // v1.65: oleadas temáticas con el bestiario de la Ciudadela (lobos, enjambres, no-muertos) + una criatura clásica para mezclar
     theme = C.themeOrder[(n - 2) % C.themeOrder.length];
     const tier = n < 8 ? 0 : n < 14 ? 1 : 2;
@@ -3777,10 +3811,15 @@ function citPlan(g, n) { // qué trae la oleada n (según los jugadores vivos)
     const tl = C.themes[theme].t, pool = [...new Set(tl.slice(0, tier + 1).flat())]; if (tier < 2 && n >= 5) for (const t of tl[1].concat(tl[2])) if (!pool.includes(t)) pool.push(t); types.splice(0, types.length, ...pool, old[(n * 7) % old.length]); // acumulativo: cada fase suma criaturas; desde la oleada 5 asoman también las de fases siguientes (los jefes menores van de 1 en 1) // en la fase media ya asoma el jefe menor del tema (con 20 oleadas no todos los temas llegan a la fase final)
     const pw = t => { const cs = cstats({ t, lv: Math.min(lv, S.CREATURES[t].max) }); return cs.mhp * cs.dmg * (1 + cs.def / 40); }, avg = a => a.reduce((m, t) => m + pw(t), 0) / a.length;
     const nw = types.filter(t => !(S.CREATURES[t].cit && S.CREATURES[t].xp >= 28)); // sin contar a los jefes menores (van de 1 en 1)
-    ratio = nw.length ? avg(nw) / avg(old) : 1; // si las criaturas del tema pegan más que las clásicas, la oleada trae menos para que la dificultad sea parecida
+    ratio = nw.length ? avg(nw) / avg(old) : 1; pw0 = nw.length ? avg(nw) : 0; // si las criaturas del tema pegan más que las clásicas, la oleada trae menos para que la dificultad sea parecida
   }
-  const f = ratio > 0.75 ? 0.75 / ratio : 1; // calibrado con simulaciones: las oleadas temáticas, con sus habilidades, no deben ser más duras que las clásicas
-  return { n, cnt: Math.max(3, Math.min(C.maxEnemies, Math.round((C.base + C.grow * n) * k * f))), lv: 1 + Math.round(n * 1.15), types, boss, theme };
+  // v1.77: la cantidad se calcula para que la FUERZA TOTAL de la oleada siga una curva suave (antes daba picos: la 10 y la 14 triplicaban a la anterior)
+  const AN = [[1, 1.5], [4, 7], [7, 30], [10, 75], [13, 130], [16, 200], [20, 300]]; // en miles de «fuerza» (vida×daño×defensa) por oleada con 1 jugador; calibrado con la media de las simulaciones anteriores
+  let T = AN[AN.length - 1][1];
+  if (n > 20) T = AN[AN.length - 1][1] * Math.pow(1.035, n - 20); // más allá de la 20 (solo Infierno) sigue creciendo un 3.5% por oleada
+  else if (n <= 1) T = AN[0][1]; else for (let i = 1; i < AN.length; i++) if (n <= AN[i][0]) { const t = (n - AN[i - 1][0]) / (AN[i][0] - AN[i - 1][0]); T = Math.exp(Math.log(AN[i - 1][1]) + (Math.log(AN[i][1]) - Math.log(AN[i - 1][1])) * t); break; }
+  const f = ratio > 0.75 ? 0.75 / ratio : 1, byPow = pw0 > 0 ? Math.round(T * 1000 * k * (citHell(g) ? 1.5 : 1) / pw0) : 0;
+  return { n, cnt: Math.max(3, Math.min(C.maxEnemies, byPow || Math.round((C.base + C.grow * n) * k * f))), lv: 1 + Math.round(n * 1.15) + (citHell(g) ? 2 + Math.round(n * 0.2) : 0), types, boss, theme };
 }
 function citLeft(g) { const w = g.cw, ids = new Set(w.ids), left = g.creatures.filter(c => ids.has(c.id)); w.ids = left.map(c => c.id); return left.length; }
 function citSpawn(g) {
@@ -3810,7 +3849,7 @@ function citSpawn(g) {
     if (place(ty, pl.lv)) made++;
   }
   let boss = '';
-  if (pl.boss && place(pl.boss, pl.lv + 3)) { made++; boss = ` ¡Y viene un jefe: ${S.CREATURES[pl.boss].n}!`; }
+  if (pl.boss && place(pl.boss, pl.lv + 3)) { made++; boss = ` ¡Y viene un jefe: ${S.CREATURES[pl.boss].n}!`; for (let b = 1, nb = citHell(g) ? Math.floor(w.n / 25) : 0; b <= nb; b++) if (place(S.CREATURES[C.bosses[(w.n / C.boss + b) % C.bosses.length | 0]] ? C.bosses[(w.n / C.boss + b) % C.bosses.length | 0] : pl.boss, pl.lv + 3)) made++; } // Infierno: +1 jefe extra cada 25 oleadas
   w.cleared = 0; w.cnt = made; w.next = 0; w.weak = 0; touch(g);
   for (const d of g.dungeons) if (!g.units.some(u => u.dg === d.id)) { d.tier = Math.min(5, (d.base || 1) + Math.floor(w.n / 6)); fillDungeon(g, d); } // las mazmorras se renuevan
   const th = pl.theme ? S.CIT.themes[pl.theme] : null;
@@ -3928,12 +3967,31 @@ function wallTick(g) { // reparación entre oleadas: tramos dañados se curan so
   }
   if (fixed) ev(g, `🧱 Se reconstruyen ${fixed} tramo(s) de muralla (${fmtMats(S.WALL.repair)} cada uno).`, null, 'city');
 }
+/* ---------- criaturas errantes (v1.80): merodean por el mundo entre oleadas; siguen el tema de la próxima oleada ---------- */
+function citRoam(g) {
+  if (!g.cw || (g.cfg && g.cfg.citRoam === 'no') || g.status !== 'playing') return;
+  const R = S.CIT.roam, w = g.cw, C = S.CIT;
+  for (const c of g.creatures.slice()) if (c.rm && g.turn >= c.rm) removeCreature(g, c); // se alejan con el tiempo
+  const mine = g.creatures.filter(c => c.rm).length, cap = Math.min(R.max, R.cap + Math.floor(w.n / R.per)) + (citHell(g) ? 3 : 0);
+  if (mine >= cap || rng(g) > R.chance || (w.ids.length && g.creatures.some(c => w.ids.includes(c.id)))) return; // (sin tocar w.ids) mientras hay una oleada en marcha no salen más
+  const pl = citPlan(g, Math.max(1, Math.min(w.total, w.n + 1))), pool = pl.types.filter(t => !(S.CREATURES[t].cit && S.CREATURES[t].xp >= 28) && !S.CREATURES[t].boss);
+  if (!pool.length) return;
+  const W = g.map.w, H = C.h, ix = idx(g);
+  for (let tries = 0; tries < 40; tries++) {
+    const x = C.plaza.x + ri(g, -34, 34), y = C.plaza.y + ri(g, -28, 28);
+    if (x < 2 || y < 2 || x > W - 3 || y > H - 3 || !'gfhd'.includes(terrAt(g, x, y)) || citInside(x, y) || cheb({ x, y }, C.plaza) < R.minDist) continue;
+    const k = y * W + x; if (ix.U.has(k) || ix.C.has(k) || ix.T.has(k) || g.creatures.some(c => c.x === x && c.y === y)) continue;
+    const lv = Math.max(1, pl.lv - 2 + ri(g, 0, 2)), c = spawnCreature(g, pick(g, pool), x, y, lv); c.rm = g.turn + R.life + ri(g, 0, 40); return;
+  }
+}
 function citTick(g) {
   const C = S.CIT, w = g.cw, city = citCity(g); if (!w || !city || g.status !== 'playing') return;
   try { citWorldTick(g); } catch (e) { console.error('cit world error', e); }
   try { citDefTick(g); } catch (e) { console.error('cit def error', e); }
   try { citEvent(g); } catch (e) { console.error('cit event error', e); }
+  try { citRoam(g); } catch (e) { console.error('cit roam error', e); }
   try { wallTick(g); } catch (e) { console.error('wall error', e); }
+  { const mx = C.hp + (C.hpPerWall || 50) * ((city.b && city.b.muralla) || 0); if (mx !== g.cit.max) { if (mx > g.cit.max) g.cit.hp += mx - g.cit.max; g.cit.max = mx; g.cit.hp = Math.min(g.cit.hp, mx); touch(g); } } // v1.77: la integridad de la plaza crece con la muralla
   // las criaturas que llegan a la plaza dañan la integridad de la ciudad
   let dmg = 0;
   for (const c of g.creatures) if (c.tg === city.id && cheb(c, city) <= 2) { const cs = cstats(c, g); dmg += Math.max(1, Math.ceil(cs.dmg / 10)) * (S.CREATURES[c.t].boss ? 3 : 1); }
@@ -3965,13 +4023,15 @@ function defStat(g, d) {
     case 'torre': return { range: lv >= 3 ? 6 : 5, shots: lv >= 3 ? 2 : 1, dmg: 14 + 10 * lv + 2 * n };
     case 'escarcha': return { range: 3, hits: 1 + lv, dmg: 4 + 3 * lv + Math.floor(n / 2), slow: lv >= 3 ? 2 : 1 };
     case 'trampa': return { dmg: 40 + 25 * lv + 4 * n, ch: 3, slow: 1 };
+    case 'farola': return { light: 2 + lv };
     default: return { hp: 70 + 50 * lv }; // barricada
   }
 }
-function defZoneOk(g, x, y) { // fuera de la muralla, a como mucho 7 casillas; nunca sobre puertas, arena ni terreno impracticable
+function defZoneOk(g, x, y, k) { // fuera de la muralla, a como mucho 7 casillas; nunca sobre puertas, arena ni terreno impracticable
   const R = S.CIT.r; if (!inB(g, x, y) || y >= mapH0(g)) return 'Casilla fuera del mapa';
   if (x < R.x0 - 7 || x > R.x1 + 7 || y < R.y0 - 7 || y > R.y1 + 7) return 'Demasiado lejos de la muralla (máx. 7 casillas)';
-  if (x >= R.x0 - 1 && x <= R.x1 + 1 && y >= R.y0 - 1 && y <= R.y1 + 1) return 'Las defensas se construyen fuera de la muralla';
+  if (k !== 'farola' && x >= R.x0 - 1 && x <= R.x1 + 1 && y >= R.y0 - 1 && y <= R.y1 + 1) return 'Las defensas se construyen fuera de la muralla';
+  if (k === 'farola' && g.map.t.charAt(y * g.map.w + x) === 'W') return 'No sobre la muralla';
   if (S.CIT.gates.some(gt => gt.x === x && gt.y === y)) return 'No puedes bloquear la puerta';
   const A = S.CIT.arena; if (cheb({ x, y }, A) <= 3) return 'Demasiado cerca de la arena';
   if (!'gfhd'.includes(terrAt(g, x, y))) return 'Ahí no se puede construir';
@@ -3983,10 +4043,11 @@ function doDef(g, p, m) {
   const op = m.op;
   if (op === 'build') {
     const T = S.DEFS[m.k]; if (!T) return 'Defensa desconocida';
-    const x = m.x | 0, y = m.y | 0, bad = defZoneOk(g, x, y); if (bad) return bad;
+    const x = m.x | 0, y = m.y | 0, bad = defZoneOk(g, x, y, m.k); if (bad) return bad;
     const ix = idx(g), k = y * g.map.w + x;
     if (ix.U.has(k) || ix.C.has(k) || ix.T.has(k) || g.defs.some(d => d.x === x && d.y === y) || (g.npcs || []).some(n => n.x === x && n.y === y)) return 'Casilla ocupada';
-    if (g.defs.length >= defCap(g)) return `Máximo ${defCap(g)} defensas (mejorar la muralla sube el límite)`;
+    if (T.free) { if (g.defs.filter(q => q.k === m.k).length >= 12) return 'Máximo 12 farolas'; }
+    else if (g.defs.filter(q => !S.DEFS[q.k].free).length >= defCap(g)) return `Máximo ${defCap(g)} defensas (mejorar la muralla sube el límite)`;
     if (!canAfford(city.st.m, T.cost)) return 'Faltan materiales en el almacén: ' + fmtMats(T.cost);
     spend(city.st.m, T.cost);
     const d = { id: (g.defid = (g.defid || 0) + 1), k: m.k, x, y, lv: 1 }; const st = defStat(g, d); d.max = st.hp || 0; d.hp = d.max; d.ch = st.ch || 0;
@@ -4384,10 +4445,15 @@ function citBotHunt(g, p, mine) {
 }
 function citBotDefs(g, p) {
   const city = citCity(g); if (!city || g.turn % 2) return;
-  const m = city.st.m, ds = g.defs || [], cap = defCap(g);
+  const m = city.st.m, ds = g.defs || [], cap = defCap(g), nd = ds.filter(q => !S.DEFS[q.k].free).length;
   const x2 = c => { const o = {}; for (const k in c) o[k] = c[k] * 2; return o; }; // solo con excedente: debe sobrar el doble
-  const tryBuild = (k, x, y) => { if (ds.length >= cap || !canAfford(m, x2(S.DEFS[k].cost))) return false; if (defZoneOk(g, x, y)) return false; return typeof doDef(g, p, { op: 'build', k, x, y }) !== 'string'; };
+  const tryBuild = (k, x, y) => { if ((S.DEFS[k].free ? ds.filter(q => q.k === k).length >= 12 : nd >= cap) || !canAfford(m, x2(S.DEFS[k].cost))) return false; if (defZoneOk(g, x, y, k)) return false; return typeof doDef(g, p, { op: 'build', k, x, y }) !== 'string'; };
   const dir = { E: [1, 0], S: [0, 1], N: [0, -1], W: [-1, 0] };
+  // 0) farolas (v1.76): cuando ya hay algo de defensa, una junto a cada puerta por dentro y otra por fuera; no gastan el cupo de defensas
+  if (nd >= 3) for (const gt of S.CIT.gates) {
+    const [dx, dy] = dir[gt.k] || [1, 0], px = -dy, py = dx;
+    for (const [x, y] of [[gt.x - dx * 2 + px, gt.y - dy * 2 + py], [gt.x + dx * 3 + px, gt.y + dy * 3 + py]]) { if (ds.some(d => d.x === x && d.y === y)) continue; if (tryBuild('farola', x, y)) return; }
+  }
   // 1) mejorar lo que ya hay (torres primero)
   for (const d of ds.slice().sort((a, b) => (a.k === 'torre' ? 0 : 1) - (b.k === 'torre' ? 0 : 1) || a.lv - b.lv)) {
     if (d.lv >= 3 || d.k === 'barricada') continue; const up = S.DEFS[d.k].up[d.lv - 1];
@@ -4400,6 +4466,19 @@ function citBotDefs(g, p) {
     for (const [k, x, y] of plan) { if (ds.some(d => d.x === x && d.y === y)) continue; if (tryBuild(k, x, y)) return; }
   }
 }
+function citBotGar(g, p) { // v1.76: un bot por turno recluta guarniciones (mezclando tipos) y mueve solo las suyas al punto de defensa
+  const city = citCity(g); if (!city) return;
+  const mineG = garList(g).filter(u => u.bg === p.id), foes = g.creatures.filter(c => c.tg).sort((a, b) => cheb(a, S.CIT.plaza) - cheb(b, S.CIT.plaza));
+  const all = garList(g), want = Math.min(garCap(g), 2 + 2 * g.players.filter(q => q.alive !== false).length);
+  if (all.length < want && g.turn % 2 === 0) {
+    const cnt = t => all.filter(u => u.gt === t).length, types = Object.keys(S.GAR.types).sort((a, b) => cnt(a) - cnt(b));
+    for (const t of types) { const cost = garCost(g, t), dbl = {}; for (const k in cost) dbl[k] = cost[k] * 2; if (!canAfford(city.st.m, dbl)) continue;
+      const before = new Set(all.map(u => u.id)); if (doGarrison(g, p, t) === null) { const nu = garList(g).find(u => !before.has(u.id)); if (nu) nu.bg = p.id; break; } }
+  }
+  let pt = { x: S.CIT.plaza.x, y: S.CIT.plaza.y + 4 };
+  if (foes.length) { const gt = S.CIT.gates.slice().sort((a, b) => cheb(a, foes[0]) - cheb(b, foes[0]))[0]; pt = gateIn(gt); }
+  mineG.forEach((u, i) => { if (!g.units.includes(u) || u.mp <= 0) return; const ox = (i % 3) - 1, oy = (Math.floor(i / 3) % 3) - 1; headTo(g, u, pt.x + ox, pt.y + oy); });
+}
 function citBot(g, p) { // los bots de la Ciudadela defienden la puerta más cercana a los enemigos
   const plaza = S.CIT.plaza, foes = g.creatures.filter(c => c.tg).sort((a, b) => cheb(a, plaza) - cheb(b, plaza));
   let pt = { x: plaza.x, y: plaza.y };
@@ -4409,7 +4488,7 @@ function citBot(g, p) { // los bots de la Ciudadela defienden la puerta más cer
   const free = !foes.length && g.cw && g.cw.next - g.turn > 12; // tiempo de sobra hasta la próxima oleada
   if (free && mine.length) citBotHunt(g, p, mine);
   else for (const u of mine) if (g.units.includes(u)) squadUnit(g, p, u, sq);
-  if (!foes.length && g.players.find(q => q.bot && q.alive !== false) === p) citBotDefs(g, p); // un solo bot por turno construye
+  if (g.players.find(q => q.bot && q.alive !== false) === p) { if (!foes.length) citBotDefs(g, p); citBotGar(g, p); } // un solo bot por turno construye y gestiona las guarniciones
   const city = citCity(g); // los bots también reclutan (sin vaciar el almacén)
   if (city && g.units.filter(x => x.o === p.id && !isAux(x)).length < 10) { const cost = recruitCost(g, p.id, city); if (canAfford(city.st.m, cost) && (city.st.m.cuero || 0) >= 3 * (cost.cuero || 0)) doRecruit(g, p, city); }
 }
@@ -4520,7 +4599,7 @@ function autoUnit(g, p, u) {
 }
 /* v1.69.1: los bots reconocen el beneficio de criar (nivel promedio de los padres + bonus de nacimiento que se acumula por generación) y buscan activamente a una pareja */
 function botBreed(g, p, outside, done) {
-  const need = BREED_NEED[g.cfg.breed]; if (!need || isCit(g) || g.cfg.mode === 'uno' || global.__nobreed) { p.brd = null; return; }
+  const need = BREED_NEED[g.cfg.breed]; if (!need || isCit(g) || g.cfg.mode === 'uno' || (typeof global !== "undefined" && global.__nobreed)) { p.brd = null; return; }
   const mine = g.units.filter(u => u.o === p.id && !isAux(u) && !u.bs);
   const cities = g.cities.filter(c => c.owner === p.id);
   if (!cities.length || mine.length >= BREED_MAX - 1) { p.brd = null; return; }
@@ -4877,7 +4956,7 @@ function snapshot(g, pid, now) {
   const roads = []; if (g.rd) for (const k in g.rd) if (ex[k]) roads.push([+k, g.rd[k]]);
   base.hist = histInfo(g, pid);
   base.chron = (g.chron || []).slice(-150);
-  return Object.assign(base, { roads, pn: (me && me.pn) || {}, graves: (g.graves || []).filter(x => x.o === pid).map(x => ({ id: x.id, name: x.name, lv: x.lv, cls: x.cls, cost: reviveCost(x) })), chat: chatFor(g, pid), recap: me ? recapFor(g, me) : null, w, h, h0: mapH0(g), terr, vis: vs, mine, others, cre, cities, sites, dip, props, trades, brk, merch, dungeons, wx: wxs, tourn, season: { i: S.seasonIdx(g.turn), left: S.SEASON_LEN - ((g.turn - 1) % S.SEASON_LEN) }, log, craftsMax: CRAFTS_PER_TURN, invCap: INV_CAP, maxUnits: MAX_UNITS });
+  return Object.assign(base, { roads, pn: (me && me.pn) || {}, graves: (g.graves || []).filter(x => x.o === pid).map(x => ({ id: x.id, name: x.name, lv: x.lv, cls: x.cls, cost: reviveCost(x) })), chat: chatFor(g, pid), recap: me ? recapFor(g, me) : null, w, h, h0: mapH0(g), terr, vis: vs, mine, others, cre, cities, sites, dip, props, trades, brk, merch, dungeons, wx: wxs, tourn, season: { i: S.seasonIdx(g.turn), left: S.SEASON_LEN - ((g.turn - 1) % S.SEASON_LEN) }, log, craftsMax: CRAFTS_PER_TURN, invCap: INV_CAP, maxUnits: maxUnitsOf(g) });
 }
 
 /* ---------- persistencia ---------- */
